@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Magiafoot",
+    "slug": "magiafoot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "magiafoot",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#f4f6f0"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
