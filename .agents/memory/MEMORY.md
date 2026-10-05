@@ -1,0 +1,1 @@
+- [MagiaFoot manager direction](magiafoot-manager.md) — fictional clubs only; touch-first, quick football management with the slogan “Sua história. Seu clube. Sua magia.”

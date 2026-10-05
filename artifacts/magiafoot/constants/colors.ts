@@ -21,6 +21,7 @@ const colors = {
     // Core surfaces
     background: '#f4f6f0',
     foreground: '#14221a',
+    inverse: '#ffffff',
 
     // Cards / elevated surfaces
     card: '#ffffff',
@@ -55,6 +56,7 @@ const colors = {
     tint: '#a9d840',
     background: '#0e1712',
     foreground: '#eef5ed',
+    inverse: '#ffffff',
     card: '#16231b',
     cardForeground: '#eef5ed',
     primary: '#80c75a',

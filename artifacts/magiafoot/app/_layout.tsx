@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AppStateProvider } from '@/context/AppState';
+import { CareerProvider } from '@/context/CareerContext';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -22,9 +22,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Voltar' }} />
   );
 }
 
@@ -50,9 +48,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <AppStateProvider>
+              <CareerProvider>
                 <RootLayoutNav />
-              </AppStateProvider>
+              </CareerProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
