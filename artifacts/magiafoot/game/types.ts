@@ -39,6 +39,15 @@ export interface PlayerSeasonStats {
   ratedMatches: number;
 }
 
+export interface PlayerCareerEvent {
+  id: string;
+  roundIndex: number;
+  season: number;
+  type: 'match' | 'contract' | 'social' | 'discipline' | 'transfer' | 'promise';
+  title: string;
+  detail: string;
+}
+
 export interface AdministrativeProfessional {
   id: string;
   name: string;
@@ -131,6 +140,10 @@ export interface Player {
   leadership?: number;
   promisedMinutesUntilRound?: number | null;
   seasonStats?: PlayerSeasonStats;
+  careerEvents?: PlayerCareerEvent[];
+  conflictLevel?: number;
+  socialStatus?: 'estavel' | 'atencao' | 'conturbada';
+  lastSocialEventRound?: number;
 }
 
 export interface Club {
