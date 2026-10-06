@@ -1741,12 +1741,16 @@ export function acceptPlayerTransferOffer(career: Career, offerId: string): Care
   if (offer.type === 'sale') {
     if (career.players.length <= 18) return career;
     const players = career.players.filter((item) => item.id !== player.id);
+    const available = players.filter((item) => item.status === 'available');
+    const lineup = buildBestLineup(available, career.formationId);
+    const benchIds = buildBench(available, lineup);
     return addCareerNews({
       ...career,
       balance: career.balance + offer.amount,
       players,
-      lineup: career.lineup.filter((slot) => slot.playerId !== player.id),
-      benchIds: career.benchIds.filter((id) => id !== player.id),
+      lineup,
+      benchIds,
+      captainId: lineup.some((slot) => slot.playerId === career.captainId) ? career.captainId : (lineup[0]?.playerId ?? ''),
       playerTransferOffers: remainingOffers,
       lastNews: player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.',
     }, 'Transferência concluída', player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.', 'market');
@@ -1767,12 +1771,16 @@ export function acceptPlayerTransferOffer(career: Career, offerId: string): Care
     detail: 'Emprestado ao ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.',
   }) : item);
 
+  const availableAfterLoan = loanedPlayers.filter((item) => item.status === 'available');
+  const lineupAfterLoan = buildBestLineup(availableAfterLoan, career.formationId);
+  const benchAfterLoan = buildBench(availableAfterLoan, lineupAfterLoan);
   return addCareerNews({
     ...career,
     balance: career.balance + offer.amount,
     players: loanedPlayers,
-    lineup: career.lineup.filter((slot) => slot.playerId !== player.id),
-    benchIds: career.benchIds.filter((id) => id !== player.id),
+    lineup: lineupAfterLoan,
+    benchIds: benchAfterLoan,
+    captainId: lineupAfterLoan.some((slot) => slot.playerId === career.captainId) ? career.captainId : (lineupAfterLoan[0]?.playerId ?? ''),
     playerTransferOffers: remainingOffers,
     lastNews: player.name + ' foi emprestado ao ' + offer.clubName + '.',
   }, 'Jogador emprestado', player.name + ' saiu por empréstimo para o ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.', 'market');
