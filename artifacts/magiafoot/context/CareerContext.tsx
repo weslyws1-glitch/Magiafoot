@@ -13,6 +13,7 @@ import {
   setCaptain,
   sellPlayer,
   setTicketPrice,
+  setHeadquartersRevenuePricing,
   startMatch,
   substitutePlayer,
   updateTactics,
@@ -20,7 +21,7 @@ import {
   upgradeStadiumFacility,
   upgradeHeadquartersFacility,
 } from '@/game/engine';
-import type { Career, FormationId, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { Career, FormationId, HeadquartersRevenueKey, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -43,6 +44,7 @@ interface CareerContextValue {
   upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
   updateTicketPrice: (price: number) => void;
   upgradeHeadquartersItem: (key: HeadquartersUpgradeKey) => boolean;
+  updateHeadquartersRevenuePricing: (key: HeadquartersRevenueKey, level: number) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -148,6 +150,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
 
+  const updateHeadquartersRevenuePricing = useCallback((key: HeadquartersRevenueKey, level: number) => {
+    update((current) => setHeadquartersRevenuePricing(current, key, level));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -167,9 +173,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     upgradeStadiumItem,
     updateTicketPrice,
     upgradeHeadquartersItem,
+    updateHeadquartersRevenuePricing,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
