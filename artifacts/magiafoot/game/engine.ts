@@ -92,6 +92,13 @@ export function createCareer(coachName: string, clubId: string): Career {
     liveMatch: null,
     lastResult: null,
     lastNews: 'A diretoria deseja uma temporada competitiva. O primeiro passo é entrar em campo.',
+    newsFeed: [{
+      id: 'news-start',
+      roundIndex: 0,
+      category: 'club',
+      title: 'Nova temporada começa',
+      body: 'A diretoria deseja uma temporada competitiva e acompanha de perto os primeiros passos do novo trabalho.',
+    }],
     createdAt: new Date().toISOString(),
   };
 }
@@ -480,12 +487,25 @@ const SPONSOR_POOL = [
   { name: 'Aurora Energia', category: 'Energia', prestige: 74, fanImpact: 2, boardImpact: 3 },
   { name: 'Vitta Saúde', category: 'Saúde', prestige: 70, fanImpact: 4, boardImpact: 2 },
   { name: 'Nexa Telecom', category: 'Tecnologia', prestige: 78, fanImpact: 2, boardImpact: 4 },
-  { name: 'MobiPay', category: 'Financeiro', prestige: 66, fanImpact: -1, boardImpact: 4 },
+  { name: 'MobiPay', category: 'Financeiro', prestige: 66, fanImpact: -2, boardImpact: 4 },
   { name: 'Brava Alimentos', category: 'Alimentos', prestige: 62, fanImpact: 3, boardImpact: 2 },
   { name: 'Titan Sports', category: 'Esportes', prestige: 82, fanImpact: 5, boardImpact: 3 },
   { name: 'Orbe Logística', category: 'Logística', prestige: 61, fanImpact: 0, boardImpact: 3 },
   { name: 'Pulse Mobile', category: 'Tecnologia', prestige: 72, fanImpact: 3, boardImpact: 3 },
+  { name: 'Atlas Bank', category: 'Financeiro', prestige: 84, fanImpact: -1, boardImpact: 5 },
+  { name: 'VerdeMax', category: 'Varejo', prestige: 68, fanImpact: 3, boardImpact: 2 },
 ];
+
+function addCareerNews(career: Career, title: string, body: string, category: 'club' | 'match' | 'sponsor' | 'market' = 'sponsor'): Career {
+  const item = {
+    id: `news-${career.roundIndex}-${hash(title + body + String((career.newsFeed ?? []).length))}`,
+    roundIndex: career.roundIndex,
+    category,
+    title,
+    body,
+  };
+  return { ...career, newsFeed: [item, ...(career.newsFeed ?? [])].slice(0, 50) };
+}
 
 function recentFormScore(career: Career): number {
   const recent = [...career.results]
@@ -518,26 +538,34 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
   const currentRound = career.roundIndex;
   if (!force && career.sponsorships?.lastMarketRound === currentRound) return career;
 
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
   const score = sponsorshipMarketScore(career);
-  const count = score >= 82 ? 4 : score >= 65 ? 3 : score >= 45 ? 2 : 1;
-  const occupied = new Set((career.sponsorships?.contracts ?? []).map((item) => item.slot));
-  const availableSlots = (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
-  const proposalCount = Math.min(count, Math.max(1, availableSlots.length));
+  const count = score >= 88 ? 5 : score >= 75 ? 4 : score >= 58 ? 3 : score >= 38 ? 2 : 1;
+  const occupied = new Set(state.contracts.map((item) => item.slot));
+  const slots = (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
   const seed = hash(`sponsor-${career.clubId}-${career.season}-${currentRound}`);
   const pool = [...SPONSOR_POOL].sort((a, b) => ((hash(a.name) ^ seed) >>> 0) - ((hash(b.name) ^ seed) >>> 0));
   const commercial = career.headquartersInvestments?.commercial ?? 3;
   const proposals: SponsorshipProposal[] = [];
 
-  for (let i = 0; i < proposalCount; i += 1) {
+  for (let i = 0; i < count && slots.length > 0; i += 1) {
     const brand = pool[i % pool.length]!;
-    const slot = availableSlots[i] ?? sponsorshipSlotForIndex(i);
-    const slotFactor = slot === 'principal' ? 1.75 : slot === 'sleeve' ? 0.72 : slot === 'back' ? 0.95 : 0.58;
-    const strength = 0.62 + score / 100 + commercial * 0.08;
-    const base = Math.round((85_000 + brand.prestige * 4_700) * slotFactor * strength);
-    const durationMatches = score >= 75 ? 10 + ((seed + i) % 5) : 6 + ((seed + i) % 5);
-    const signingBonus = Math.round(base * (0.75 + ((seed >> (i + 1)) % 25) / 100));
-    const perMatch = Math.round(base * 0.18);
-    const winBonus = Math.round(base * 0.07);
+    // Em mercado muito aquecido, marcas podem disputar o mesmo espaço principal.
+    const slot = score >= 82 && i === 1 && slots.includes('principal')
+      ? 'principal'
+      : (slots[i % slots.length] ?? sponsorshipSlotForIndex(i));
+    const slotFactor = slot === 'principal' ? 1.85 : slot === 'sleeve' ? 0.72 : slot === 'back' ? 0.98 : 0.60;
+    const strength = 0.58 + score / 100 + commercial * 0.085;
+    const base = Math.round((80_000 + brand.prestige * 4_900) * slotFactor * strength);
+    const durationMatches = score >= 75 ? 10 + ((seed + i) % 7) : 6 + ((seed + i) % 6);
+    const signingBonus = Math.round(base * (0.72 + ((seed >> (i + 1)) % 28) / 100));
+    const perMatch = Math.round(base * 0.17);
+    const winBonus = Math.round(base * 0.065);
+    const qualificationBonus = Math.round(base * 0.42);
+    const titleBonus = Math.round(base * 0.95);
+    const attendanceTarget = 9000 + ((seed + i * 977) % 13000);
+    const attendanceBonus = Math.round(base * 0.05);
+    const expectedValue = signingBonus + perMatch * durationMatches + winBonus * Math.round(durationMatches * 0.45);
     proposals.push({
       id: `sp-${currentRound}-${i}-${brand.name.replace(/\s+/g, '-').toLowerCase()}`,
       sponsorName: brand.name,
@@ -546,39 +574,103 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
       signingBonus,
       perMatch,
       winBonus,
+      qualificationBonus,
+      titleBonus,
+      attendanceBonus,
+      attendanceTarget,
       durationMatches,
-      expiresRound: currentRound + 2,
+      expiresRound: currentRound + (score >= 70 ? 2 : 1),
       fanImpact: brand.fanImpact,
       boardImpact: brand.boardImpact,
       prestige: brand.prestige,
-      note: score >= 75 ? 'A marca quer aproveitar a boa fase e crescer junto com o clube.' : score <= 40 ? 'A empresa vê potencial, mas oferece valores conservadores pelo momento do time.' : 'Proposta compatível com o momento esportivo e comercial do clube.',
+      exitFanTrustBelow: brand.prestige >= 80 ? 24 : 18,
+      exclusivityCategory: brand.prestige >= 72,
+      expectedValue,
+      negotiationRound: 0,
+      note: score >= 78
+        ? 'A marca quer aproveitar a boa fase e aceita pagar acima do padrão do mercado.'
+        : score <= 38
+          ? 'A empresa vê potencial, mas protege seu risco com valores mais conservadores.'
+          : 'Oferta calculada pelo momento esportivo, força da torcida e exposição comercial.',
     });
   }
 
-  return {
+  let next: Career = {
     ...career,
     sponsorships: {
       proposals,
-      contracts: career.sponsorships?.contracts ?? [],
+      contracts: state.contracts,
       lastMarketRound: currentRound,
-      history: career.sponsorships?.history ?? [],
+      history: state.history,
     },
   };
+
+  if (proposals.length >= 4) {
+    next = addCareerNews(next, 'Marcas disputam espaço no clube', `${proposals.length} empresas abriram conversas após a valorização do clube. A concorrência pode elevar os contratos.`, 'market');
+  } else if (proposals.length === 1 && score < 40) {
+    next = addCareerNews(next, 'Mercado esfria para o clube', 'A fase esportiva reduziu o interesse comercial e apenas uma empresa apresentou oferta nesta rodada.', 'market');
+  }
+  return next;
+}
+
+export function negotiateSponsorshipProposal(career: Career, proposalId: string): Career {
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+  const proposal = state.proposals.find((item) => item.id === proposalId);
+  if (!proposal || proposal.negotiationRound >= 2) return career;
+
+  const score = sponsorshipMarketScore(career);
+  const commercial = career.headquartersInvestments?.commercial ?? 3;
+  const chance = clamp(35 + commercial * 9 + score * 0.28 - proposal.prestige * 0.22 - proposal.negotiationRound * 18, 18, 88);
+  const roll = (hash(`${proposal.id}-nego-${proposal.negotiationRound}-${career.roundIndex}`) % 100) + 1;
+
+  if (roll <= chance) {
+    const improved = {
+      ...proposal,
+      signingBonus: Math.round(proposal.signingBonus * 1.10),
+      perMatch: Math.round(proposal.perMatch * 1.10),
+      winBonus: Math.round(proposal.winBonus * 1.08),
+      expectedValue: Math.round(proposal.expectedValue * 1.095),
+      negotiationRound: proposal.negotiationRound + 1,
+      note: 'A empresa aceitou melhorar a oferta após a contraproposta do clube.',
+    };
+    let next: Career = {
+      ...career,
+      sponsorships: {
+        ...state,
+        proposals: state.proposals.map((item) => item.id === proposalId ? improved : item),
+        history: [`${proposal.sponsorName} aceitou uma contraproposta.`, ...state.history].slice(0, 20),
+      },
+    };
+    return addCareerNews(next, 'Patrocinador melhora proposta', `${proposal.sponsorName} aceitou a negociação e aumentou os valores oferecidos ao clube.`);
+  }
+
+  const next: Career = {
+    ...career,
+    boardTrust: clamp(career.boardTrust - 1, 0, 100),
+    sponsorships: {
+      ...state,
+      proposals: state.proposals.filter((item) => item.id !== proposalId),
+      history: [`${proposal.sponsorName} encerrou as conversas após a contraproposta.`, ...state.history].slice(0, 20),
+    },
+  };
+  return addCareerNews(next, 'Negociação fracassa', `${proposal.sponsorName} não aceitou a contraproposta e deixou a mesa de negociação.`);
 }
 
 export function acceptSponsorshipProposal(career: Career, proposalId: string): Career {
   const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
   const proposal = state.proposals.find((item) => item.id === proposalId);
   if (!proposal || state.contracts.some((item) => item.slot === proposal.slot)) return career;
+  if (proposal.exclusivityCategory && state.contracts.some((item) => item.category === proposal.category)) return career;
 
   const contract: SponsorshipContract = {
     ...proposal,
     acceptedRound: career.roundIndex,
     matchesRemaining: proposal.durationMatches,
     totalEarned: proposal.signingBonus,
+    renewalOffered: false,
   };
 
-  return {
+  let next: Career = {
     ...career,
     balance: career.balance + proposal.signingBonus,
     boardTrust: clamp(career.boardTrust + proposal.boardImpact, 0, 100),
@@ -591,20 +683,72 @@ export function acceptSponsorshipProposal(career: Career, proposalId: string): C
     },
     lastNews: `${proposal.sponsorName} é o novo patrocinador do clube. Acordo de ${proposal.durationMatches} jogos.`,
   };
+  return addCareerNews(next, 'Novo patrocinador anunciado', `${proposal.sponsorName} fechou contrato para ${SLOT_LABELS_ENGINE[proposal.slot]} por ${proposal.durationMatches} jogos. Luvas de ${formatCurrency(proposal.signingBonus)}.`);
 }
+
+const SLOT_LABELS_ENGINE: Record<SponsorshipSlot, string> = {
+  principal: 'patrocínio principal',
+  sleeve: 'manga',
+  back: 'costas',
+  institutional: 'parceria institucional',
+};
 
 export function declineSponsorshipProposal(career: Career, proposalId: string): Career {
   const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
   const proposal = state.proposals.find((item) => item.id === proposalId);
   if (!proposal) return career;
-  return {
+
+  // A diretoria se irrita apenas quando o clube recusa uma oferta claramente muito boa.
+  const marketScore = sponsorshipMarketScore(career);
+  const strongOffer = proposal.expectedValue > 900_000 && proposal.prestige >= 75;
+  const boardDelta = strongOffer ? -3 : 0;
+  const next: Career = {
     ...career,
+    boardTrust: clamp(career.boardTrust + boardDelta, 0, 100),
     sponsorships: {
       ...state,
       proposals: state.proposals.filter((item) => item.id !== proposalId),
       history: [`Proposta de ${proposal.sponsorName} recusada.`, ...state.history].slice(0, 20),
     },
   };
+  return strongOffer
+    ? addCareerNews(next, 'Diretoria questiona recusa', `A diretoria considerava a oferta de ${proposal.sponsorName} acima do mercado atual (${marketScore}/100) e não gostou da decisão.`)
+    : next;
+}
+
+export function renewSponsorshipContract(career: Career, contractId: string): Career {
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+  const contract = state.contracts.find((item) => item.id === contractId);
+  if (!contract || contract.matchesRemaining > 2) return career;
+
+  const score = sponsorshipMarketScore(career);
+  const raise = score >= 75 ? 1.22 : score >= 55 ? 1.10 : 0.94;
+  const extension = score >= 70 ? 12 : 8;
+  const renewalBonus = Math.round(contract.signingBonus * 0.45 * raise);
+  const updated = {
+    ...contract,
+    perMatch: Math.round(contract.perMatch * raise),
+    winBonus: Math.round(contract.winBonus * Math.max(1, raise)),
+    signingBonus: renewalBonus,
+    durationMatches: extension,
+    matchesRemaining: extension,
+    totalEarned: contract.totalEarned + renewalBonus,
+    acceptedRound: career.roundIndex,
+    renewalOffered: false,
+  };
+
+  let next: Career = {
+    ...career,
+    balance: career.balance + renewalBonus,
+    boardTrust: clamp(career.boardTrust + (raise >= 1.1 ? 2 : 0), 0, 100),
+    fanTrust: clamp(career.fanTrust + (contract.fanImpact > 0 ? 1 : 0), 0, 100),
+    sponsorships: {
+      ...state,
+      contracts: state.contracts.map((item) => item.id === contractId ? updated : item),
+      history: [`${contract.sponsorName} renovou por mais ${extension} jogos.`, ...state.history].slice(0, 20),
+    },
+  };
+  return addCareerNews(next, 'Patrocinador renova contrato', `${contract.sponsorName} renovou por ${extension} jogos com valor por partida de ${formatCurrency(updated.perMatch)}.`);
 }
 
 function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
@@ -614,24 +758,42 @@ function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
   let sponsorIncome = 0;
   const active: SponsorshipContract[] = [];
   const history = [...state.history];
+  let next = career;
+  const attendance = career.lastResult?.attendance ?? 0;
+  const standings = calculateStandings(career.results);
+  const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
 
   for (const contract of state.contracts) {
-    const payment = contract.perMatch + (won ? contract.winBonus : 0);
+    // Cláusula de imagem: marcas podem romper se a relação com a torcida entrar em crise.
+    if (career.fanTrust < contract.exitFanTrustBelow) {
+      history.unshift(`${contract.sponsorName} rompeu o contrato por crise de imagem.`);
+      next = addCareerNews(next, 'Patrocinador rompe contrato', `${contract.sponsorName} acionou cláusula de imagem após a satisfação da torcida cair para ${career.fanTrust}/100.`);
+      continue;
+    }
+
+    let payment = contract.perMatch + (won ? contract.winBonus : 0);
+    if (attendance >= contract.attendanceTarget) payment += contract.attendanceBonus;
     sponsorIncome += payment;
     const remaining = Math.max(0, contract.matchesRemaining - 1);
+
     if (remaining > 0) {
-      active.push({ ...contract, matchesRemaining: remaining, totalEarned: contract.totalEarned + payment });
+      active.push({ ...contract, matchesRemaining: remaining, totalEarned: contract.totalEarned + payment, renewalOffered: remaining <= 2 });
     } else {
+      let finalBonus = 0;
+      if (position === 1) finalBonus += contract.titleBonus;
+      else if (position > 0 && position <= 4) finalBonus += contract.qualificationBonus;
+      sponsorIncome += finalBonus;
       history.unshift(`Contrato com ${contract.sponsorName} chegou ao fim após ${contract.durationMatches} jogos.`);
+      next = addCareerNews(next, 'Contrato de patrocínio encerrado', `${contract.sponsorName} concluiu seu vínculo. Total acumulado: ${formatCurrency(contract.totalEarned + payment + finalBonus)}.`);
     }
   }
 
-  const updated: Career = {
-    ...career,
-    balance: career.balance + sponsorIncome,
+  next = {
+    ...next,
+    balance: next.balance + sponsorIncome,
     sponsorships: { proposals: [], contracts: active, lastMarketRound: -1, history: history.slice(0, 20) },
   };
-  return refreshSponsorshipMarket(updated, true);
+  return refreshSponsorshipMarket(next, true);
 }
 
 export function ticketDemandMultiplier(ticketPrice: number, referencePrice: number): number {
@@ -788,6 +950,7 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquartersImageAcquisition: Career['headquartersImageAcquisition'] = { museum: 1, press: 1, history: 1 };
     const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
     const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+    const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
@@ -803,6 +966,7 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
       fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
       sponsorships: { ...fallbackSponsorships, ...((parsed as Career).sponsorships ?? {}) },
+      newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
     return null;
