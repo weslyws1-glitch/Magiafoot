@@ -109,6 +109,10 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
     leadership: player.leadership ?? (25 + (seed % 70)),
     promisedMinutesUntilRound: player.promisedMinutesUntilRound ?? null,
     seasonStats: player.seasonStats ?? { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedMatches: 0 },
+    careerEvents: player.careerEvents ?? [],
+    conflictLevel: player.conflictLevel ?? 0,
+    socialStatus: player.socialStatus ?? 'estavel',
+    lastSocialEventRound: player.lastSocialEventRound ?? -99,
   };
 }
 
@@ -1189,6 +1193,78 @@ export function setTicketPrice(career: Career, price: number): Career {
   return { ...career, ticketPrice: nextPrice };
 }
 
+function appendPlayerEvent(player: Player, event: NonNullable<Player['careerEvents']>[number]): Player {
+  return { ...player, careerEvents: [event, ...(player.careerEvents ?? [])].slice(0, 40) };
+}
+
+function processSquadSocialDynamics(career: Career): Career {
+  let legalDelta = 0;
+  const news: string[] = [];
+  const players = career.players.map((player) => {
+    let next = { ...player };
+    const role = player.squadRole ?? 'rotacao';
+    const unhappy = (player.playingTimeSatisfaction ?? 70) < 35 || player.morale < 35;
+    const personalityRisk =
+      player.personality === 'festeiro' ? 20 :
+      player.personality === 'temperamental' ? 15 :
+      player.personality === 'ambicioso' ? 7 : 0;
+    const conflictPressure = unhappy ? 20 : 0;
+    const risk = clamp((player.socialRisk ?? 20) + personalityRisk + conflictPressure + (player.conflictLevel ?? 0) * 8, 0, 100);
+    const roll = hash(player.id + '-social-' + career.season + '-' + career.roundIndex) % 100;
+    const enoughGap = career.roundIndex - (player.lastSocialEventRound ?? -99) >= 4;
+
+    if (enoughGap && roll < Math.max(0, risk - 58)) {
+      const severe = risk >= 78 || player.personality === 'temperamental';
+      next = {
+        ...next,
+        morale: clamp(next.morale - (severe ? 8 : 4), 0, 100),
+        relationship: clamp((next.relationship ?? 60) - (severe ? 7 : 3), 0, 100),
+        conflictLevel: clamp((next.conflictLevel ?? 0) + (severe ? 2 : 1), 0, 5),
+        socialStatus: severe ? 'conturbada' : 'atencao',
+        lastSocialEventRound: career.roundIndex,
+      };
+      next = appendPlayerEvent(next, {
+        id: 'social-' + player.id + '-' + career.season + '-' + career.roundIndex,
+        roundIndex: career.roundIndex,
+        season: career.season,
+        type: 'social',
+        title: severe ? 'Problema fora de campo' : 'Atenção fora de campo',
+        detail: severe
+          ? 'Um episódio fora de campo gerou desgaste interno e mais trabalho para o clube.'
+          : 'A vida pessoal do atleta começou a exigir atenção do clube.',
+      });
+      if (severe) legalDelta += 1;
+      news.push(player.name + (severe ? ' vive momento conturbado fora de campo.' : ' exige atenção fora de campo.'));
+    } else {
+      const calmRecovery = !unhappy && (player.relationship ?? 60) >= 55;
+      if (calmRecovery) {
+        next.conflictLevel = Math.max(0, (next.conflictLevel ?? 0) - 1);
+        if ((next.conflictLevel ?? 0) === 0) next.socialStatus = 'estavel';
+      }
+    }
+
+    if (unhappy && (role === 'estrela' || role === 'titular')) {
+      next.conflictLevel = clamp((next.conflictLevel ?? 0) + 1, 0, 5);
+      next = appendPlayerEvent(next, {
+        id: 'conflict-' + player.id + '-' + career.season + '-' + career.roundIndex,
+        roundIndex: career.roundIndex,
+        season: career.season,
+        type: 'discipline',
+        title: 'Cobrança por espaço',
+        detail: 'O jogador demonstrou insatisfação com a utilização no time e aumentou a pressão no vestiário.',
+      });
+    }
+
+    return next;
+  });
+
+  let nextCareer = { ...career, players, legalWorkloadEvents: Math.max(0, (career.legalWorkloadEvents ?? 0) + legalDelta) };
+  if (news.length) {
+    nextCareer = addCareerNews(nextCareer, 'Vestiário exige atenção', news.slice(0, 2).join(' '), 'club');
+  }
+  return nextCareer;
+}
+
 export function finalizeMatch(career: Career): Career {
   const game = career.liveMatch;
   if (!game || game.phase !== 'finished') return career;
@@ -1286,9 +1362,22 @@ export function finalizeMatch(career: Career): Career {
   const resultText = isDraw ? 'Um ponto para cada lado.' : userWon ? 'Vitória! A torcida comemora.' : 'A diretoria espera uma reação na próxima rodada.';
   const redCardsThisMatch = game.events.filter((event) => event.type === 'red' && event.clubId === career.clubId).length;
   const lowMoraleCases = updatedPlayers.filter((player) => player.morale < 30).length;
+  const playersWithHistory = updatedPlayers.map((player) => {
+    const stats = player.seasonStats;
+    const appeared = (stats?.appearances ?? 0) > ((career.players.find((p) => p.id === player.id)?.seasonStats?.appearances) ?? 0);
+    if (!appeared) return player;
+    return appendPlayerEvent(player, {
+      id: 'match-' + player.id + '-' + career.season + '-' + career.roundIndex,
+      roundIndex: career.roundIndex,
+      season: career.season,
+      type: 'match',
+      title: 'Partida disputada',
+      detail: 'Atuou na rodada ' + (career.roundIndex + 1) + ' da temporada.',
+    });
+  });
   const afterMatch: Career = {
     ...career,
-    players: updatedPlayers,
+    players: playersWithHistory,
     results: [...career.results.filter((item) => item.roundIndex !== game.fixture.roundIndex), ...newResults],
     roundIndex: career.roundIndex + 1,
     balance: Math.max(0, career.balance + revenue),
@@ -1299,7 +1388,7 @@ export function finalizeMatch(career: Career): Career {
     lastResult: leagueResult,
     lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
   };
-  return settleSponsorshipsAfterMatch(afterMatch, userWon);
+  return processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
 }
 
 export function calculateStandings(results: LeagueResult[]): StandingRow[] {
@@ -1545,6 +1634,14 @@ export function renewPlayerContract(career: Career, playerId: string, seasons = 
       contractEndRound: Math.max(currentEnd, career.roundIndex) + extension,
       relationship: clamp((item.relationship ?? 60) + 6, 0, 100),
       morale: clamp(item.morale + 5, 0, 100),
+      careerEvents: [{
+        id: 'contract-' + item.id + '-' + career.season + '-' + career.roundIndex,
+        roundIndex: career.roundIndex,
+        season: career.season,
+        type: 'contract' as const,
+        title: 'Contrato renovado',
+        detail: 'Renovação por mais ' + seasons + ' temporada(s).',
+      }, ...(item.careerEvents ?? [])].slice(0, 40),
     } : item),
     lastNews: player.name + ' renovou contrato com o clube.',
   }, 'Contrato renovado', player.name + ' renovou por mais ' + seasons + ' temporada(s).', 'club');
@@ -1559,6 +1656,14 @@ export function promisePlayerMinutes(career: Career, playerId: string): Career {
       ...item,
       promisedMinutesUntilRound: career.roundIndex + 5,
       relationship: clamp((item.relationship ?? 60) + 3, 0, 100),
+      careerEvents: [{
+        id: 'promise-' + item.id + '-' + career.season + '-' + career.roundIndex,
+        roundIndex: career.roundIndex,
+        season: career.season,
+        type: 'promise' as const,
+        title: 'Promessa de minutos',
+        detail: 'O treinador prometeu mais oportunidades nas próximas rodadas.',
+      }, ...(item.careerEvents ?? [])].slice(0, 40),
     } : item),
     lastNews: 'Você prometeu mais minutos a ' + player.name + '.',
   };
