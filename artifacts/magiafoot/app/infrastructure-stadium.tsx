@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { GameHeader, Panel, Screen, SectionLabel, formatCurrency } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { stadiumUpgradeCost } from '@/game/engine';
+import { stadiumUpgradeCost, ticketDemandMultiplier } from '@/game/engine';
 import type { StadiumUpgradeKey } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -31,7 +31,7 @@ const ITEMS: Array<{
 
 export default function StadiumDetailScreen() {
   const colors = useColors();
-  const { career, upgradeStadiumItem } = useCareer();
+  const { career, upgradeStadiumItem, updateTicketPrice } = useCareer();
 
   if (!career) {
     return <><GameHeader title="Estádio" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar o estádio.</Text></Screen></>;
@@ -43,10 +43,17 @@ export default function StadiumDetailScreen() {
   const upgrades = career.stadiumUpgrades;
   const standsLevel = upgrades.stands ?? 1;
   const capacity = club.stadiumCapacity + Math.max(0, standsLevel - 1) * 4000;
-  const occupancyFactor = Math.min(0.82, 0.50 + (upgrades.seats ?? 1) * 0.025 + (upgrades.roof ?? 0) * 0.02 + (upgrades.parking ?? 0) * 0.012);
+  const baseOccupancy = Math.min(0.82, 0.50 + (upgrades.seats ?? 1) * 0.025 + (upgrades.roof ?? 0) * 0.02 + (upgrades.parking ?? 0) * 0.012);
+  const currentTicketPrice = career.ticketPrice ?? club.ticketPrice;
+  const demandMultiplier = ticketDemandMultiplier(currentTicketPrice, club.ticketPrice);
+  const occupancyFactor = Math.min(0.95, baseOccupancy * demandMultiplier);
   const projectedAttendance = Math.round(capacity * occupancyFactor);
   const premiumBonus = 1 + (upgrades.boxes ?? 0) * 0.045 + (upgrades.scoreboard ?? 0) * 0.012;
-  const projectedIncome = Math.round(projectedAttendance * club.ticketPrice * premiumBonus);
+  const projectedIncome = Math.round(projectedAttendance * currentTicketPrice * premiumBonus);
+  const minTicket = Math.max(5, Math.round(club.ticketPrice * 0.45));
+  const maxTicket = Math.max(minTicket + 1, Math.round(club.ticketPrice * 2.2));
+  const demandLabel = demandMultiplier >= 1.12 ? 'MUITO ALTA' : demandMultiplier >= 1.04 ? 'ALTA' : demandMultiplier >= 0.9 ? 'NORMAL' : demandMultiplier >= 0.7 ? 'BAIXA' : 'MUITO BAIXA';
+  const demandPercent = Math.round(occupancyFactor * 100);
   const maintenance = Math.round(
     55000
     + Object.values(upgrades).reduce((sum, level) => sum + level * 8500, 0)
@@ -84,6 +91,67 @@ export default function StadiumDetailScreen() {
           <Panel style={styles.metric}><Text style={styles.metricLabel}>RENDA / JOGO</Text><Text style={styles.metricValueSmall}>{formatCurrency(projectedIncome)}</Text></Panel>
           <Panel style={styles.metric}><Text style={styles.metricLabel}>MANUTENÇÃO</Text><Text style={styles.metricValueSmall}>{formatCurrency(maintenance)}/mês</Text></Panel>
         </View>
+
+        <SectionLabel title="Ingressos e demanda" />
+        <Panel style={styles.ticketPanel}>
+          <View style={styles.ticketTop}>
+            <View>
+              <Text style={styles.ticketLabel}>VALOR DO INGRESSO</Text>
+              <Text style={styles.ticketPrice}>{formatCurrency(currentTicketPrice)}</Text>
+            </View>
+            <View style={styles.demandBadge}>
+              <Text style={styles.demandBadgeLabel}>DEMANDA</Text>
+              <Text style={styles.demandBadgeValue}>{demandLabel}</Text>
+            </View>
+          </View>
+
+          <View style={styles.ticketControls}>
+            <Pressable
+              onPress={() => updateTicketPrice(Math.max(minTicket, currentTicketPrice - 5))}
+              disabled={currentTicketPrice <= minTicket}
+              style={[styles.ticketButton, currentTicketPrice <= minTicket && styles.ticketButtonDisabled]}
+            >
+              <Feather name="minus" size={18} color={currentTicketPrice <= minTicket ? '#65756b' : '#f5f7f5'} />
+              <Text style={[styles.ticketButtonText, currentTicketPrice <= minTicket && styles.ticketButtonTextDisabled]}>R$ 5</Text>
+            </Pressable>
+
+            <View style={styles.ticketRange}>
+              <Text style={styles.ticketRangeText}>Mín. {formatCurrency(minTicket)}</Text>
+              <View style={styles.ticketRangeTrack}>
+                <View style={[styles.ticketRangeFill, { width: (((currentTicketPrice - minTicket) / Math.max(1, maxTicket - minTicket)) * 100 + '%') as any }]} />
+              </View>
+              <Text style={styles.ticketRangeText}>Máx. {formatCurrency(maxTicket)}</Text>
+            </View>
+
+            <Pressable
+              onPress={() => updateTicketPrice(Math.min(maxTicket, currentTicketPrice + 5))}
+              disabled={currentTicketPrice >= maxTicket}
+              style={[styles.ticketButton, currentTicketPrice >= maxTicket && styles.ticketButtonDisabled]}
+            >
+              <Feather name="plus" size={18} color={currentTicketPrice >= maxTicket ? '#65756b' : '#07150d'} />
+              <Text style={[styles.ticketButtonTextPlus, currentTicketPrice >= maxTicket && styles.ticketButtonTextDisabled]}>R$ 5</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.demandInfo}>
+            <View style={styles.demandMetric}>
+              <Text style={styles.demandMetricLabel}>OCUPAÇÃO ESTIMADA</Text>
+              <Text style={styles.demandMetricValue}>{demandPercent}%</Text>
+            </View>
+            <View style={styles.demandMetric}>
+              <Text style={styles.demandMetricLabel}>PÚBLICO ESTIMADO</Text>
+              <Text style={styles.demandMetricValue}>{projectedAttendance.toLocaleString('pt-BR')}</Text>
+            </View>
+            <View style={styles.demandMetric}>
+              <Text style={styles.demandMetricLabel}>RENDA ESTIMADA</Text>
+              <Text style={styles.demandMetricValue}>{formatCurrency(projectedIncome)}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.ticketHint}>
+            Preço menor tende a aumentar a procura. Preço alto pode aumentar a receita por torcedor, mas reduz a ocupação do estádio.
+          </Text>
+        </Panel>
 
         <SectionLabel title="Evolução do estádio" />
         <Text style={styles.sectionHint}>As melhorias alteram o estádio visualmente e afetam capacidade, público e receita.</Text>
@@ -135,7 +203,7 @@ export default function StadiumDetailScreen() {
           <View style={styles.financeRow}><Text style={styles.financeLabel}>Caixa atual</Text><Text style={styles.financeValue}>{formatCurrency(career.balance)}</Text></View>
           <View style={styles.financeRow}><Text style={styles.financeLabel}>Renda potencial por jogo</Text><Text style={styles.financePositive}>{formatCurrency(projectedIncome)}</Text></View>
           <View style={styles.financeRow}><Text style={styles.financeLabel}>Manutenção mensal</Text><Text style={styles.financeNegative}>-{formatCurrency(maintenance)}</Text></View>
-          <View style={[styles.financeRow, styles.financeRowLast]}><Text style={styles.financeLabel}>Ingresso médio</Text><Text style={styles.financeValue}>{formatCurrency(club.ticketPrice)}</Text></View>
+          <View style={[styles.financeRow, styles.financeRowLast]}><Text style={styles.financeLabel}>Ingresso atual</Text><Text style={styles.financeValue}>{formatCurrency(currentTicketPrice)}</Text></View>
         </Panel>
       </Screen>
     </>
@@ -265,6 +333,28 @@ const styles = StyleSheet.create({
   upgradeButtonTextDisabled: { color: '#75867b' },
   maxed: { minHeight: 36, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#153426', borderWidth: 1, borderColor: '#356a4a' },
   maxedText: { color: '#79ef91', fontSize: 9, fontWeight: '900' },
+  ticketPanel: { gap: 13, backgroundColor: '#10291d', borderColor: '#2c503d' },
+  ticketTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  ticketLabel: { color: '#90a898', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8 },
+  ticketPrice: { color: '#f5f7f5', fontSize: 24, fontWeight: '900', marginTop: 3 },
+  demandBadge: { minWidth: 92, minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#153426', borderWidth: 1, borderColor: '#356a4a', paddingHorizontal: 8 },
+  demandBadgeLabel: { color: '#90a898', fontSize: 7, fontWeight: '900' },
+  demandBadgeValue: { color: '#79ef91', fontSize: 10, fontWeight: '900', marginTop: 3 },
+  ticketControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ticketButton: { width: 66, minHeight: 44, borderRadius: 10, backgroundColor: '#173326', borderWidth: 1, borderColor: '#356a4a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  ticketButtonDisabled: { backgroundColor: '#12231b', borderColor: '#26382f' },
+  ticketButtonText: { color: '#f5f7f5', fontSize: 8, fontWeight: '900' },
+  ticketButtonTextPlus: { color: '#07150d', fontSize: 8, fontWeight: '900' },
+  ticketButtonTextDisabled: { color: '#65756b' },
+  ticketRange: { flex: 1, minWidth: 0, gap: 5 },
+  ticketRangeTrack: { height: 7, borderRadius: 99, backgroundColor: '#081a11', overflow: 'hidden', borderWidth: 1, borderColor: '#2c503d' },
+  ticketRangeFill: { height: '100%', backgroundColor: '#79ef91' },
+  ticketRangeText: { color: '#8fa696', fontSize: 7, fontWeight: '800', textAlign: 'center' },
+  demandInfo: { flexDirection: 'row', gap: 6 },
+  demandMetric: { flex: 1, minWidth: 0, minHeight: 62, borderRadius: 9, backgroundColor: '#0b2117', borderWidth: 1, borderColor: '#2c503d', padding: 8, justifyContent: 'center' },
+  demandMetricLabel: { color: '#8fa696', fontSize: 6.5, fontWeight: '900' },
+  demandMetricValue: { color: '#f5f7f5', fontSize: 10, fontWeight: '900', marginTop: 4 },
+  ticketHint: { color: '#9fb2a5', fontSize: 8.5, lineHeight: 13 },
   financePanel: { paddingVertical: 2, backgroundColor: '#10291d', borderColor: '#2c503d' },
   financeRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#274535' },
   financeRowLast: { borderBottomWidth: 0 },
