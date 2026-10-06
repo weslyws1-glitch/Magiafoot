@@ -1109,6 +1109,38 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
     const fallbackAdministrationStaff: Career['administrationStaff'] = { board: [], finance: [], legal: [] };
     const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+    const rawSponsorships = (parsed as Career).sponsorships ?? fallbackSponsorships;
+    const migratedProposals = Array.isArray(rawSponsorships.proposals)
+      ? rawSponsorships.proposals.map((proposal) => ({
+          ...proposal,
+          qualificationBonus: typeof proposal.qualificationBonus === 'number' ? proposal.qualificationBonus : Math.round((proposal.perMatch ?? 0) * 2.5),
+          titleBonus: typeof proposal.titleBonus === 'number' ? proposal.titleBonus : Math.round((proposal.perMatch ?? 0) * 5.5),
+          attendanceBonus: typeof proposal.attendanceBonus === 'number' ? proposal.attendanceBonus : Math.round((proposal.perMatch ?? 0) * 0.35),
+          attendanceTarget: typeof proposal.attendanceTarget === 'number' ? proposal.attendanceTarget : 12000,
+          exitFanTrustBelow: typeof proposal.exitFanTrustBelow === 'number' ? proposal.exitFanTrustBelow : 20,
+          exclusivityCategory: typeof proposal.exclusivityCategory === 'boolean' ? proposal.exclusivityCategory : false,
+          expectedValue: typeof proposal.expectedValue === 'number'
+            ? proposal.expectedValue
+            : (proposal.signingBonus ?? 0) + (proposal.perMatch ?? 0) * (proposal.durationMatches ?? 8),
+          negotiationRound: typeof proposal.negotiationRound === 'number' ? proposal.negotiationRound : 0,
+        }))
+      : [];
+    const migratedContracts = Array.isArray(rawSponsorships.contracts)
+      ? rawSponsorships.contracts.map((contract) => ({
+          ...contract,
+          qualificationBonus: typeof contract.qualificationBonus === 'number' ? contract.qualificationBonus : Math.round((contract.perMatch ?? 0) * 2.5),
+          titleBonus: typeof contract.titleBonus === 'number' ? contract.titleBonus : Math.round((contract.perMatch ?? 0) * 5.5),
+          attendanceBonus: typeof contract.attendanceBonus === 'number' ? contract.attendanceBonus : Math.round((contract.perMatch ?? 0) * 0.35),
+          attendanceTarget: typeof contract.attendanceTarget === 'number' ? contract.attendanceTarget : 12000,
+          exitFanTrustBelow: typeof contract.exitFanTrustBelow === 'number' ? contract.exitFanTrustBelow : 20,
+          exclusivityCategory: typeof contract.exclusivityCategory === 'boolean' ? contract.exclusivityCategory : false,
+          expectedValue: typeof contract.expectedValue === 'number'
+            ? contract.expectedValue
+            : (contract.signingBonus ?? 0) + (contract.perMatch ?? 0) * (contract.durationMatches ?? 8),
+          negotiationRound: typeof contract.negotiationRound === 'number' ? contract.negotiationRound : 0,
+          renewalOffered: typeof contract.renewalOffered === 'boolean' ? contract.renewalOffered : false,
+        }))
+      : [];
     const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
@@ -1125,7 +1157,13 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
       administrationStaff: { ...fallbackAdministrationStaff, ...((parsed as Career).administrationStaff ?? {}) },
       fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
-      sponsorships: { ...fallbackSponsorships, ...((parsed as Career).sponsorships ?? {}) },
+      sponsorships: {
+        ...fallbackSponsorships,
+        ...rawSponsorships,
+        proposals: migratedProposals,
+        contracts: migratedContracts,
+        history: Array.isArray(rawSponsorships.history) ? rawSponsorships.history : [],
+      },
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
