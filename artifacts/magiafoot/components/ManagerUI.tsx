@@ -18,7 +18,7 @@ export function GameHeader({ title, eyebrow, back = true, right }: {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 7) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 16 : 7) }]}>
       <View style={styles.headerLine}>
         {back ? (
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Voltar" style={[styles.iconButton, { backgroundColor: colors.secondary }]}>
