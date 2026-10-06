@@ -28,7 +28,7 @@ import {
   upgradeStadiumFacility,
   upgradeHeadquartersFacility,
 } from '@/game/engine';
-import type { Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -57,7 +57,7 @@ interface CareerContextValue {
   refreshSponsors: (force?: boolean) => void;
   acceptSponsor: (proposalId: string) => boolean;
   declineSponsor: (proposalId: string) => void;
-  negotiateSponsor: (proposalId: string) => void;
+  negotiateSponsor: (proposalId: string, requestedSlot?: SponsorshipSlot, requestedMultiplier?: number) => void;
   renewSponsor: (contractId: string) => void;
 }
 
@@ -192,8 +192,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => declineSponsorshipProposal(current, proposalId));
   }, [update]);
 
-  const negotiateSponsor = useCallback((proposalId: string) => {
-    update((current) => negotiateSponsorshipProposal(current, proposalId));
+  const negotiateSponsor = useCallback((proposalId: string, requestedSlot?: SponsorshipSlot, requestedMultiplier = 1.10) => {
+    update((current) => negotiateSponsorshipProposal(current, proposalId, requestedSlot, requestedMultiplier));
   }, [update]);
 
   const renewSponsor = useCallback((contractId: string) => {
