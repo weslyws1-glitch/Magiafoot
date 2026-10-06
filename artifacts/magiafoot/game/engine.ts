@@ -199,7 +199,7 @@ function currentGamePlayers(career: Career, game: MatchSession) {
     .filter((item): item is { slot: FormationSlot; player: Player } => Boolean(item.player && item.player.status === 'available'));
 }
 
-function recoverBetweenRounds(players: Player[], currentRound: number): Player[] {
+function recoverBetweenRounds(players: Player[], currentRound: number, physioLevel = 1, gymLevel = 1): Player[] {
   return players.map((player) => {
     const expiredInjury = player.status === 'injured'
       && player.injuryUntilRound !== null
@@ -207,9 +207,10 @@ function recoverBetweenRounds(players: Player[], currentRound: number): Player[]
     const expiredSuspension = player.status === 'suspended'
       && player.suspendedUntilRound !== null
       && currentRound > player.suspendedUntilRound;
+    const recovery = 18 + physioLevel * 2 + Math.floor(gymLevel / 2);
     return {
       ...player,
-      fitness: clamp(player.fitness + 22, 15, 100),
+      fitness: clamp(player.fitness + recovery, 15, 100),
       ...(expiredInjury ? { status: 'available' as const, injuryUntilRound: null } : {}),
       ...(expiredSuspension ? { status: 'available' as const, suspendedUntilRound: null } : {}),
     };
@@ -223,7 +224,7 @@ export function startMatch(career: Career): Career {
   const club = getClub(career.clubId);
   if (!club) return career;
 
-  const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex);
+  const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex, career.trainingCenterUpgrades?.physio ?? 1, career.trainingCenterUpgrades?.gym ?? 1);
   const eligibleIds = new Set(recoveredPlayers.filter((player) => player.status === 'available').map((player) => player.id));
   let lineup = career.lineup.map((slot) => ({ ...slot }));
   if (lineup.some((slot) => !eligibleIds.has(slot.playerId))) {
@@ -249,7 +250,12 @@ export function startMatch(career: Career): Career {
     events: [],
     randomSeed: (hash(`${career.clubId}-${career.roundIndex}-${career.season}`) + 19) >>> 0,
   };
-  return { ...career, players: recoveredPlayers, lineup, benchIds, liveMatch: game };
+  const fieldCapacity = trainingFieldCapacity(career.trainingCenterUpgrades?.field ?? 1);
+  const overcrowding = Math.max(0, recoveredPlayers.length - fieldCapacity);
+  const adjustedPlayers = overcrowding > 0
+    ? recoveredPlayers.map((player) => ({ ...player, fitness: clamp(player.fitness - overcrowding * 2, 10, 100) }))
+    : recoveredPlayers;
+  return { ...career, players: adjustedPlayers, lineup, benchIds, liveMatch: game };
 }
 
 function statLine(game: MatchSession, clubId: string): MatchStats {
@@ -288,8 +294,12 @@ function maybeInjurePlayer(career: Career, game: MatchSession, clubId: string): 
   const stat = statLine(game, clubId);
   const isUser = clubId === career.clubId;
   const candidate = isUser ? activeClubPlayer(career, game) : undefined;
+  const medicalLevel = career.trainingCenterUpgrades?.medical ?? 1;
+  const gymLevel = career.trainingCenterUpgrades?.gym ?? 1;
+  const medicalProtection = Math.max(0.35, 1 - (medicalLevel - 1) * 0.055);
+  const gymProtection = Math.max(0.72, 1 - (gymLevel - 1) * 0.02);
   const risk = isUser
-    ? (candidate && candidate.fitness < 45 ? 0.00125 : 0.00032)
+    ? (candidate && candidate.fitness < 45 ? 0.00125 : 0.00032) * medicalProtection * gymProtection
     : 0.00018;
   if (gameRandom(game) >= risk) return career;
   stat.injuries += 1;
@@ -1255,6 +1265,7 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquartersImageAcquisition: Career['headquartersImageAcquisition'] = { museum: 1, press: 1, history: 1 };
     const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
     const fallbackAdministrationStaff: Career['administrationStaff'] = { board: [], finance: [], legal: [] };
+    const fallbackTrainingCenter: Career['trainingCenterUpgrades'] = { field: 1, medical: 1, physio: 1, gym: 1, analysis: 1 };
     const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
     const rawSponsorships = (parsed as Career).sponsorships ?? fallbackSponsorships;
     const migratedProposals = Array.isArray(rawSponsorships.proposals)
@@ -1302,6 +1313,7 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
       headquartersImageAcquisition: { ...fallbackHeadquartersImageAcquisition, ...((parsed as Career).headquartersImageAcquisition ?? {}) },
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
+      trainingCenterUpgrades: { ...fallbackTrainingCenter, ...((parsed as Career).trainingCenterUpgrades ?? {}) },
       administrationStaff: {
         board: (((parsed as Career).administrationStaff?.board ?? [])).map((person) => ({
           ...person,
