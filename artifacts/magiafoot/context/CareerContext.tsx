@@ -3,6 +3,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ReactNode } from 'react';
 import {
   addTransferPlayer,
+  fireAdministrativeProfessional,
+  hireAdministrativeProfessional,
   refreshSponsorshipMarket,
   renewSponsorshipContract,
   negotiateSponsorshipProposal,
@@ -28,7 +30,7 @@ import {
   upgradeStadiumFacility,
   upgradeHeadquartersFacility,
 } from '@/game/engine';
-import type { Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -59,6 +61,8 @@ interface CareerContextValue {
   declineSponsor: (proposalId: string) => void;
   negotiateSponsor: (proposalId: string, requestedSlot?: SponsorshipSlot, requestedMultiplier?: number) => void;
   renewSponsor: (contractId: string) => void;
+  hireAdminProfessional: (department: AdministrationDepartmentKey) => boolean;
+  fireAdminProfessional: (department: AdministrationDepartmentKey, professionalId: string) => boolean;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -200,6 +204,22 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => renewSponsorshipContract(current, contractId));
   }, [update]);
 
+  const hireAdminProfessional = useCallback((department: AdministrationDepartmentKey) => {
+    if (!career) return false;
+    const next = hireAdministrativeProfessional(career, department);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
+  const fireAdminProfessional = useCallback((department: AdministrationDepartmentKey, professionalId: string) => {
+    if (!career) return false;
+    const next = fireAdministrativeProfessional(career, department, professionalId);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -227,9 +247,11 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     declineSponsor,
     negotiateSponsor,
     renewSponsor,
+    hireAdminProfessional,
+    fireAdminProfessional,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
