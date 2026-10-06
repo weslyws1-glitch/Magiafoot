@@ -19,6 +19,11 @@ import {
   serializeCareer,
   setCaptain,
   sellPlayer,
+  setPlayerTrainingFocus,
+  setPlayerSquadRole,
+  setPlayerMarketStatus,
+  renewPlayerContract,
+  promisePlayerMinutes,
   setTicketPrice,
   setHeadquartersRevenuePricing,
   setHeadquartersImageAcquisition,
@@ -31,7 +36,7 @@ import {
   upgradeHeadquartersFacility,
   upgradeTrainingCenterFacility,
 } from '@/game/engine';
-import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
+import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -65,6 +70,11 @@ interface CareerContextValue {
   hireAdminProfessional: (department: AdministrationDepartmentKey) => boolean;
   fireAdminProfessional: (department: AdministrationDepartmentKey, professionalId: string) => boolean;
   upgradeTrainingCenterItem: (key: TrainingCenterUpgradeKey) => boolean;
+  renewPlayer: (playerId: string, seasons?: number) => boolean;
+  updatePlayerMarketStatus: (playerId: string, status: PlayerMarketStatus) => void;
+  updatePlayerSquadRole: (playerId: string, role: PlayerSquadRole) => void;
+  updatePlayerTrainingFocus: (playerId: string, focus: PlayerTrainingFocus) => void;
+  promiseMinutes: (playerId: string) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -230,6 +240,30 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
 
+  const renewPlayer = useCallback((playerId: string, seasons = 2) => {
+    if (!career) return false;
+    const next = renewPlayerContract(career, playerId, seasons);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
+  const updatePlayerMarketStatus = useCallback((playerId: string, status: PlayerMarketStatus) => {
+    update((current) => setPlayerMarketStatus(current, playerId, status));
+  }, [update]);
+
+  const updatePlayerSquadRole = useCallback((playerId: string, role: PlayerSquadRole) => {
+    update((current) => setPlayerSquadRole(current, playerId, role));
+  }, [update]);
+
+  const updatePlayerTrainingFocus = useCallback((playerId: string, focus: PlayerTrainingFocus) => {
+    update((current) => setPlayerTrainingFocus(current, playerId, focus));
+  }, [update]);
+
+  const promiseMinutes = useCallback((playerId: string) => {
+    update((current) => promisePlayerMinutes(current, playerId));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -260,9 +294,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     hireAdminProfessional,
     fireAdminProfessional,
     upgradeTrainingCenterItem,
+    renewPlayer,
+    updatePlayerMarketStatus,
+    updatePlayerSquadRole,
+    updatePlayerTrainingFocus,
+    promiseMinutes,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
