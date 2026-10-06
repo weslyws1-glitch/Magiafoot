@@ -52,6 +52,33 @@ function makeLeagueSchedule(): Fixture[] {
 export const LEAGUE_FIXTURES = makeLeagueSchedule();
 export const LEAGUE_ROUNDS = CLUBS.length * 2 - 2;
 
+function assignSquadNumbers(players: Player[]): Player[] {
+  const used = new Set<number>();
+  return players.map((player, index) => {
+    const existing = player.shirtNumber;
+    if (typeof existing === 'number' && existing >= 1 && existing <= 99 && !used.has(existing)) {
+      used.add(existing);
+      return player;
+    }
+    const preferred =
+      player.position === 'GOL' ? [1,12,22] :
+      player.position === 'ZAG' ? [3,4,13,14,23] :
+      player.position === 'LD' ? [2,22,32] :
+      player.position === 'LE' ? [6,16,26] :
+      player.position === 'VOL' ? [5,15,25] :
+      player.position === 'MC' ? [8,18,28] :
+      player.position === 'MEI' ? [10,20,30] :
+      player.position === 'PE' ? [11,21,31] :
+      player.position === 'PD' ? [7,17,27] :
+      [9,19,29];
+    const number = preferred.find((n) => !used.has(n))
+      ?? Array.from({ length: 99 }, (_, i) => i + 1).find((n) => !used.has(n))
+      ?? ((index % 99) + 1);
+    used.add(number);
+    return { ...player, shirtNumber: number };
+  });
+}
+
 function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 0): Player {
   const seed = hash(player.id + '-' + player.name);
   const personalities = ['profissional','lider','ambicioso','tranquilo','temperamental','festeiro'] as const;
@@ -88,7 +115,7 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
 export function createCareer(coachName: string, clubId: string): Career {
   const club = getClub(clubId);
   if (!club) throw new Error('Escolha um clube disponível.');
-  const roster = makeRoster(club).map((player) => initializePlayerCareerProfile(player, 1, 0));
+  const roster = assignSquadNumbers(makeRoster(club).map((player) => initializePlayerCareerProfile(player, 1, 0)));
   const formationId: FormationId = '4-3-3';
   const lineup = buildBestLineup(roster, formationId);
   const benchIds = buildBench(roster, lineup);
@@ -1383,7 +1410,7 @@ export function parseCareer(saved: string | null): Career | null {
     };
     return {
       ...(parsed as Career),
-      players: (parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
+      players: assignSquadNumbers((parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0))),
       market: ((parsed as Career).market ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
       stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
