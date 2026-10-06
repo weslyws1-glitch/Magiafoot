@@ -22,6 +22,14 @@ export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
 export type SponsorshipSlot = 'principal' | 'sleeve' | 'back' | 'institutional';
 
+export interface CareerNewsItem {
+  id: string;
+  roundIndex: number;
+  category: 'club' | 'match' | 'sponsor' | 'market';
+  title: string;
+  body: string;
+}
+
 export interface SponsorshipProposal {
   id: string;
   sponsorName: string;
@@ -36,12 +44,21 @@ export interface SponsorshipProposal {
   boardImpact: number;
   prestige: number;
   note: string;
+  qualificationBonus: number;
+  titleBonus: number;
+  attendanceBonus: number;
+  attendanceTarget: number;
+  exitFanTrustBelow: number;
+  exclusivityCategory: boolean;
+  expectedValue: number;
+  negotiationRound: number;
 }
 
 export interface SponsorshipContract extends SponsorshipProposal {
   acceptedRound: number;
   matchesRemaining: number;
   totalEarned: number;
+  renewalOffered?: boolean;
 }
 
 export interface SponsorshipState {
@@ -192,6 +209,7 @@ export interface Career {
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
   lastNews: string;
+  newsFeed: CareerNewsItem[];
   createdAt: string;
 }
 
