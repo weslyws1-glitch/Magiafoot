@@ -22,10 +22,10 @@ const SHORTCUTS: Shortcut[] = [
   { label: 'Classificação', icon: 'columns', route: '/league' },
   { label: 'Mercado', icon: 'search', route: '/market' },
   { label: 'Finanças', icon: 'dollar-sign', route: '/finances' },
-  { label: 'Estádio', icon: 'home', route: '/club' },
-  { label: 'Notícias', icon: 'file-text', route: '/club' },
-  { label: 'Competições', icon: 'award', route: '/league' },
-  { label: 'Carreira', icon: 'briefcase', route: '/club' },
+  { label: 'Estádio', icon: 'home', route: '/stadium' },
+  { label: 'Notícias', icon: 'file-text', route: '/news' },
+  { label: 'Competições', icon: 'award', route: '/competitions' },
+  { label: 'Carreira', icon: 'briefcase', route: '/career' },
 ];
 
 function getPositionAndPoints(career: NonNullable<ReturnType<typeof useCareer>['career']>) {
