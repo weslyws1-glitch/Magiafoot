@@ -45,7 +45,7 @@ function cpuLiveScore(fixtureId: string, season: number, minute: number, homeRat
 export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { career, startCurrentMatch, advanceCurrentMatch, makeSubstitution, closeCurrentMatch } = useCareer();
+  const { career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
   const game = career?.liveMatch ?? null;
@@ -95,7 +95,6 @@ export default function MatchScreen() {
   const away = getClub(game.fixture.awayClubId);
   if (!home || !away) return null;
 
-  const isLive = game.phase === 'first_half' || game.phase === 'second_half';
   const isFinal = game.phase === 'finished';
   const clock = game.phase === 'halftime' ? 'INTERVALO' : isFinal ? 'FIM' : game.phase === 'pregame' ? '0′' : game.minute + '′';
   const recentEvents = [...game.events].slice(-6).reverse();
@@ -117,9 +116,6 @@ export default function MatchScreen() {
           );
       return { fixture, home: fixtureHome, away: fixtureAway, ...live, isUser };
     });
-
-    return player ? { slot, player } : null;
-  }).filter(Boolean) as Array<{ slot: typeof activeSlots[number]; player: typeof career.players[number] }>, [activeSlots, career.players]);
 
   const handleMain = () => {
     if (isFinal) {
@@ -245,9 +241,9 @@ export default function MatchScreen() {
         </Panel>
 
         <View style={styles.liveControls}>
-          <Pressable onPress={() => setAutoRunning((v) => !v)} style={styles.controlButton}>
+          <Pressable onPress={() => game.phase !== 'pregame' && setAutoRunning((v) => !v)} style={styles.controlButton}>
             <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
-            <Text style={styles.controlButtonText}>{autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
+            <Text style={styles.controlButtonText}>{game.phase === 'pregame' ? 'PRONTO' : autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
           </Pressable>
 
           <View style={styles.speedGroup}>
@@ -266,6 +262,10 @@ export default function MatchScreen() {
             <Text style={styles.controlDarkText}>TÁTICA</Text>
           </Pressable>
         </View>
+
+        {game.phase === 'pregame' ? (
+          <GameButton label="APITO INICIAL" icon="play" onPress={() => advanceCurrentMatch(1)} />
+        ) : null}
 
         {isFinal ? (
           <>
