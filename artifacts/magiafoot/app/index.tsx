@@ -22,7 +22,7 @@ const SHORTCUTS: Shortcut[] = [
   { label: 'Classificação', icon: 'columns', route: '/league' },
   { label: 'Mercado', icon: 'search', route: '/market' },
   { label: 'Finanças', icon: 'dollar-sign', route: '/finances' },
-  { label: 'Estádio', icon: 'home', route: '/stadium' },
+  { label: 'Infraestrutura', icon: 'home', route: '/stadium' },
   { label: 'Notícias', icon: 'file-text', route: '/news' },
   { label: 'Competições', icon: 'award', route: '/competitions' },
   { label: 'Carreira', icon: 'briefcase', route: '/career' },
