@@ -101,40 +101,89 @@ export default function SponsorshipsScreen() {
 
         <SectionLabel title="Uniforme e exposição atual" />
         <Panel style={styles.uniformPanel}>
-          <Text style={styles.uniformIntro}>As marcas contratadas aparecem no uniforme conforme o espaço negociado. Patrocínios estruturais ficam listados ao lado.</Text>
+          <Text style={styles.uniformIntro}>O uniforme acompanha as cores do clube e muda automaticamente quando um contrato é assinado. Cada patrocinador aparece exatamente no espaço negociado.</Text>
 
-          <View style={styles.uniformArea}>
-            <View style={styles.shirtWrap}>
-              <View style={[styles.sleeveLeft, { backgroundColor: club.color }]} />
-              <View style={[styles.sleeveRight, { backgroundColor: club.color }]} />
-              <View style={[styles.shirtBody, { backgroundColor: club.color }]}>
-                <View style={styles.clubBadge}><Text style={styles.clubBadgeText}>{club.initials}</Text></View>
-                <View style={styles.chestSponsor}>
-                  <Text style={styles.chestSponsorText} numberOfLines={1}>{uniformMain?.sponsorName ?? 'ESPAÇO LIVRE'}</Text>
-                </View>
-                <View style={styles.backSponsor}>
-                  <Text style={styles.smallSponsorText} numberOfLines={1}>{uniformBack?.sponsorName ?? 'COSTAS LIVRE'}</Text>
-                </View>
-                <View style={styles.sleeveSponsor}>
-                  <Text style={styles.tinySponsorText} numberOfLines={1}>{uniformSleeve?.sponsorName ?? 'MANGA'}</Text>
-                </View>
-              </View>
-              <View style={[styles.shorts, { backgroundColor: club.color }]}>
-                <Text style={styles.shortsSponsorText} numberOfLines={1}>{uniformShorts?.sponsorName ?? 'CALÇÃO LIVRE'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.exposureList}>
-              {(['stadium','training_center','headquarters','media_wall','institutional'] as SponsorshipSlot[]).map((slot) => {
-                const deal = contracts.find((item) => item.slot === slot);
-                return (
-                  <View key={slot} style={styles.exposureRow}>
-                    <Text style={styles.exposureLabel}>{SLOT_LABELS[slot]}</Text>
-                    <Text style={deal ? styles.exposureBrand : styles.exposureEmpty}>{deal?.sponsorName ?? 'Livre'}</Text>
+          <View style={styles.kitStage}>
+            <View style={styles.kitColumn}>
+              <Text style={styles.kitViewLabel}>COSTAS</Text>
+              <View style={styles.kitModel}>
+                <View style={[styles.backSleeveLeft, { backgroundColor: club.color }]} />
+                <View style={[styles.backSleeveRight, { backgroundColor: club.color }]} />
+                <View style={[styles.jerseyBack, { backgroundColor: club.color }]}>
+                  <View style={styles.jerseyStripeA} />
+                  <View style={styles.jerseyStripeB} />
+                  <View style={styles.jerseyStripeC} />
+                  <View style={styles.backSponsorArea}>
+                    <Text style={styles.backSponsorName} numberOfLines={1}>{uniformBack?.sponsorName ?? 'PATROCÍNIO COSTAS'}</Text>
                   </View>
-                );
-              })}
+                  <Text style={styles.playerNumber}>10</Text>
+                  <Text style={styles.playerName}>JOGADOR</Text>
+                </View>
+                <View style={[styles.kitShorts, { backgroundColor: club.color }]}>
+                  <View style={styles.shortsStripe} />
+                </View>
+                <View style={styles.socksRow}>
+                  <View style={[styles.sock, { backgroundColor: club.color }]}><View style={styles.sockStripe} /></View>
+                  <View style={[styles.sock, { backgroundColor: club.color }]}><View style={styles.sockStripe} /></View>
+                </View>
+              </View>
             </View>
+
+            <View style={styles.kitColumn}>
+              <Text style={styles.kitViewLabel}>FRENTE</Text>
+              <View style={styles.kitModel}>
+                <View style={[styles.frontSleeveLeft, { backgroundColor: club.color }]}>
+                  <View style={styles.sleeveBrandBox}>
+                    <Text style={styles.sleeveBrandText} numberOfLines={1}>{uniformSleeve?.sponsorName ?? 'MANGA'}</Text>
+                  </View>
+                </View>
+                <View style={[styles.frontSleeveRight, { backgroundColor: club.color }]} />
+                <View style={[styles.jerseyFront, { backgroundColor: club.color }]}>
+                  <View style={styles.jerseyStripeA} />
+                  <View style={styles.jerseyStripeB} />
+                  <View style={styles.jerseyStripeC} />
+                  <View style={styles.collarV} />
+                  <View style={styles.clubCrest}>
+                    <Text style={styles.clubCrestText}>{club.initials}</Text>
+                  </View>
+                  <View style={styles.mainSponsorArea}>
+                    <Text style={styles.mainSponsorName} numberOfLines={2}>{uniformMain?.sponsorName ?? 'PATROCÍNIO PRINCIPAL'}</Text>
+                  </View>
+                </View>
+                <View style={[styles.kitShorts, { backgroundColor: club.color }]}>
+                  <View style={styles.shortsStripe} />
+                  <View style={styles.shortsBrandBox}>
+                    <Text style={styles.shortsBrandText} numberOfLines={1}>{uniformShorts?.sponsorName ?? 'CALÇÃO'}</Text>
+                  </View>
+                </View>
+                <View style={styles.socksRow}>
+                  <View style={[styles.sock, { backgroundColor: club.color }]}><View style={styles.sockStripe} /></View>
+                  <View style={[styles.sock, { backgroundColor: club.color }]}><View style={styles.sockStripe} /></View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.kitLegend}>
+            <View style={styles.legendRow}><View style={styles.legendDot} /><Text style={styles.legendText}>Peito: {uniformMain?.sponsorName ?? 'Livre'}</Text></View>
+            <View style={styles.legendRow}><View style={styles.legendDot} /><Text style={styles.legendText}>Manga: {uniformSleeve?.sponsorName ?? 'Livre'}</Text></View>
+            <View style={styles.legendRow}><View style={styles.legendDot} /><Text style={styles.legendText}>Costas: {uniformBack?.sponsorName ?? 'Livre'}</Text></View>
+            <View style={styles.legendRow}><View style={styles.legendDot} /><Text style={styles.legendText}>Calção: {uniformShorts?.sponsorName ?? 'Livre'}</Text></View>
+          </View>
+
+          <View style={styles.structureTitleWrap}>
+            <Text style={styles.structureTitle}>EXPOSIÇÃO NA ESTRUTURA DO CLUBE</Text>
+          </View>
+          <View style={styles.exposureList}>
+            {(['stadium','training_center','headquarters','media_wall','institutional'] as SponsorshipSlot[]).map((slot) => {
+              const deal = contracts.find((item) => item.slot === slot);
+              return (
+                <View key={slot} style={styles.exposureRow}>
+                  <Text style={styles.exposureLabel}>{SLOT_LABELS[slot]}</Text>
+                  <Text style={deal ? styles.exposureBrand : styles.exposureEmpty}>{deal?.sponsorName ?? 'Livre'}</Text>
+                </View>
+              );
+            })}
           </View>
         </Panel>
 
@@ -343,24 +392,46 @@ const styles = StyleSheet.create({
   emptySmall:{alignItems:'center',paddingVertical:16},
   emptyTitle:{color:'#f5f7f5',fontSize:12,fontWeight:'900'},
   emptyText:{color:'#91a496',fontSize:8.5,lineHeight:13,textAlign:'center'},
-  uniformPanel:{gap:12,backgroundColor:'#101f19',borderColor:'#355846'},
+  uniformPanel:{gap:14,backgroundColor:'#101f19',borderColor:'#355846'},
   uniformIntro:{color:'#a8baae',fontSize:8.5,lineHeight:13},
-  uniformArea:{flexDirection:'row',gap:12,alignItems:'flex-start',flexWrap:'wrap'},
-  shirtWrap:{width:150,alignItems:'center',paddingTop:8},
-  shirtBody:{width:92,height:118,borderRadius:14,borderTopLeftRadius:22,borderTopRightRadius:22,borderWidth:2,borderColor:'#dce8df',alignItems:'center',position:'relative',paddingTop:13},
-  sleeveLeft:{position:'absolute',left:8,top:16,width:38,height:46,borderRadius:12,borderWidth:2,borderColor:'#dce8df',transform:[{rotate:'18deg'}]},
-  sleeveRight:{position:'absolute',right:8,top:16,width:38,height:46,borderRadius:12,borderWidth:2,borderColor:'#dce8df',transform:[{rotate:'-18deg'}]},
-  clubBadge:{position:'absolute',left:10,top:11,width:20,height:20,borderRadius:10,backgroundColor:'#f5f7f5',alignItems:'center',justifyContent:'center'},
-  clubBadgeText:{color:'#10251a',fontSize:6,fontWeight:'900'},
-  chestSponsor:{position:'absolute',top:48,left:10,right:10,minHeight:22,borderRadius:5,backgroundColor:'rgba(0,0,0,0.28)',alignItems:'center',justifyContent:'center',paddingHorizontal:4},
-  chestSponsorText:{color:'#fff',fontSize:7.5,fontWeight:'900'},
-  backSponsor:{position:'absolute',bottom:13,left:15,right:15,minHeight:17,borderRadius:4,backgroundColor:'rgba(0,0,0,0.22)',alignItems:'center',justifyContent:'center',paddingHorizontal:3},
-  smallSponsorText:{color:'#fff',fontSize:6,fontWeight:'900'},
-  sleeveSponsor:{position:'absolute',right:-35,top:28,width:42,height:15,borderRadius:4,backgroundColor:'rgba(0,0,0,0.38)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},
-  tinySponsorText:{color:'#fff',fontSize:5,fontWeight:'900'},
-  shorts:{width:80,height:38,marginTop:5,borderRadius:8,borderTopLeftRadius:3,borderTopRightRadius:3,borderWidth:2,borderColor:'#dce8df',alignItems:'center',justifyContent:'center',paddingHorizontal:4},
-  shortsSponsorText:{color:'#fff',fontSize:5.5,fontWeight:'900'},
-  exposureList:{flex:1,minWidth:155,gap:6},
+  kitStage:{flexDirection:'row',gap:12,justifyContent:'space-between',alignItems:'flex-start'},
+  kitColumn:{flex:1,minWidth:0,alignItems:'center'},
+  kitViewLabel:{color:'#8ca092',fontSize:7,fontWeight:'900',letterSpacing:1,marginBottom:7},
+  kitModel:{width:'100%',alignItems:'center',position:'relative',paddingTop:12},
+  jerseyFront:{width:112,height:138,borderRadius:16,borderTopLeftRadius:24,borderTopRightRadius:24,borderWidth:2,borderColor:'#e2e9e4',overflow:'hidden',alignItems:'center',position:'relative',zIndex:3},
+  jerseyBack:{width:112,height:138,borderRadius:16,borderTopLeftRadius:24,borderTopRightRadius:24,borderWidth:2,borderColor:'#e2e9e4',overflow:'hidden',alignItems:'center',position:'relative',zIndex:3},
+  frontSleeveLeft:{position:'absolute',left:5,top:24,width:42,height:52,borderRadius:13,borderWidth:2,borderColor:'#e2e9e4',transform:[{rotate:'17deg'}],zIndex:1,overflow:'hidden'},
+  frontSleeveRight:{position:'absolute',right:5,top:24,width:42,height:52,borderRadius:13,borderWidth:2,borderColor:'#e2e9e4',transform:[{rotate:'-17deg'}],zIndex:1},
+  backSleeveLeft:{position:'absolute',left:5,top:24,width:42,height:52,borderRadius:13,borderWidth:2,borderColor:'#e2e9e4',transform:[{rotate:'17deg'}],zIndex:1},
+  backSleeveRight:{position:'absolute',right:5,top:24,width:42,height:52,borderRadius:13,borderWidth:2,borderColor:'#e2e9e4',transform:[{rotate:'-17deg'}],zIndex:1},
+  jerseyStripeA:{position:'absolute',left:23,top:0,bottom:0,width:8,backgroundColor:'rgba(255,255,255,0.20)'},
+  jerseyStripeB:{position:'absolute',left:50,top:0,bottom:0,width:8,backgroundColor:'rgba(0,0,0,0.24)'},
+  jerseyStripeC:{position:'absolute',right:22,top:0,bottom:0,width:8,backgroundColor:'rgba(255,255,255,0.14)'},
+  collarV:{position:'absolute',top:-3,width:38,height:19,borderBottomLeftRadius:18,borderBottomRightRadius:18,backgroundColor:'#0c1711',borderWidth:2,borderColor:'#e2e9e4'},
+  clubCrest:{position:'absolute',top:20,right:12,width:24,height:28,borderRadius:7,backgroundColor:'rgba(5,15,10,0.72)',borderWidth:1,borderColor:'#eef4ef',alignItems:'center',justifyContent:'center'},
+  clubCrestText:{color:'#fff',fontSize:6,fontWeight:'900'},
+  mainSponsorArea:{position:'absolute',top:60,left:10,right:10,minHeight:34,borderRadius:6,backgroundColor:'rgba(0,0,0,0.36)',alignItems:'center',justifyContent:'center',paddingHorizontal:5},
+  mainSponsorName:{color:'#fff',fontSize:8,fontWeight:'900',textAlign:'center'},
+  sleeveBrandBox:{position:'absolute',left:3,right:3,top:16,minHeight:17,borderRadius:5,backgroundColor:'rgba(0,0,0,0.45)',alignItems:'center',justifyContent:'center',paddingHorizontal:2},
+  sleeveBrandText:{color:'#fff',fontSize:5.2,fontWeight:'900'},
+  backSponsorArea:{position:'absolute',top:18,left:12,right:12,minHeight:24,borderRadius:5,backgroundColor:'rgba(0,0,0,0.36)',alignItems:'center',justifyContent:'center',paddingHorizontal:4},
+  backSponsorName:{color:'#fff',fontSize:6.5,fontWeight:'900',textAlign:'center'},
+  playerNumber:{position:'absolute',top:51,color:'#fff',fontSize:36,fontWeight:'900',textShadowColor:'rgba(0,0,0,0.5)',textShadowRadius:4},
+  playerName:{position:'absolute',bottom:15,color:'#fff',fontSize:8,fontWeight:'900',letterSpacing:0.8},
+  kitShorts:{width:98,height:48,marginTop:5,borderRadius:9,borderTopLeftRadius:3,borderTopRightRadius:3,borderWidth:2,borderColor:'#e2e9e4',position:'relative',overflow:'hidden'},
+  shortsStripe:{position:'absolute',left:8,top:0,bottom:0,width:8,backgroundColor:'rgba(255,255,255,0.18)'},
+  shortsBrandBox:{position:'absolute',right:6,bottom:8,maxWidth:55,minHeight:16,borderRadius:4,backgroundColor:'rgba(0,0,0,0.42)',alignItems:'center',justifyContent:'center',paddingHorizontal:4},
+  shortsBrandText:{color:'#fff',fontSize:5,fontWeight:'900'},
+  socksRow:{flexDirection:'row',gap:18,marginTop:6},
+  sock:{width:24,height:64,borderRadius:8,borderTopLeftRadius:4,borderTopRightRadius:4,borderWidth:1,borderColor:'#dfe8e1',overflow:'hidden'},
+  sockStripe:{position:'absolute',left:8,top:0,bottom:0,width:5,backgroundColor:'rgba(255,255,255,0.20)'},
+  kitLegend:{gap:6,padding:9,borderRadius:9,backgroundColor:'#0a1811',borderWidth:1,borderColor:'#273f31'},
+  legendRow:{flexDirection:'row',alignItems:'center',gap:7},
+  legendDot:{width:6,height:6,borderRadius:3,backgroundColor:'#79ef91'},
+  legendText:{color:'#c6d3ca',fontSize:7.5,fontWeight:'800'},
+  structureTitleWrap:{paddingTop:2},
+  structureTitle:{color:'#8ca092',fontSize:7,fontWeight:'900',letterSpacing:0.8},
+  exposureList:{gap:6},
   exposureRow:{minHeight:38,borderRadius:8,paddingHorizontal:8,paddingVertical:6,backgroundColor:'#0a1811',borderWidth:1,borderColor:'#273f31',justifyContent:'center'},
   exposureLabel:{color:'#788d7e',fontSize:6.5,fontWeight:'900'},
   exposureBrand:{color:'#79ef91',fontSize:8.5,fontWeight:'900',marginTop:2},
