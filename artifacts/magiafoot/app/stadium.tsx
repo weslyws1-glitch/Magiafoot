@@ -11,7 +11,7 @@ export default function StadiumScreen() {
   const { career, expandStadium } = useCareer();
 
   if (!career) {
-    return <><GameHeader title="Estádio" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar o estádio.</Text></Screen></>;
+    return <><GameHeader title="Infraestrutura" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar a infraestrutura do clube.</Text></Screen></>;
   }
 
   const club = getClub(career.clubId);
@@ -24,12 +24,12 @@ export default function StadiumScreen() {
 
   return (
     <>
-      <GameHeader title="Estádio" eyebrow={club.name} />
+      <GameHeader title="Infraestrutura" eyebrow={club.name} />
       <Screen>
         <Panel style={styles.hero}>
           <View style={styles.heroIcon}><Feather name="home" size={30} color="#79ef91" /></View>
-          <Text style={styles.heroTitle}>Estádio {club.name}</Text>
-          <Text style={styles.heroSub}>Casa do clube · nível {career.stadiumLevel + 1}</Text>
+          <Text style={styles.heroTitle}>Infraestrutura do {club.name}</Text>
+          <Text style={styles.heroSub}>Centro estrutural do clube · nível {career.stadiumLevel + 1}</Text>
         </Panel>
 
         <View style={styles.grid}>
@@ -39,15 +39,86 @@ export default function StadiumScreen() {
           <Panel style={styles.metric}><Text style={styles.metricLabel}>CAIXA</Text><Text style={styles.metricValue}>{formatCurrency(career.balance)}</Text></Panel>
         </View>
 
-        <SectionLabel title="Melhorias" />
+        <SectionLabel title="Infraestrutura" />
         <Panel style={styles.upgrade}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.upgradeTitle}>{maxed ? 'Estádio no nível máximo' : 'Ampliar arquibancadas'}</Text>
-            <Text style={styles.upgradeText}>{maxed ? 'A estrutura atual já atingiu o limite desta versão.' : 'Adiciona 3.500 lugares e aumenta a renda possível nos jogos em casa.'}</Text>
+            <Text style={styles.upgradeTitle}>{maxed ? 'Arquibancadas no nível máximo' : 'Ampliar arquibancadas'}</Text>
+            <Text style={styles.upgradeText}>{maxed ? 'As arquibancadas já atingiram o limite atual.' : 'Adiciona 3.500 lugares e aumenta a renda possível nos jogos em casa.'}</Text>
           </View>
           {!maxed ? <Text style={styles.cost}>{formatCurrency(nextCost)}</Text> : null}
         </Panel>
-        {!maxed ? <GameButton label="AMPLIAR ESTÁDIO" icon="arrow-up-circle" onPress={expandStadium} disabled={career.balance < nextCost} /> : null}
+        {!maxed ? <GameButton label="AMPLIAR ARQUIBANCADAS" icon="arrow-up-circle" onPress={expandStadium} disabled={career.balance < nextCost} /> : null}
+
+        <SectionLabel title="Estrutura interna" />
+        <View style={styles.featureGrid}>
+          {[
+            ['Gramado', 'Melhora desempenho e reduz risco de lesão.', 'activity'],
+            ['Iluminação', 'Melhora jogos noturnos e qualidade do espetáculo.', 'sun'],
+            ['Vestiários', 'Ajuda moral, conforto e preparação da equipe.', 'users'],
+            ['Academia', 'Apoia evolução física e condicionamento.', 'trending-up'],
+            ['Centro médico', 'Acelera recuperação e tratamento de lesões.', 'heart'],
+            ['Recuperação', 'Ajuda desgaste e fadiga entre partidas.', 'refresh-cw'],
+            ['Drenagem', 'Reduz impacto da chuva no gramado.', 'droplet'],
+            ['Irrigação', 'Mantém o gramado em melhor estado.', 'cloud-rain'],
+          ].map(([title, text, icon]) => (
+            <Panel key={title} style={styles.featureCard}>
+              <View style={styles.featureIcon}><Feather name={icon as any} size={18} color="#79ef91" /></View>
+              <Text style={styles.featureTitle}>{title}</Text>
+              <Text style={styles.featureText}>{text}</Text>
+              <View style={styles.levelBar}><View style={styles.levelFill} /></View>
+              <Text style={styles.featureLevel}>NÍVEL 1</Text>
+            </Panel>
+          ))}
+        </View>
+
+        <SectionLabel title="Experiência da torcida" />
+        <View style={styles.featureGrid}>
+          {[
+            ['Cobertura', 'Aumenta conforto e público em dias de chuva.', 'umbrella'],
+            ['Cadeiras', 'Melhora conforto e percepção do estádio.', 'grid'],
+            ['Camarotes', 'Aumenta receita premium por partida.', 'star'],
+            ['Placar eletrônico', 'Melhora experiência e prestígio.', 'monitor'],
+            ['Segurança', 'Reduz problemas e melhora controle de público.', 'shield'],
+            ['Catracas', 'Agiliza entrada e organização dos torcedores.', 'log-in'],
+            ['Estacionamento', 'Facilita acesso e ajuda média de público.', 'truck'],
+            ['Wi-Fi', 'Melhora experiência digital do torcedor.', 'wifi'],
+          ].map(([title, text, icon]) => (
+            <Panel key={title} style={styles.featureCard}>
+              <View style={styles.featureIcon}><Feather name={icon as any} size={18} color="#79ef91" /></View>
+              <Text style={styles.featureTitle}>{title}</Text>
+              <Text style={styles.featureText}>{text}</Text>
+              <View style={styles.levelBar}><View style={styles.levelFill} /></View>
+              <Text style={styles.featureLevel}>NÍVEL 1</Text>
+            </Panel>
+          ))}
+        </View>
+
+        <SectionLabel title="Receitas e imagem" />
+        <View style={styles.featureGrid}>
+          {[
+            ['Loja oficial', 'Gera receita com produtos do clube.', 'shopping-bag'],
+            ['Praça de alimentação', 'Aumenta receita por torcedor.', 'coffee'],
+            ['Museu do clube', 'Melhora popularidade e gera renda.', 'book-open'],
+            ['Centro de imprensa', 'Ajuda reputação e exposição do clube.', 'mic'],
+          ].map(([title, text, icon]) => (
+            <Panel key={title} style={styles.featureCard}>
+              <View style={styles.featureIcon}><Feather name={icon as any} size={18} color="#79ef91" /></View>
+              <Text style={styles.featureTitle}>{title}</Text>
+              <Text style={styles.featureText}>{text}</Text>
+              <View style={styles.levelBar}><View style={styles.levelFill} /></View>
+              <Text style={styles.featureLevel}>NÍVEL 1</Text>
+            </Panel>
+          ))}
+        </View>
+
+        <SectionLabel title="Manutenção" />
+        <Panel style={styles.maintenance}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.maintenanceTitle}>Estado geral da infraestrutura</Text>
+            <Text style={styles.maintenanceText}>Estruturas mal cuidadas poderão reduzir público, receitas e desempenho do clube.</Text>
+          </View>
+          <View style={styles.maintenanceBadge}><Text style={styles.maintenanceBadgeText}>100%</Text></View>
+        </Panel>
       </Screen>
     </>
   );
@@ -66,4 +137,17 @@ const styles = StyleSheet.create({
   upgradeTitle: { color: '#f5f7f5', fontSize: 14, fontWeight: '900' },
   upgradeText: { color: '#9fb2a5', fontSize: 11, lineHeight: 17, marginTop: 5 },
   cost: { color: '#79ef91', fontSize: 13, fontWeight: '900' },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  featureCard: { width: '48%', minHeight: 150, gap: 7, justifyContent: 'flex-start' },
+  featureIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b2117', borderWidth: 1, borderColor: '#2c503d' },
+  featureTitle: { color: '#f5f7f5', fontSize: 12, fontWeight: '900' },
+  featureText: { color: '#9fb2a5', fontSize: 9, lineHeight: 13, minHeight: 38 },
+  featureLevel: { color: '#79ef91', fontSize: 8, fontWeight: '900' },
+  levelBar: { height: 6, borderRadius: 999, backgroundColor: '#0b2117', overflow: 'hidden', borderWidth: 1, borderColor: '#2c503d' },
+  levelFill: { width: '20%', height: '100%', backgroundColor: '#79ef91' },
+  maintenance: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#153426', borderColor: '#2c503d' },
+  maintenanceTitle: { color: '#f5f7f5', fontSize: 13, fontWeight: '900' },
+  maintenanceText: { color: '#9fb2a5', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  maintenanceBadge: { width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b2117', borderWidth: 1, borderColor: '#79ef91' },
+  maintenanceBadgeText: { color: '#79ef91', fontSize: 14, fontWeight: '900' },
 });
