@@ -146,6 +146,7 @@ export interface Career {
   boardTrust: number;
   balance: number;
   stadiumLevel: number;
+  ticketPrice: number;
   stadiumUpgrades: Record<StadiumUpgradeKey, number>;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
