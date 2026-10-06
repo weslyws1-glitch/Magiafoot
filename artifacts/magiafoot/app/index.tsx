@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,8 +74,7 @@ export default function HomeScreen() {
       .sort((a, b) => {
         const posOrder = ['GOL', 'LD', 'ZAG', 'LE', 'VOL', 'MC', 'MEI', 'PE', 'PD', 'ATA'];
         return posOrder.indexOf(a.position) - posOrder.indexOf(b.position) || b.strength - a.strength;
-      })
-      .slice(0, 8);
+      });
 
     return {
       club,
@@ -144,14 +143,16 @@ export default function HomeScreen() {
             <Text style={[styles.colAge, styles.tableHeaderText]}>IDADE</Text>
             <Text style={[styles.colFor, styles.tableHeaderText]}>FOR</Text>
           </View>
-          {dashboard.squad.map((player) => (
-            <View key={player.id} style={styles.playerRow}>
-              <Text style={[styles.colPos, styles.playerText]}>{player.position}</Text>
-              <Text numberOfLines={1} style={[styles.colName, styles.playerName]}>{player.name}</Text>
-              <Text style={[styles.colAge, styles.playerText]}>{player.age}</Text>
-              <Text style={[styles.colFor, styles.playerRating]}>{effectiveStrength(player)}</Text>
-            </View>
-          ))}
+          <ScrollView style={styles.squadScroll} nestedScrollEnabled showsVerticalScrollIndicator>
+            {dashboard.squad.map((player) => (
+              <View key={player.id} style={styles.playerRow}>
+                <Text style={[styles.colPos, styles.playerText]}>{player.position}</Text>
+                <Text numberOfLines={1} style={[styles.colName, styles.playerName]}>{player.name}</Text>
+                <Text style={[styles.colAge, styles.playerText]}>{player.age}</Text>
+                <Text style={[styles.colFor, styles.playerRating]}>{effectiveStrength(player)}</Text>
+              </View>
+            ))}
+          </ScrollView>
         </View>
 
         <View style={styles.sideColumn}>
@@ -226,7 +227,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b2117',
     overflow: 'hidden',
   },
-  squadPanel: { flex: 1.7, minWidth: 0 },
+  squadPanel: { flex: 1.7, minWidth: 0, maxHeight: 520 },
+  squadScroll: { maxHeight: 420 },
   sideColumn: { flex: 0.95, minWidth: 0, gap: 8 },
   panelHeader: {
     minHeight: 46,
