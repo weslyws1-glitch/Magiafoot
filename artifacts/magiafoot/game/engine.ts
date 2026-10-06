@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
+import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, PlayerTransferOffer, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -113,6 +113,8 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
     conflictLevel: player.conflictLevel ?? 0,
     socialStatus: player.socialStatus ?? 'estavel',
     lastSocialEventRound: player.lastSocialEventRound ?? -99,
+    loanedOutUntilRound: player.loanedOutUntilRound ?? null,
+    loanClubName: player.loanClubName ?? null,
   };
 }
 
@@ -155,6 +157,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     administrationStaff: { board: [], finance: [], legal: [] },
     trainingCenterUpgrades: { field: 1, medical: 1, physio: 1, gym: 1, analysis: 1 },
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
+    playerTransferOffers: [],
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -271,12 +274,16 @@ function recoverBetweenRounds(players: Player[], currentRound: number, physioLev
     const expiredSuspension = player.status === 'suspended'
       && player.suspendedUntilRound !== null
       && currentRound > player.suspendedUntilRound;
+    const expiredLoan = player.status === 'loaned'
+      && typeof player.loanedOutUntilRound === 'number'
+      && currentRound > player.loanedOutUntilRound;
     const recovery = 18 + physioLevel * 2 + Math.floor(gymLevel / 2);
     return {
       ...player,
       fitness: clamp(player.fitness + recovery, 15, 100),
       ...(expiredInjury ? { status: 'available' as const, injuryUntilRound: null } : {}),
       ...(expiredSuspension ? { status: 'available' as const, suspendedUntilRound: null } : {}),
+      ...(expiredLoan ? { status: 'available' as const, loanedOutUntilRound: null, loanClubName: null } : {}),
     };
   });
 }
@@ -1388,7 +1395,7 @@ export function finalizeMatch(career: Career): Career {
     lastResult: leagueResult,
     lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
   };
-  return processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
+  return generatePlayerTransferOffers(processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon)));
 }
 
 export function calculateStandings(results: LeagueResult[]): StandingRow[] {
@@ -1534,6 +1541,7 @@ export function parseCareer(saved: string | null): Career | null {
         contracts: migratedContracts,
         history: Array.isArray(rawSponsorships.history) ? rawSponsorships.history : [],
       },
+      playerTransferOffers: Array.isArray((parsed as Career).playerTransferOffers) ? (parsed as Career).playerTransferOffers : [],
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
@@ -1666,6 +1674,121 @@ export function promisePlayerMinutes(career: Career, playerId: string): Career {
       }, ...(item.careerEvents ?? [])].slice(0, 40),
     } : item),
     lastNews: 'Você prometeu mais minutos a ' + player.name + '.',
+  };
+}
+
+const TRANSFER_INTEREST_CLUBS = [
+  'Atlético Serrano', 'União Portuária', 'Estrela do Norte', 'Real do Vale',
+  'Ferroviário Azul', 'Nacional da Serra', 'Sporting Litoral', 'Juventude Imperial',
+];
+
+function generatePlayerTransferOffers(career: Career): Career {
+  const existing = (career.playerTransferOffers ?? []).filter((offer) => offer.expiresRound >= career.roundIndex);
+  const offeredPlayers = new Set(existing.map((offer) => offer.playerId));
+  const candidates = career.players.filter((player) =>
+    player.status === 'available'
+    && !offeredPlayers.has(player.id)
+    && player.marketStatus !== 'inegociavel'
+    && player.marketStatus !== undefined
+  );
+
+  const generated: PlayerTransferOffer[] = [];
+  for (const player of candidates) {
+    const seed = hash('offer-' + career.season + '-' + career.roundIndex + '-' + player.id);
+    const interestRoll = seed % 100;
+    const listedBoost = player.marketStatus === 'disponivel' ? 24 : player.marketStatus === 'emprestimo' ? 30 : 8;
+    if (interestRoll >= 9 + listedBoost) continue;
+
+    const prefersLoan = player.marketStatus === 'emprestimo' || (player.age <= 22 && (seed % 3 === 0));
+    const type: PlayerTransferOffer['type'] = prefersLoan ? 'loan' : 'sale';
+    const clubName = TRANSFER_INTEREST_CLUBS[(seed >> 5) % TRANSFER_INTEREST_CLUBS.length]!;
+    const amount = type === 'sale'
+      ? Math.round(player.value * (0.72 + ((seed >> 7) % 41) / 100))
+      : Math.round(player.value * (0.05 + ((seed >> 7) % 8) / 100));
+    const durationRounds = type === 'loan' ? 8 + ((seed >> 11) % 11) : 0;
+
+    generated.push({
+      id: 'offer-' + player.id + '-' + career.season + '-' + career.roundIndex,
+      playerId: player.id,
+      clubName,
+      type,
+      amount,
+      durationRounds,
+      expiresRound: career.roundIndex + 2,
+    });
+    if (generated.length >= 3) break;
+  }
+
+  if (!generated.length) return { ...career, playerTransferOffers: existing };
+
+  return addCareerNews({
+    ...career,
+    playerTransferOffers: [...existing, ...generated],
+  }, 'Mercado procura jogadores do clube', generated.length === 1
+    ? 'Chegou uma nova proposta por um jogador do elenco.'
+    : 'Chegaram ' + generated.length + ' novas propostas por jogadores do elenco.', 'market');
+}
+
+export function acceptPlayerTransferOffer(career: Career, offerId: string): Career {
+  const offers = career.playerTransferOffers ?? [];
+  const offer = offers.find((item) => item.id === offerId);
+  if (!offer) return career;
+  const player = career.players.find((item) => item.id === offer.playerId);
+  if (!player) return career;
+
+  const remainingOffers = offers.filter((item) => item.id !== offerId && item.playerId !== player.id);
+
+  if (offer.type === 'sale') {
+    if (career.players.length <= 18) return career;
+    const players = career.players.filter((item) => item.id !== player.id);
+    return addCareerNews({
+      ...career,
+      balance: career.balance + offer.amount,
+      players,
+      lineup: career.lineup.filter((slot) => slot.playerId !== player.id),
+      benchIds: career.benchIds.filter((id) => id !== player.id),
+      playerTransferOffers: remainingOffers,
+      lastNews: player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.',
+    }, 'Transferência concluída', player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.', 'market');
+  }
+
+  const loanedPlayers = career.players.map((item) => item.id === player.id ? appendPlayerEvent({
+    ...item,
+    status: 'loaned' as const,
+    loanedOutUntilRound: career.roundIndex + offer.durationRounds,
+    loanClubName: offer.clubName,
+    morale: clamp(item.morale + 2, 0, 100),
+  }, {
+    id: 'loan-' + item.id + '-' + career.season + '-' + career.roundIndex,
+    roundIndex: career.roundIndex,
+    season: career.season,
+    type: 'transfer',
+    title: 'Empréstimo acertado',
+    detail: 'Emprestado ao ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.',
+  }) : item);
+
+  return addCareerNews({
+    ...career,
+    balance: career.balance + offer.amount,
+    players: loanedPlayers,
+    lineup: career.lineup.filter((slot) => slot.playerId !== player.id),
+    benchIds: career.benchIds.filter((id) => id !== player.id),
+    playerTransferOffers: remainingOffers,
+    lastNews: player.name + ' foi emprestado ao ' + offer.clubName + '.',
+  }, 'Jogador emprestado', player.name + ' saiu por empréstimo para o ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.', 'market');
+}
+
+export function declinePlayerTransferOffer(career: Career, offerId: string): Career {
+  const offer = (career.playerTransferOffers ?? []).find((item) => item.id === offerId);
+  if (!offer) return career;
+  const player = career.players.find((item) => item.id === offer.playerId);
+  return {
+    ...career,
+    playerTransferOffers: (career.playerTransferOffers ?? []).filter((item) => item.id !== offerId),
+    players: career.players.map((item) => item.id === offer.playerId && item.marketStatus === 'disponivel'
+      ? { ...item, morale: clamp(item.morale - 2, 0, 100) }
+      : item),
+    lastNews: player ? 'Proposta por ' + player.name + ' foi recusada.' : career.lastNews,
   };
 }
 
