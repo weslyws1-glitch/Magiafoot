@@ -96,7 +96,7 @@ export default function MatchScreen() {
     const away = fixture ? getClub(fixture.awayClubId) : undefined;
     return (
       <>
-        <GameHeader title="Próxima partida" eyebrow={fixture ? `LIGA PRISMA · RODADA ${career.roundIndex + 1}` : 'TEMPORADA ENCERRADA'} />
+        <GameHeader title="Próxima partida" eyebrow={fixture ? `3ª DIVISÃO · RODADA ${career.roundIndex + 1}` : 'TEMPORADA ENCERRADA'} />
         <Screen>
           <Panel style={styles.previewPanel}>
             {fixture && home && away ? (
@@ -145,7 +145,7 @@ export default function MatchScreen() {
   const handlePrimary = () => {
     if (isFinal) {
       closeCurrentMatch();
-      router.replace('/club');
+      router.replace('/');
     } else {
       advanceCurrentMatch(stepSize);
     }
@@ -161,7 +161,7 @@ export default function MatchScreen() {
 
   return (
     <>
-      <GameHeader title="Partida" eyebrow={`LIGA PRISMA · RODADA ${game.fixture.roundIndex + 1}`} right={<Text style={[styles.clockTag, { color: colors.primary }]}>{clock}</Text>} />
+      <GameHeader title="Partida" eyebrow={`3ª DIVISÃO · RODADA ${game.fixture.roundIndex + 1}`} right={<Text style={[styles.clockTag, { color: colors.primary }]}>{clock}</Text>} />
       <Screen>
         <Panel style={styles.scorePanel}>
           <View style={styles.scoreTop}>
@@ -260,7 +260,7 @@ export default function MatchScreen() {
 
 const styles = StyleSheet.create({
   clockTag: { fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
-  scorePanel: { gap: 14 },
+  scorePanel: { gap: 14, backgroundColor: '#0b2117', borderColor: '#2c503d' },
   scoreTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   liveBadge: { minHeight: 25, borderRadius: 12, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveBadgeDot: { width: 6, height: 6, borderRadius: 3 },
@@ -269,10 +269,10 @@ const styles = StyleSheet.create({
   scoreBoard: { minHeight: 112, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   scoreSide: { flex: 1, alignItems: 'flex-start', gap: 5 },
   scoreTeamName: { fontSize: 10, fontWeight: '800', maxWidth: '100%' },
-  scoreGoals: { fontSize: 30, fontWeight: '900', letterSpacing: -1 },
+  scoreGoals: { fontSize: 38, fontWeight: '900', letterSpacing: -1.4 },
   scoreCenter: { alignItems: 'center', minWidth: 27 },
   scoreColon: { fontSize: 19, fontWeight: '900' },
-  scoreClock: { fontSize: 8, fontWeight: '900', marginTop: 3 },
+  scoreClock: { fontSize: 12, fontWeight: '900', marginTop: 4 },
   progressTrack: { height: 6, borderRadius: 5, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 5 },
   stepLine: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -2 },
@@ -287,14 +287,14 @@ const styles = StyleSheet.create({
   choiceList: { gap: 1 },
   noBench: { fontSize: 11, lineHeight: 17, paddingVertical: 7 },
   notice: { fontSize: 10, fontWeight: '700' },
-  statsPanel: { gap: 12 },
+  statsPanel: { gap: 12, backgroundColor: '#0b2117', borderColor: '#2c503d' },
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   statsNumber: { width: 22, fontSize: 12, fontWeight: '900', textAlign: 'center' },
   statsLabel: { fontSize: 9, fontWeight: '700', textAlign: 'center', marginBottom: 5 },
   statsTrack: { height: 5, borderRadius: 4, overflow: 'hidden' },
   statsBarHome: { height: '100%', borderRadius: 4 },
   cardCount: { fontSize: 9, textAlign: 'center', paddingTop: 1 },
-  eventsPanel: { gap: 8 },
+  eventsPanel: { gap: 8, backgroundColor: '#0b2117', borderColor: '#2c503d' },
   eventCount: { fontSize: 9, fontWeight: '700' },
   eventRow: { minHeight: 43, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 9 },
   eventIcon: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   resultPanel: { gap: 7 },
   resultTitle: { fontSize: 15, fontWeight: '900' },
   resultText: { fontSize: 11, lineHeight: 16 },
-  previewPanel: { gap: 16, minHeight: 290, justifyContent: 'center' },
+  previewPanel: { gap: 16, minHeight: 290, justifyContent: 'center', backgroundColor: '#0b2117', borderColor: '#2c503d' },
   previewTeams: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', gap: 8 },
   previewClub: { flex: 1, alignItems: 'center', gap: 7 },
   previewName: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
