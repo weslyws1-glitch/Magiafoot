@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -85,6 +85,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     headquartersUpgrades: { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 },
     headquartersRevenuePricing: { store: 3, members: 3, events: 3 },
     headquartersImageAcquisition: { museum: 1, press: 1, history: 1 },
+    headquartersInvestments: { marketing: 3, commercial: 3 },
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -623,6 +624,7 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquarters: Career['headquartersUpgrades'] = { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 };
     const fallbackHeadquartersRevenuePricing: Career['headquartersRevenuePricing'] = { store: 3, members: 3, events: 3 };
     const fallbackHeadquartersImageAcquisition: Career['headquartersImageAcquisition'] = { museum: 1, press: 1, history: 1 };
+    const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
@@ -635,6 +637,7 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersUpgrades: { ...fallbackHeadquarters, ...((parsed as Career).headquartersUpgrades ?? {}) },
       headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
       headquartersImageAcquisition: { ...fallbackHeadquartersImageAcquisition, ...((parsed as Career).headquartersImageAcquisition ?? {}) },
+      headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
     };
   } catch {
     return null;
@@ -726,6 +729,29 @@ export function setHeadquartersRevenuePricing(career: Career, key: HeadquartersR
     ...career,
     headquartersRevenuePricing: {
       ...(career.headquartersRevenuePricing ?? { store: 3, members: 3, events: 3 }),
+      [key]: safeLevel,
+    },
+  };
+}
+
+export const HEADQUARTERS_INVESTMENT_MONTHLY_COST: Record<number, number> = {
+  1: 18_000,
+  2: 36_000,
+  3: 65_000,
+  4: 105_000,
+  5: 165_000,
+};
+
+export function headquartersInvestmentLabel(level: number): string {
+  return ({ 1: 'Muito baixo', 2: 'Baixo', 3: 'Normal', 4: 'Alto', 5: 'Muito alto' } as Record<number, string>)[clamp(Math.round(level), 1, 5)] ?? 'Normal';
+}
+
+export function setHeadquartersInvestment(career: Career, key: HeadquartersInvestmentKey, level: number): Career {
+  const safeLevel = clamp(Math.round(level), 1, 5);
+  return {
+    ...career,
+    headquartersInvestments: {
+      ...(career.headquartersInvestments ?? { marketing: 3, commercial: 3 }),
       [key]: safeLevel,
     },
   };
