@@ -20,6 +20,7 @@ export default function TacticsScreen() {
   }
 
   const live = Boolean(career.liveMatch && career.liveMatch.phase !== 'pregame' && career.liveMatch.phase !== 'finished');
+  const substitutionsRemaining = live && career.liveMatch ? Math.max(0, 5 - career.liveMatch.substitutionsUsed) : 5;
   const lineup = career.liveMatch?.userLineup ?? career.lineup;
   const starterIds = new Set(lineup.map((slot) => slot.playerId));
   const benchIds = career.liveMatch?.userBenchIds ?? career.benchIds;
@@ -43,6 +44,19 @@ export default function TacticsScreen() {
     <>
       <GameHeader title="Táticas" eyebrow={live ? 'PARTIDA AO VIVO' : 'ESCALAÇÃO'} />
       <Screen>
+        {live ? (
+          <Panel style={styles.subStatus}>
+            <View style={styles.subStatusIcon}>
+              <Feather name="repeat" size={18} color="#79ef91" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subStatusLabel}>SUBSTITUIÇÕES DISPONÍVEIS</Text>
+              <Text style={styles.subStatusValue}>{substitutionsRemaining} de 5</Text>
+            </View>
+            <Text style={styles.subStatusUsed}>{career.liveMatch?.substitutionsUsed ?? 0} usadas</Text>
+          </Panel>
+        ) : null}
+
         {!live ? (
           <>
             <Text style={styles.sectionTitle}>FORMAÇÃO</Text>
@@ -127,6 +141,11 @@ function OptionRow({ title, options, value, onChange }: { title: string; options
 }
 
 const styles = StyleSheet.create({
+  subStatus: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#153426', borderColor: '#356a4a' },
+  subStatusIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b2117', borderWidth: 1, borderColor: '#2c503d' },
+  subStatusLabel: { color: '#9fb2a5', fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  subStatusValue: { color: '#f5f7f5', fontSize: 18, fontWeight: '900', marginTop: 3 },
+  subStatusUsed: { color: '#79ef91', fontSize: 10, fontWeight: '900' },
   sectionTitle: { color: '#dce8df', fontSize: 12, fontWeight: '900', letterSpacing: 0.9 },
   formations: { gap: 8, paddingRight: 20 },
   formation: { minWidth: 84, minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: '#2c503d', backgroundColor: '#0b2117', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
