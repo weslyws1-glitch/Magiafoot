@@ -110,6 +110,9 @@ export default function SquadScreen() {
   const avgSatisfaction = Math.round(career.players.reduce((sum,p) => sum + (p.playingTimeSatisfaction ?? 70),0) / Math.max(1,career.players.length));
   const unhappy = career.players.filter((p) => (p.playingTimeSatisfaction ?? 70) < 40 || p.morale < 40).length;
   const expiring = career.players.filter((p) => contractRemaining(p,career.roundIndex) <= 10).length;
+  const conflictAverage = Math.round(career.players.reduce((sum,p) => sum + (p.conflictLevel ?? 0) * 20,0) / Math.max(1,career.players.length));
+  const unity = Math.max(0,Math.min(100,Math.round((avgMorale + avgSatisfaction) / 2 - conflictAverage * 0.35)));
+  const discipline = Math.max(0,Math.min(100,100 - Math.round(career.players.reduce((sum,p) => sum + (p.socialRisk ?? 20),0) / Math.max(1,career.players.length) * 0.6) - conflictAverage * 0.25));
   const leaders = [...career.players].sort((a,b) => (b.leadership ?? 50) - (a.leadership ?? 50)).slice(0,3);
 
   const visible = ordered.filter((player) => {
@@ -135,6 +138,8 @@ export default function SquadScreen() {
           <View style={styles.environmentMetrics}>
             <View style={styles.environmentMetric}><Text style={styles.metricLabel}>MORAL</Text><Text style={styles.metricValue}>{avgMorale}</Text></View>
             <View style={styles.environmentMetric}><Text style={styles.metricLabel}>SATISFAÇÃO</Text><Text style={styles.metricValue}>{avgSatisfaction}</Text></View>
+            <View style={styles.environmentMetric}><Text style={styles.metricLabel}>UNIÃO</Text><Text style={styles.metricValue}>{unity}</Text></View>
+            <View style={styles.environmentMetric}><Text style={styles.metricLabel}>DISCIPLINA</Text><Text style={styles.metricValue}>{discipline}</Text></View>
             <View style={styles.environmentMetric}><Text style={styles.metricLabel}>INSATISFEITOS</Text><Text style={styles.metricValue}>{unhappy}</Text></View>
             <View style={styles.environmentMetric}><Text style={styles.metricLabel}>CONTRATOS CURTOS</Text><Text style={styles.metricValue}>{expiring}</Text></View>
           </View>
@@ -305,7 +310,27 @@ export default function SquadScreen() {
                     <View style={styles.detailRow}><Text style={styles.detailKey}>Personalidade</Text><Text style={styles.detailValue}>{PERSONALITY_LABELS[selected.personality ?? 'tranquilo']}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailKey}>Liderança</Text><Text style={styles.detailValue}>{selected.leadership ?? 50}/100</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailKey}>Risco social</Text><Text style={styles.detailValue}>{selected.socialRisk ?? 20}/100</Text></View>
+                    <View style={styles.detailRow}><Text style={styles.detailKey}>Vida social</Text><Text style={styles.detailValue}>{selected.socialStatus === 'conturbada' ? 'Conturbada' : selected.socialStatus === 'atencao' ? 'Atenção' : 'Estável'}</Text></View>
+                    <View style={styles.detailRow}><Text style={styles.detailKey}>Conflito interno</Text><Text style={styles.detailValue}>{(selected.conflictLevel ?? 0) * 20}/100</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailKey}>Posições secundárias</Text><Text style={styles.detailValue}>{selected.secondaryPositions?.join(', ') || 'Nenhuma'}</Text></View>
+                  </Panel>
+
+                  <Panel style={styles.detailPanel}>
+                    <Text style={styles.sectionTitle}>HISTÓRICO DO JOGADOR</Text>
+                    {(selected.careerEvents ?? []).length > 0 ? (
+                      (selected.careerEvents ?? []).slice(0,8).map((event) => (
+                        <View key={event.id} style={styles.historyItem}>
+                          <View style={styles.historyDot} />
+                          <View style={styles.historyBody}>
+                            <Text style={styles.historyTitle}>{event.title}</Text>
+                            <Text style={styles.historyMeta}>Temporada {event.season} · Rodada {event.roundIndex + 1}</Text>
+                            <Text style={styles.historyText}>{event.detail}</Text>
+                          </View>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.helperText}>Ainda não há acontecimentos registrados nesta carreira.</Text>
+                    )}
                   </Panel>
 
                   <Panel style={styles.detailPanel}>
@@ -347,7 +372,7 @@ const styles=StyleSheet.create({
   environmentTitle:{color:'#f5f7f5',fontSize:16,fontWeight:'900',marginTop:3},
   environmentScore:{color:'#79ef91',fontSize:15,fontWeight:'900'},
   environmentMetrics:{flexDirection:'row',flexWrap:'wrap',gap:7},
-  environmentMetric:{width:'48.5%',padding:9,borderRadius:8,backgroundColor:'#0c2117'},
+  environmentMetric:{width:'31.8%',padding:9,borderRadius:8,backgroundColor:'#0c2117'},
   metricLabel:{color:'#83998b',fontSize:6.5,fontWeight:'900',letterSpacing:0.5},
   metricValue:{color:'#f5f7f5',fontSize:14,fontWeight:'900',marginTop:2},
   tabs:{gap:7,paddingVertical:2},
@@ -426,4 +451,10 @@ const styles=StyleSheet.create({
   statNumber:{color:'#f5f7f5',fontSize:13,fontWeight:'900'},
   statLabel:{color:'#7f9486',fontSize:6,fontWeight:'900',marginTop:2},
   helperText:{color:'#8fa394',fontSize:7.5,lineHeight:11.5},
+  historyItem:{flexDirection:'row',gap:8,paddingVertical:7,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:'#254232'},
+  historyDot:{width:7,height:7,borderRadius:99,backgroundColor:'#79ef91',marginTop:4},
+  historyBody:{flex:1,minWidth:0},
+  historyTitle:{color:'#f5f7f5',fontSize:8,fontWeight:'900'},
+  historyMeta:{color:'#75907f',fontSize:6.3,fontWeight:'800',marginTop:2},
+  historyText:{color:'#9db0a3',fontSize:7.2,lineHeight:10.8,marginTop:2},
 });
