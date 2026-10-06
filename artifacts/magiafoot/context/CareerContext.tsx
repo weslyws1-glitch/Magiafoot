@@ -18,8 +18,9 @@ import {
   updateTactics,
   upgradeStadium,
   upgradeStadiumFacility,
+  upgradeHeadquartersFacility,
 } from '@/game/engine';
-import type { Career, FormationId, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { Career, FormationId, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -41,6 +42,7 @@ interface CareerContextValue {
   expandStadium: () => boolean;
   upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
   updateTicketPrice: (price: number) => void;
+  upgradeHeadquartersItem: (key: HeadquartersUpgradeKey) => boolean;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -138,6 +140,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => setTicketPrice(current, price));
   }, [update]);
 
+  const upgradeHeadquartersItem = useCallback((key: HeadquartersUpgradeKey) => {
+    if (!career) return false;
+    const next = upgradeHeadquartersFacility(career, key);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -156,9 +166,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     expandStadium,
     upgradeStadiumItem,
     updateTicketPrice,
+    upgradeHeadquartersItem,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
