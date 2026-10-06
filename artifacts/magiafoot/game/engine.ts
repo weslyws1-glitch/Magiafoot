@@ -510,7 +510,7 @@ export function administrationStaffCapacity(career: Career): number {
   return clamp(2 + meeting + technology, 2, 10);
 }
 
-function activeAdministrativeStaff(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional[] {
+export function activeAdministrativeStaff(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional[] {
   const people = career.administrationStaff?.[department] ?? [];
   return people.filter((person) => {
     const end = typeof person.contractEndRound === 'number'
