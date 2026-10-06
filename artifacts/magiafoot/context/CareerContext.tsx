@@ -29,8 +29,9 @@ import {
   upgradeStadium,
   upgradeStadiumFacility,
   upgradeHeadquartersFacility,
+  upgradeTrainingCenterFacility,
 } from '@/game/engine';
-import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -63,6 +64,7 @@ interface CareerContextValue {
   renewSponsor: (contractId: string) => void;
   hireAdminProfessional: (department: AdministrationDepartmentKey) => boolean;
   fireAdminProfessional: (department: AdministrationDepartmentKey, professionalId: string) => boolean;
+  upgradeTrainingCenterItem: (key: TrainingCenterUpgradeKey) => boolean;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -220,6 +222,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
 
+  const upgradeTrainingCenterItem = useCallback((key: TrainingCenterUpgradeKey) => {
+    if (!career) return false;
+    const next = upgradeTrainingCenterFacility(career, key);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -249,9 +259,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     renewSponsor,
     hireAdminProfessional,
     fireAdminProfessional,
+    upgradeTrainingCenterItem,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
