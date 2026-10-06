@@ -10,7 +10,7 @@ import {
   headquartersRevenueLabel,
   headquartersUpgradeCost,
 } from '@/game/engine';
-import type { HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
+import type { HeadquartersImageKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
 type HqItem = {
@@ -19,7 +19,7 @@ type HqItem = {
   text: string;
   icon: keyof typeof Feather.glyphMap;
   effect: string;
-  group: 'administracao' | 'comercial' | 'imagem';
+  group: 'administracao' | 'comercial';
 };
 
 type RevenueItem = {
@@ -28,6 +28,14 @@ type RevenueItem = {
   text: string;
   icon: keyof typeof Feather.glyphMap;
   baseRevenue: number;
+};
+
+type ImageItem = {
+  key: HeadquartersImageKey;
+  title: string;
+  text: string;
+  icon: keyof typeof Feather.glyphMap;
+  baseFans: number;
 };
 
 const ITEMS: HqItem[] = [
@@ -40,10 +48,12 @@ const ITEMS: HqItem[] = [
   { key: 'marketing', title: 'Marketing', text: 'Aumenta exposição, alcance da torcida e valor da marca.', icon: 'radio', effect: 'Mais popularidade', group: 'comercial' },
   { key: 'sponsors', title: 'Patrocínios', text: 'Melhora captação e valor dos contratos comerciais.', icon: 'award', effect: 'Mais receita comercial', group: 'comercial' },
   { key: 'commercial', title: 'Departamento comercial', text: 'Amplia parcerias, ações promocionais e novos negócios.', icon: 'trending-up', effect: 'Mais oportunidades', group: 'comercial' },
+];
 
-  { key: 'museum', title: 'Museu do clube', text: 'Fortalece história, visitação e prestígio institucional.', icon: 'book-open', effect: 'Mais prestígio e visitação', group: 'imagem' },
-  { key: 'press', title: 'Centro de imprensa', text: 'Melhora relacionamento com mídia e exposição do clube.', icon: 'mic', effect: 'Mais reputação', group: 'imagem' },
-  { key: 'history', title: 'Arquivo histórico', text: 'Preserva conquistas e reforça tradição e identidade do clube.', icon: 'archive', effect: 'Mais tradição', group: 'imagem' },
+const IMAGE_ITEMS: ImageItem[] = [
+  { key: 'museum', title: 'Museu do clube', text: 'Ações de história, visitas e experiências para aproximar novos torcedores.', icon: 'book-open', baseFans: 1100 },
+  { key: 'press', title: 'Centro de imprensa', text: 'Exposição na mídia e comunicação para alcançar novos públicos.', icon: 'mic', baseFans: 1500 },
+  { key: 'history', title: 'História e identidade', text: 'Campanhas de tradição e identidade para converter simpatizantes em torcedores.', icon: 'archive', baseFans: 900 },
 ];
 
 const REVENUE_ITEMS: RevenueItem[] = [
@@ -55,7 +65,6 @@ const REVENUE_ITEMS: RevenueItem[] = [
 const GROUPS = [
   ['administracao', 'Administração'],
   ['comercial', 'Comercial'],
-  ['imagem', 'Imagem do clube'],
 ] as const;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -97,9 +106,19 @@ function demandLabel(value: number) {
   return 'Muito baixa';
 }
 
+function acquisitionLabel(level: number) {
+  return ({ 1: 'Baixa', 2: 'Média', 3: 'Alta' } as Record<number, string>)[level] ?? 'Baixa';
+}
+
+function riskLabel(risk: number) {
+  if (risk >= 68) return 'Alto';
+  if (risk >= 38) return 'Médio';
+  return 'Baixo';
+}
+
 export default function ClubHeadquartersScreen() {
   const colors = useColors();
-  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing } = useCareer();
+  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition } = useCareer();
 
   if (!career) {
     return <><GameHeader title="Sede do clube" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar a sede.</Text></Screen></>;
@@ -110,6 +129,7 @@ export default function ClubHeadquartersScreen() {
 
   const levels = career.headquartersUpgrades;
   const pricing = career.headquartersRevenuePricing ?? { store: 3, members: 3, events: 3 };
+  const imageAcquisition = career.headquartersImageAcquisition ?? { museum: 1, press: 1, history: 1 };
   const satisfaction = fanSatisfaction(career);
   const satisfactionText = satisfactionLabel(satisfaction);
   const fanMultiplier = 0.72 + (satisfaction / 100) * 0.58;
@@ -198,6 +218,103 @@ export default function ClubHeadquartersScreen() {
             </View>
           </React.Fragment>
         ))}
+
+        <SectionLabel title="Imagem do clube" />
+        <Panel style={styles.fanPanel}>
+          <View style={styles.fanHeader}>
+            <View>
+              <Text style={styles.fanKicker}>CAPTAÇÃO DE TORCEDORES</Text>
+              <Text style={styles.fanTitle}>{satisfactionText}</Text>
+            </View>
+            <Text style={styles.fanScore}>{satisfaction}/100</Text>
+          </View>
+          <Text style={styles.fanText}>A captação depende da fase do time, reputação, marketing e satisfação. Aumentar a capacidade de captação aumenta o alcance, mas também eleva o risco de campanhas caras não converterem novos torcedores.</Text>
+        </Panel>
+
+        <View style={styles.list}>
+          {IMAGE_ITEMS.map((item) => {
+            const acquisitionLevel = imageAcquisition[item.key] ?? 1;
+            const formFactor = satisfaction / 100;
+            const reputationFactor = reputation / 100;
+            const marketingFactor = 0.85 + (levels.marketing ?? 0) * 0.06;
+            const ambitionRisk = acquisitionLevel === 1 ? 18 : acquisitionLevel === 2 ? 39 : 62;
+            const poorFormRisk = Math.max(0, 55 - satisfaction) * 0.55;
+            const reputationRelief = reputation * 0.18;
+            const rawRisk = clamp(Math.round(ambitionRisk + poorFormRisk - reputationRelief), 8, 85);
+            const risk = rawRisk;
+            const successChance = clamp(100 - risk, 15, 92);
+            const reachMultiplier = acquisitionLevel === 1 ? 0.85 : acquisitionLevel === 2 ? 1.35 : 2.0;
+            const projectedFans = Math.max(0, Math.round(item.baseFans * reachMultiplier * (0.55 + formFactor * 0.65) * (0.65 + reputationFactor * 0.55) * marketingFactor * (successChance / 100)));
+            const demand = clamp(Math.round((satisfaction * 0.52) + (reputation * 0.28) + ((levels.marketing ?? 0) * 4)), 10, 100);
+
+            return (
+              <Panel key={item.key} style={styles.revenueCard}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardIcon}><Feather name={item.icon} size={19} color="#79ef91" /></View>
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardText}>{item.text}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.priceControl}>
+                  <Pressable
+                    onPress={() => updateHeadquartersImageAcquisition(item.key, acquisitionLevel - 1)}
+                    disabled={acquisitionLevel <= 1}
+                    style={[styles.priceButton, acquisitionLevel <= 1 && styles.priceButtonDisabled]}
+                  >
+                    <Feather name="minus" size={18} color={acquisitionLevel <= 1 ? '#65756b' : '#f5f7f5'} />
+                  </Pressable>
+
+                  <View style={styles.priceCenter}>
+                    <Text style={styles.priceLabel}>NÍVEL DE CAPTAÇÃO</Text>
+                    <Text style={styles.priceValue}>{acquisitionLabel(acquisitionLevel).toUpperCase()}</Text>
+                    <View style={styles.priceDots}>
+                      {[1,2,3].map((dot) => <View key={dot} style={[styles.priceDot, dot <= acquisitionLevel && styles.priceDotActive]} />)}
+                    </View>
+                  </View>
+
+                  <Pressable
+                    onPress={() => updateHeadquartersImageAcquisition(item.key, acquisitionLevel + 1)}
+                    disabled={acquisitionLevel >= 3}
+                    style={[styles.priceButton, acquisitionLevel >= 3 && styles.priceButtonDisabled]}
+                  >
+                    <Feather name="plus" size={18} color={acquisitionLevel >= 3 ? '#65756b' : '#f5f7f5'} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.miniWindow}>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>DEMANDA</Text>
+                    <Text style={styles.miniValue}>{demand}%</Text>
+                    <Text style={styles.miniHint}>{demand >= 75 ? 'Muito favorável' : demand >= 55 ? 'Favorável' : demand >= 35 ? 'Instável' : 'Fraca'}</Text>
+                  </View>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>RISCO</Text>
+                    <Text style={[styles.miniValue, risk >= 68 ? styles.riskHigh : risk >= 38 ? styles.riskMedium : styles.riskLow]}>{riskLabel(risk)}</Text>
+                    <Text style={styles.miniHint}>{risk}%</Text>
+                  </View>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>NOVOS TORCEDORES</Text>
+                    <Text style={styles.miniValue}>{projectedFans.toLocaleString('pt-BR')}</Text>
+                    <Text style={styles.miniHint}>projeção / mês</Text>
+                  </View>
+                </View>
+
+                <View style={styles.riskBox}>
+                  <Feather name="alert-triangle" size={14} color={risk >= 68 ? '#f09d9d' : '#d8c27c'} />
+                  <Text style={styles.riskText}>
+                    {risk >= 68
+                      ? 'Campanha agressiva: grande alcance, mas alto risco de baixa conversão. Uma sequência ruim do time pode derrubar a captação.'
+                      : risk >= 38
+                        ? 'Captação equilibrada: bom alcance, porém o resultado depende bastante da fase do time e da reputação.'
+                        : 'Captação conservadora: crescimento menor, com risco reduzido de desperdício e rejeição.'}
+                  </Text>
+                </View>
+              </Panel>
+            );
+          })}
+        </View>
 
         <SectionLabel title="Receitas" />
         <Panel style={styles.fanPanel}>
@@ -368,6 +485,11 @@ const styles = StyleSheet.create({
   miniValue: { color: '#f5f7f5', fontSize: 9, fontWeight: '900', marginTop: 4 },
   miniHint: { color: '#79ef91', fontSize: 6.5, fontWeight: '800', marginTop: 3 },
   revenueExplanation: { color: '#9fb2a5', fontSize: 8.2, lineHeight: 12.5 },
+  riskBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 9, borderRadius: 9, backgroundColor: '#171f19', borderWidth: 1, borderColor: '#3b463e' },
+  riskText: { flex: 1, color: '#b9c7bd', fontSize: 8, lineHeight: 12 },
+  riskLow: { color: '#79ef91' },
+  riskMedium: { color: '#d8c27c' },
+  riskHigh: { color: '#f09d9d' },
 
   financePanel: { paddingVertical: 2, backgroundColor: '#10291d', borderColor: '#2c503d' },
   financeRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#274535' },
