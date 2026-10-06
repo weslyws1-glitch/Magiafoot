@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -87,6 +87,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     headquartersRevenuePricing: { store: 3, members: 3, events: 3 },
     headquartersImageAcquisition: { museum: 1, press: 1, history: 1 },
     headquartersInvestments: { marketing: 3, commercial: 3 },
+    administrationStaff: { board: [], finance: [], legal: [] },
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     results: [],
     liveMatch: null,
@@ -481,6 +482,116 @@ function cpuScore(home: Club, away: Club, seed: number): [number, number] {
   const homeGoals = clamp(Math.floor(roll() * (0.9 + home.rating / 45)), 0, 4);
   const awayGoals = clamp(Math.floor(roll() * (0.9 + away.rating / 45)), 0, 4);
   return [homeGoals, awayGoals];
+}
+
+export const ADMIN_DEPARTMENT_LABELS: Record<AdministrationDepartmentKey, string> = {
+  board: 'Diretoria',
+  finance: 'Departamento financeiro',
+  legal: 'Departamento jurídico',
+};
+
+const ADMIN_ROLES: Record<AdministrationDepartmentKey, string[]> = {
+  board: ['Diretor executivo', 'Gerente administrativo', 'Analista de gestão', 'Coordenador institucional'],
+  finance: ['Controller', 'Analista financeiro', 'Contador', 'Planejador financeiro'],
+  legal: ['Advogado desportivo', 'Analista jurídico', 'Especialista contratual', 'Compliance'],
+};
+
+const ADMIN_NAMES = [
+  'Rafael Martins', 'Bruno Azevedo', 'Caio Nogueira', 'Marcos Tavares',
+  'Felipe Andrade', 'Diego Moura', 'Lucas Barreto', 'Renato Freitas',
+  'André Farias', 'Thiago Campos', 'Gustavo Prado', 'Vitor Sales',
+  'Eduardo Lima', 'Henrique Duarte', 'Matheus Reis', 'Daniel Rocha',
+];
+
+export function administrationStaffCapacity(career: Career): number {
+  const meeting = career.headquartersUpgrades?.meeting ?? 0;
+  const technology = career.headquartersUpgrades?.technology ?? 0;
+  return clamp(2 + meeting + technology, 2, 10);
+}
+
+export function administrationRequiredStaff(career: Career, department: AdministrationDepartmentKey): number {
+  const club = getClub(career.clubId);
+  const base = club?.rating ?? 60;
+  const scale = base >= 78 ? 5 : base >= 70 ? 4 : base >= 62 ? 3 : 2;
+  const pressure = career.roundIndex >= 20 ? 1 : 0;
+  const departmentExtra = department === 'board' ? 1 : 0;
+  return clamp(scale + pressure + departmentExtra, 2, 8);
+}
+
+function administrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
+  const current = career.administrationStaff?.[department]?.length ?? 0;
+  const seed = hash(`staff-${career.id}-${department}-${current}-${career.roundIndex}`);
+  const quality = clamp(52 + (seed % 37), 50, 88);
+  const salary = Math.round((18_000 + quality * 720) / 1000) * 1000;
+  const hireCost = Math.round((salary * (1.6 + quality / 100)) / 1000) * 1000;
+  const fireCost = Math.round((salary * (0.75 + quality / 220)) / 1000) * 1000;
+  const roles = ADMIN_ROLES[department];
+  return {
+    id: `staff-${department}-${career.roundIndex}-${current}-${seed}`,
+    name: ADMIN_NAMES[seed % ADMIN_NAMES.length]!,
+    department,
+    role: roles[(seed >> 4) % roles.length]!,
+    quality,
+    salary,
+    hireCost,
+    fireCost,
+    hiredRound: career.roundIndex,
+  };
+}
+
+export function previewAdministrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
+  return administrativeCandidate(career, department);
+}
+
+export function hireAdministrativeProfessional(career: Career, department: AdministrationDepartmentKey): Career {
+  const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
+  const current = staff[department] ?? [];
+  const capacity = administrationStaffCapacity(career);
+  if (current.length >= capacity || current.length >= 10) return career;
+
+  const candidate = administrativeCandidate(career, department);
+  if (career.balance < candidate.hireCost) return career;
+
+  const next: Career = {
+    ...career,
+    balance: career.balance - candidate.hireCost,
+    administrationStaff: {
+      ...staff,
+      [department]: [...current, candidate],
+    },
+    lastNews: `${candidate.name} foi contratado para ${ADMIN_DEPARTMENT_LABELS[department]}.`,
+  };
+  return addCareerNews(next, 'Novo profissional na administração', `${candidate.name}, ${candidate.role}, chegou para reforçar ${ADMIN_DEPARTMENT_LABELS[department]} por ${formatCurrency(candidate.hireCost)}.`, 'club');
+}
+
+export function fireAdministrativeProfessional(career: Career, department: AdministrationDepartmentKey, professionalId: string): Career {
+  const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
+  const current = staff[department] ?? [];
+  const professional = current.find((item) => item.id === professionalId);
+  if (!professional || career.balance < professional.fireCost) return career;
+
+  const next: Career = {
+    ...career,
+    balance: career.balance - professional.fireCost,
+    administrationStaff: {
+      ...staff,
+      [department]: current.filter((item) => item.id !== professionalId),
+    },
+    boardTrust: clamp(career.boardTrust - (department === 'board' ? 1 : 0), 0, 100),
+    lastNews: `${professional.name} deixou ${ADMIN_DEPARTMENT_LABELS[department]}.`,
+  };
+  return addCareerNews(next, 'Mudança na administração', `${professional.name} foi desligado de ${ADMIN_DEPARTMENT_LABELS[department]}. Rescisão de ${formatCurrency(professional.fireCost)}.`, 'club');
+}
+
+export function administrationDepartmentEfficiency(career: Career, department: AdministrationDepartmentKey): number {
+  const people = career.administrationStaff?.[department] ?? [];
+  const required = administrationRequiredStaff(career, department);
+  if (!people.length) return 15;
+  const averageQuality = people.reduce((sum, person) => sum + person.quality, 0) / people.length;
+  const staffing = clamp(people.length / Math.max(1, required), 0.35, 1.15);
+  const tech = career.headquartersUpgrades?.technology ?? 0;
+  const meetings = career.headquartersUpgrades?.meeting ?? 0;
+  return clamp(Math.round(averageQuality * staffing + tech * 3 + meetings * 2), 10, 100);
 }
 
 const SPONSOR_POOL = [
@@ -993,6 +1104,7 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquartersRevenuePricing: Career['headquartersRevenuePricing'] = { store: 3, members: 3, events: 3 };
     const fallbackHeadquartersImageAcquisition: Career['headquartersImageAcquisition'] = { museum: 1, press: 1, history: 1 };
     const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
+    const fallbackAdministrationStaff: Career['administrationStaff'] = { board: [], finance: [], legal: [] };
     const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
     const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
@@ -1008,6 +1120,7 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
       headquartersImageAcquisition: { ...fallbackHeadquartersImageAcquisition, ...((parsed as Career).headquartersImageAcquisition ?? {}) },
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
+      administrationStaff: { ...fallbackAdministrationStaff, ...((parsed as Career).administrationStaff ?? {}) },
       fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
       sponsorships: { ...fallbackSponsorships, ...((parsed as Career).sponsorships ?? {}) },
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
