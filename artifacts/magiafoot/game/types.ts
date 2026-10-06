@@ -10,7 +10,7 @@ export type Position =
   | 'PD'
   | 'ATA';
 
-export type PlayerStatus = 'available' | 'injured' | 'suspended';
+export type PlayerStatus = 'available' | 'injured' | 'suspended' | 'loaned';
 export type FormationId = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1';
 export type MatchPhase = 'pregame' | 'first_half' | 'halftime' | 'second_half' | 'finished';
 export type Mentality = 'cautelosa' | 'equilibrada' | 'ofensiva';
@@ -46,6 +46,16 @@ export interface PlayerCareerEvent {
   type: 'match' | 'contract' | 'social' | 'discipline' | 'transfer' | 'promise';
   title: string;
   detail: string;
+}
+
+export interface PlayerTransferOffer {
+  id: string;
+  playerId: string;
+  clubName: string;
+  type: 'sale' | 'loan';
+  amount: number;
+  durationRounds: number;
+  expiresRound: number;
 }
 
 export interface AdministrativeProfessional {
@@ -144,6 +154,8 @@ export interface Player {
   conflictLevel?: number;
   socialStatus?: 'estavel' | 'atencao' | 'conturbada';
   lastSocialEventRound?: number;
+  loanedOutUntilRound?: number | null;
+  loanClubName?: string | null;
 }
 
 export interface Club {
@@ -271,6 +283,7 @@ export interface Career {
   administrationStaff: AdministrationStaff;
   trainingCenterUpgrades: Record<TrainingCenterUpgradeKey, number>;
   sponsorships: SponsorshipState;
+  playerTransferOffers: PlayerTransferOffer[];
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
