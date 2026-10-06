@@ -525,9 +525,7 @@ function recentFormScore(career: Career): number {
 
 function sponsorshipMarketScore(career: Career): number {
   const form = recentFormScore(career);
-  const marketing = career.headquartersInvestments?.marketing ?? 3;
-  const commercial = career.headquartersInvestments?.commercial ?? 3;
-  return clamp(Math.round(form * 0.42 + career.boardTrust * 0.18 + career.fanTrust * 0.18 + marketing * 4 + commercial * 4), 10, 100);
+  return clamp(Math.round(form * 0.48 + career.boardTrust * 0.20 + career.fanTrust * 0.32), 10, 100);
 }
 
 export const SPONSORSHIP_PLACEMENT_LABELS: Record<SponsorshipSlot, string> = {
@@ -570,7 +568,6 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
   const slots = (['principal','sleeve','back','shorts','stadium','training_center','headquarters','media_wall','institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
   const seed = hash(`sponsor-${career.clubId}-${career.season}-${currentRound}`);
   const pool = [...SPONSOR_POOL].sort((a, b) => ((hash(a.name) ^ seed) >>> 0) - ((hash(b.name) ^ seed) >>> 0));
-  const commercial = career.headquartersInvestments?.commercial ?? 3;
   const proposals: SponsorshipProposal[] = [];
 
   for (let i = 0; i < count && slots.length > 0; i += 1) {
@@ -580,7 +577,7 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
       ? 'principal'
       : (slots[i % slots.length] ?? sponsorshipSlotForIndex(i));
     const slotFactor = SPONSORSHIP_PLACEMENT_FACTOR[slot];
-    const strength = 0.58 + score / 100 + commercial * 0.085;
+    const strength = 0.72 + score / 100;
     const base = Math.round((80_000 + brand.prestige * 4_900) * slotFactor * strength);
     const durationMatches = score >= 75 ? 10 + ((seed + i) % 7) : 6 + ((seed + i) % 6);
     const signingBonus = Math.round(base * (0.72 + ((seed >> (i + 1)) % 28) / 100));
@@ -655,13 +652,12 @@ export function negotiateSponsorshipProposal(
   const oldFactor = SPONSORSHIP_PLACEMENT_FACTOR[proposal.slot] ?? 1;
   const newFactor = SPONSORSHIP_PLACEMENT_FACTOR[targetSlot] ?? 1;
   const placementRatio = newFactor / Math.max(0.1, oldFactor);
-  const commercial = career.headquartersInvestments?.commercial ?? 3;
   const score = sponsorshipMarketScore(career);
 
   const requestedIncrease = Math.max(0, safeMultiplier - 1);
   const relocationPenalty = targetSlot === proposal.slot ? 0 : Math.abs(newFactor - oldFactor) * 18;
   const chance = clamp(
-    58 + commercial * 7 + score * 0.22
+    58 + score * 0.31
       - proposal.prestige * 0.18
       - proposal.negotiationRound * 17
       - requestedIncrease * 115
