@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --dir artifacts/magiafoot exec expo export --platform web",
+  "outputDirectory": "artifacts/magiafoot/dist"
+}
