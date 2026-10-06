@@ -7,13 +7,12 @@ import { useCareer } from '@/context/CareerContext';
 import { effectiveStrength, formatCurrency, getRosterGroups } from '@/game/engine';
 import type { Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus } from '@/game/types';
 
-type TabKey = 'plantel' | 'contratos' | 'desempenho' | 'moral' | 'treino' | 'mercado';
+type TabKey = 'plantel' | 'contratos' | 'desempenho' | 'treino' | 'mercado';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'plantel', label: 'PLANTEL' },
   { key: 'contratos', label: 'CONTRATOS' },
   { key: 'desempenho', label: 'DESEMPENHO' },
-  { key: 'moral', label: 'MORAL' },
   { key: 'treino', label: 'TREINO' },
   { key: 'mercado', label: 'MERCADO' },
 ];
@@ -116,7 +115,6 @@ export default function SquadScreen() {
   const visible = ordered.filter((player) => {
     if (tab === 'contratos') return contractRemaining(player,career.roundIndex) <= 18;
     if (tab === 'desempenho') return (player.seasonStats?.appearances ?? 0) > 0;
-    if (tab === 'moral') return true;
     if (tab === 'treino') return true;
     if (tab === 'mercado') return true;
     return true;
@@ -166,35 +164,65 @@ export default function SquadScreen() {
 
         {tab === 'contratos' ? <SectionLabel title="Contratos que exigem atenção" /> : null}
         {tab === 'desempenho' ? <SectionLabel title="Desempenho na temporada" /> : null}
-        {tab === 'moral' ? <SectionLabel title="Moral e satisfação" /> : null}
         {tab === 'treino' ? <SectionLabel title="Treino individual" /> : null}
         {tab === 'mercado' ? <SectionLabel title="Situação no mercado" /> : null}
 
-        <Panel style={styles.listPanel}>
-          {visible.map((player) => (
-            <Pressable key={player.id} onPress={() => setSelectedId(player.id)} style={styles.playerRow}>
-              <View style={styles.positionBadge}><Text style={styles.positionText}>{player.position}</Text></View>
-              <View style={styles.playerMain}>
-                <Text style={styles.playerName}>{player.name}</Text>
-                <Text style={styles.playerSub}>
-                  {tab === 'contratos'
-                    ? contractRemaining(player,career.roundIndex) + ' jogos restantes · ' + formatCurrency(player.wage) + '/sem'
-                    : tab === 'desempenho'
-                      ? (player.seasonStats?.appearances ?? 0) + ' J · ' + (player.seasonStats?.goals ?? 0) + ' G · Nota ' + averageRating(player)
-                      : tab === 'moral'
-                        ? satisfactionText(player.playingTimeSatisfaction ?? 70) + ' · Moral ' + player.morale
+        {tab === 'plantel' ? (
+          <Panel style={styles.tablePanel}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.th,styles.colPos]}>POS</Text>
+              <Text style={[styles.th,styles.colNum]}>N.</Text>
+              <Text style={[styles.th,styles.colName]}>NOME</Text>
+              <Text style={[styles.th,styles.colCond]}>CND</Text>
+              <Text style={[styles.th,styles.colQuality]}>QUAL.</Text>
+              <Text style={[styles.th,styles.colMorale]}>MOR.</Text>
+            </View>
+            {visible.map((player) => {
+              const condition = Math.round(player.fitness);
+              const quality = effectiveStrength(player);
+              return (
+                <Pressable key={player.id} onPress={() => setSelectedId(player.id)} style={styles.tableRow}>
+                  <View style={styles.colPos}><Text style={styles.posCell}>{player.position}</Text></View>
+                  <Text style={[styles.cell,styles.colNum]}>{player.shirtNumber ?? '—'}</Text>
+                  <View style={styles.colName}>
+                    <Text numberOfLines={1} style={styles.nameCell}>{player.name}</Text>
+                    <Text numberOfLines={1} style={styles.nameSub}>{ROLE_LABELS[player.squadRole ?? 'rotacao']}</Text>
+                  </View>
+                  <View style={styles.colCond}>
+                    <View style={styles.conditionTrack}>
+                      <View style={[styles.conditionFill,{ width:(Math.max(8,Math.min(100,condition)) + '%') as any }]} />
+                    </View>
+                    <Text style={styles.miniCell}>{condition}</Text>
+                  </View>
+                  <Text style={[styles.qualityCell,styles.colQuality]}>{quality}</Text>
+                  <Text style={[styles.moraleCell,styles.colMorale]}>{player.morale}</Text>
+                </Pressable>
+              );
+            })}
+          </Panel>
+        ) : (
+          <Panel style={styles.listPanel}>
+            {visible.map((player) => (
+              <Pressable key={player.id} onPress={() => setSelectedId(player.id)} style={styles.playerRow}>
+                <View style={styles.positionBadge}><Text style={styles.positionText}>{player.position}</Text></View>
+                <View style={styles.playerMain}>
+                  <Text style={styles.playerName}>{player.name}</Text>
+                  <Text style={styles.playerSub}>
+                    {tab === 'contratos'
+                      ? contractRemaining(player,career.roundIndex) + ' jogos restantes · ' + formatCurrency(player.wage) + '/sem'
+                      : tab === 'desempenho'
+                        ? (player.seasonStats?.appearances ?? 0) + ' J · ' + (player.seasonStats?.goals ?? 0) + ' G · Nota ' + averageRating(player)
                         : tab === 'treino'
                           ? 'Foco: ' + TRAINING_LABELS[player.trainingFocus ?? 'equilibrado'] + ' · Potencial ' + (player.potential ?? player.strength)
-                          : tab === 'mercado'
-                            ? MARKET_LABELS[player.marketStatus ?? 'negociavel'] + ' · ' + formatCurrency(player.value)
-                            : ROLE_LABELS[player.squadRole ?? 'rotacao'] + ' · ' + player.age + ' anos'}
-                </Text>
-              </View>
-              <View style={styles.rowStat}><Text style={styles.rowStatValue}>{effectiveStrength(player)}</Text><Text style={styles.rowStatLabel}>FOR</Text></View>
-              <Feather name="chevron-right" size={17} color="#789080" />
-            </Pressable>
-          ))}
-        </Panel>
+                          : MARKET_LABELS[player.marketStatus ?? 'negociavel'] + ' · ' + formatCurrency(player.value)}
+                  </Text>
+                </View>
+                <View style={styles.rowStat}><Text style={styles.rowStatValue}>{effectiveStrength(player)}</Text><Text style={styles.rowStatLabel}>FOR</Text></View>
+                <Feather name="chevron-right" size={17} color="#789080" />
+              </Pressable>
+            ))}
+          </Panel>
+        )}
 
         <GameButton label="ORGANIZAR ESCALAÇÃO" icon="layout" onPress={() => router.push('/tactics')} />
       </Screen>
@@ -334,6 +362,25 @@ const styles=StyleSheet.create({
   leadersPanel:{gap:5,backgroundColor:'#10291d',borderColor:'#2c503d'},
   leadersText:{color:'#dfe8e2',fontSize:9,fontWeight:'800'},
   listPanel:{padding:0,overflow:'hidden'},
+  tablePanel:{padding:0,overflow:'hidden'},
+  tableHeader:{minHeight:38,paddingHorizontal:6,flexDirection:'row',alignItems:'center',backgroundColor:'#0b1d14',borderBottomWidth:1,borderBottomColor:'#2c503d'},
+  tableRow:{minHeight:54,paddingHorizontal:6,flexDirection:'row',alignItems:'center',borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:'#214231'},
+  th:{color:'#79ef91',fontSize:6.5,fontWeight:'900',letterSpacing:0.4},
+  cell:{color:'#dfe8e2',fontSize:8,fontWeight:'800',textAlign:'center'},
+  colPos:{width:40},
+  colNum:{width:28,textAlign:'center'},
+  colName:{flex:1,minWidth:0,paddingRight:5},
+  colCond:{width:60,alignItems:'center'},
+  colQuality:{width:42,textAlign:'center'},
+  colMorale:{width:42,textAlign:'center'},
+  posCell:{color:'#dfe8e2',fontSize:8,fontWeight:'900'},
+  nameCell:{color:'#f6f8f6',fontSize:8.5,fontWeight:'900'},
+  nameSub:{color:'#718579',fontSize:5.8,marginTop:2},
+  conditionTrack:{width:46,height:7,borderRadius:99,backgroundColor:'#1d2c23',overflow:'hidden',borderWidth:1,borderColor:'#31493a'},
+  conditionFill:{height:'100%',backgroundColor:'#79ef91'},
+  miniCell:{color:'#8da092',fontSize:5.8,fontWeight:'900',marginTop:2},
+  qualityCell:{color:'#79ef91',fontSize:9,fontWeight:'900'},
+  moraleCell:{color:'#f1d36c',fontSize:9,fontWeight:'900'},
   playerRow:{minHeight:64,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:9,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:'#214231'},
   positionBadge:{width:38,height:38,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#153426',borderWidth:1,borderColor:'#355846'},
   positionText:{color:'#79ef91',fontSize:8,fontWeight:'900'},
