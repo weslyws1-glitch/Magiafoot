@@ -12,6 +12,7 @@ import {
   serializeCareer,
   setCaptain,
   sellPlayer,
+  setTicketPrice,
   startMatch,
   substitutePlayer,
   updateTactics,
@@ -39,6 +40,7 @@ interface CareerContextValue {
   transferPlayer: (playerId: string) => boolean;
   expandStadium: () => boolean;
   upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
+  updateTicketPrice: (price: number) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -132,6 +134,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
 
+  const updateTicketPrice = useCallback((price: number) => {
+    update((current) => setTicketPrice(current, price));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -149,9 +155,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     transferPlayer,
     expandStadium,
     upgradeStadiumItem,
+    updateTicketPrice,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
