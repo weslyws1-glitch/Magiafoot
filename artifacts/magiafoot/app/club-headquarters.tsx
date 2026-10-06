@@ -15,6 +15,8 @@ import {
   administrationStaffCapacity,
   administrationRequiredStaff,
   administrationDepartmentEfficiency,
+  administrationNeedScore,
+  activeAdministrativeStaff,
   previewAdministrativeCandidate,
 } from '@/game/engine';
 import type { AdministrationDepartmentKey, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
@@ -177,15 +179,24 @@ export default function ClubHeadquartersScreen() {
   const marketingInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.marketing] ?? 65000;
   const commercialInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.commercial] ?? 65000;
   const reputation = Math.min(100, 25 + investments.marketing * 6 + (levels.press ?? 0) * 6 + (levels.museum ?? 0) * 5 + (levels.history ?? 0) * 4);
-  const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
   const staffCapacity = administrationStaffCapacity(career);
+  const boardStaff = activeAdministrativeStaff(career, 'board');
+  const financeStaff = activeAdministrativeStaff(career, 'finance');
+  const legalStaff = activeAdministrativeStaff(career, 'legal');
+  const activeStaff = { board: boardStaff, finance: financeStaff, legal: legalStaff };
   const adminEfficiencies = [
     administrationDepartmentEfficiency(career, 'board'),
     administrationDepartmentEfficiency(career, 'finance'),
     administrationDepartmentEfficiency(career, 'legal'),
   ];
   const management = Math.round(adminEfficiencies.reduce((sum, value) => sum + value, 0) / adminEfficiencies.length);
-  const adminPayroll = [...staff.board, ...staff.finance, ...staff.legal].reduce((sum, person) => sum + person.salary, 0);
+  const adminPayroll = [...boardStaff, ...financeStaff, ...legalStaff].reduce((sum, person) => sum + person.salary, 0);
+  const adminNeedScores = {
+    board: administrationNeedScore(career, 'board'),
+    finance: administrationNeedScore(career, 'finance'),
+    legal: administrationNeedScore(career, 'legal'),
+  };
+  const overallAdminNeed = Math.round((adminNeedScores.board + adminNeedScores.finance + adminNeedScores.legal) / 3);
   const baseOperatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
   const operatingCost = baseOperatingCost + adminPayroll;
   const projectedNet = commercialRevenue - operatingCost;
@@ -226,7 +237,14 @@ export default function ClubHeadquartersScreen() {
             </View>
             <Text style={styles.adminOverviewScore}>Gestão {management}/100</Text>
           </View>
-          <Text style={styles.adminOverviewText}>Sala de reuniões e Tecnologia/TI trabalham em conjunto e liberam mais vagas. Cada departamento pode chegar a no máximo 10 profissionais.</Text>
+          <Text style={styles.adminOverviewText}>A necessidade muda conforme a realidade do clube. Se tudo estiver organizado, não há obrigação de contratar. Crescimento, crise, dinheiro, contratos e problemas disciplinares podem aumentar a demanda.</Text>
+          <View style={styles.needHeader}>
+            <Text style={styles.needLabel}>NECESSIDADE ADMINISTRATIVA GERAL</Text>
+            <Text style={styles.needValue}>{overallAdminNeed}%</Text>
+          </View>
+          <View style={styles.needTrack}>
+            <View style={[styles.needFill, { width: (overallAdminNeed + '%') as any }]} />
+          </View>
           <View style={styles.adminOverviewMetrics}>
             <View style={styles.adminMini}><Text style={styles.adminMiniLabel}>FOLHA ADMIN.</Text><Text style={styles.adminMiniValue}>{formatCurrency(adminPayroll)}/mês</Text></View>
             <View style={styles.adminMini}><Text style={styles.adminMiniLabel}>CAPACIDADE</Text><Text style={styles.adminMiniValue}>{staffCapacity}/10</Text></View>
@@ -235,13 +253,20 @@ export default function ClubHeadquartersScreen() {
 
         <View style={styles.list}>
           {ADMIN_STAFF_ITEMS.map((item) => {
-            const people = staff[item.key] ?? [];
+            const people = activeStaff[item.key] ?? [];
             const required = administrationRequiredStaff(career, item.key);
+            const needScore = adminNeedScores[item.key];
             const efficiency = administrationDepartmentEfficiency(career, item.key);
             const candidate = previewAdministrativeCandidate(career, item.key);
             const full = people.length >= staffCapacity || people.length >= 10;
             const canHire = !full && career.balance >= candidate.hireCost;
-            const status = people.length < required ? 'DEFICIENTE' : efficiency >= 82 ? 'EXCELENTE' : efficiency >= 65 ? 'BOA' : 'ADEQUADA';
+            const excess = Math.max(0, people.length - required);
+            const status =
+              required === 0
+                ? (people.length === 0 ? 'SEM NECESSIDADE' : 'SOBRA DE PESSOAL')
+                : people.length < required
+                  ? 'SOBRECARGA'
+                  : efficiency >= 82 ? 'EXCELENTE' : efficiency >= 65 ? 'BOA' : 'CONTROLADA';
 
             return (
               <Panel key={item.key} style={styles.adminDeptCard}>
@@ -250,15 +275,23 @@ export default function ClubHeadquartersScreen() {
                   <View style={styles.cardBody}>
                     <View style={styles.titleRow}>
                       <Text style={styles.cardTitle}>{item.title}</Text>
-                      <Text style={[styles.adminStatus, people.length < required && styles.adminStatusBad]}>{status}</Text>
+                      <Text style={[styles.adminStatus, people.length < required && styles.adminStatusBad, excess > 0 && styles.adminStatusWarn]}>{status}</Text>
                     </View>
                     <Text style={styles.cardText}>{item.text}</Text>
                   </View>
                 </View>
 
+                <View style={styles.needHeader}>
+                  <Text style={styles.needLabel}>NECESSIDADE DO DEPARTAMENTO</Text>
+                  <Text style={styles.needValue}>{needScore}%</Text>
+                </View>
+                <View style={styles.needTrack}>
+                  <View style={[styles.needFill, { width: (needScore + '%') as any }]} />
+                </View>
+
                 <View style={styles.adminDeptMetrics}>
                   <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>CONTRATADOS</Text><Text style={styles.adminDeptValue}>{people.length}/{staffCapacity}</Text></View>
-                  <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>NECESSÁRIO</Text><Text style={styles.adminDeptValue}>{required}</Text></View>
+                  <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>NECESSÁRIO</Text><Text style={styles.adminDeptValue}>{required === 0 ? 'Nenhum' : required}</Text></View>
                   <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>EFICIÊNCIA</Text><Text style={styles.adminDeptValue}>{efficiency}%</Text></View>
                 </View>
 
@@ -270,6 +303,7 @@ export default function ClubHeadquartersScreen() {
                           <Text style={styles.staffName}>{person.name}</Text>
                           <Text style={styles.staffRole}>{person.role} · Qualidade {person.quality}</Text>
                           <Text style={styles.staffSalary}>{formatCurrency(person.salary)}/mês</Text>
+                          <Text style={styles.staffContract}>Contrato: {Math.max(0, person.contractEndRound - career.roundIndex)} jogos restantes</Text>
                         </View>
                         <Pressable
                           onPress={() => fireAdminProfessional(item.key, person.id)}
@@ -286,12 +320,25 @@ export default function ClubHeadquartersScreen() {
                   <Text style={styles.noStaff}>Nenhum profissional contratado.</Text>
                 )}
 
+                {required === 0 && people.length > 0 ? (
+                  <View style={styles.savingHint}>
+                    <Feather name="trending-down" size={13} color="#d8c27c" />
+                    <Text style={styles.savingHintText}>O clube não precisa desse quadro agora. Demitir pode aliviar a folha, mas existe custo de rescisão.</Text>
+                  </View>
+                ) : excess > 0 ? (
+                  <View style={styles.savingHint}>
+                    <Feather name="alert-circle" size={13} color="#d8c27c" />
+                    <Text style={styles.savingHintText}>Há {excess} profissional(is) acima da necessidade atual. Você pode manter por segurança ou reduzir custos.</Text>
+                  </View>
+                ) : null}
+
                 <View style={styles.candidateBox}>
                   <View style={styles.candidateInfo}>
                     <Text style={styles.candidateKicker}>PRÓXIMO CANDIDATO</Text>
                     <Text style={styles.candidateName}>{candidate.name}</Text>
                     <Text style={styles.candidateMeta}>{candidate.role} · Qualidade {candidate.quality}</Text>
                     <Text style={styles.candidateMeta}>Salário {formatCurrency(candidate.salary)}/mês</Text>
+                    <Text style={styles.candidateMeta}>Contrato de {candidate.contractRounds} jogos</Text>
                   </View>
                   <Pressable
                     onPress={() => hireAdminProfessional(item.key)}
@@ -299,7 +346,7 @@ export default function ClubHeadquartersScreen() {
                     style={[styles.hireButton, !canHire && styles.hireButtonDisabled]}
                   >
                     <Text style={[styles.hireButtonText, !canHire && styles.hireButtonTextDisabled]}>
-                      {full ? 'SEM VAGA' : 'CONTRATAR'}
+                      {full ? 'SEM VAGA' : required === 0 ? 'CONTRATAR MESMO ASSIM' : 'CONTRATAR'}
                     </Text>
                     {!full ? <Text style={styles.hireCost}>{formatCurrency(candidate.hireCost)}</Text> : null}
                   </Pressable>
@@ -672,6 +719,12 @@ const styles = StyleSheet.create({
   adminDeptCard:{gap:11,backgroundColor:'#10291d',borderColor:'#2c503d'},
   adminStatus:{color:'#79ef91',fontSize:7,fontWeight:'900'},
   adminStatusBad:{color:'#f09d9d'},
+  adminStatusWarn:{color:'#d8c27c'},
+  needHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  needLabel:{color:'#789080',fontSize:6.5,fontWeight:'900',letterSpacing:0.6},
+  needValue:{color:'#f5f7f5',fontSize:8,fontWeight:'900'},
+  needTrack:{height:7,borderRadius:99,backgroundColor:'#08150e',overflow:'hidden',borderWidth:1,borderColor:'#294336'},
+  needFill:{height:'100%',backgroundColor:'#79ef91'},
   adminDeptMetrics:{flexDirection:'row',gap:6},
   adminDeptMetric:{flex:1,minHeight:52,borderRadius:8,padding:7,justifyContent:'center',backgroundColor:'#0b2117',borderWidth:1,borderColor:'#2c503d'},
   adminDeptValue:{color:'#f5f7f5',fontSize:10,fontWeight:'900',marginTop:3},
@@ -681,11 +734,14 @@ const styles = StyleSheet.create({
   staffName:{color:'#f5f7f5',fontSize:9.5,fontWeight:'900'},
   staffRole:{color:'#8fa195',fontSize:7,lineHeight:10.5,marginTop:2},
   staffSalary:{color:'#79ef91',fontSize:7,fontWeight:'800',marginTop:3},
+  staffContract:{color:'#d8c27c',fontSize:6.5,fontWeight:'800',marginTop:2},
   fireButton:{minWidth:68,minHeight:38,borderRadius:7,alignItems:'center',justifyContent:'center',backgroundColor:'#2a1a1a',borderWidth:1,borderColor:'#624141',paddingHorizontal:6},
   fireButtonDisabled:{opacity:0.4},
   fireButtonText:{color:'#efb2b2',fontSize:6.5,fontWeight:'900'},
   fireCost:{color:'#c99797',fontSize:5.8,fontWeight:'800',marginTop:2},
   noStaff:{color:'#73877a',fontSize:8,fontStyle:'italic'},
+  savingHint:{flexDirection:'row',alignItems:'flex-start',gap:7,padding:8,borderRadius:8,backgroundColor:'#211f14',borderWidth:1,borderColor:'#5b5230'},
+  savingHintText:{flex:1,color:'#d8cda7',fontSize:7.4,lineHeight:11.5},
   candidateBox:{flexDirection:'row',alignItems:'center',gap:8,padding:9,borderRadius:9,backgroundColor:'#13251b',borderWidth:1,borderColor:'#355846'},
   candidateInfo:{flex:1,minWidth:0},
   candidateKicker:{color:'#789080',fontSize:6.2,fontWeight:'900',letterSpacing:0.6},
