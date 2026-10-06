@@ -16,8 +16,9 @@ import {
   substitutePlayer,
   updateTactics,
   upgradeStadium,
+  upgradeStadiumFacility,
 } from '@/game/engine';
-import type { Career, FormationId, Tactics } from '@/game/types';
+import type { Career, FormationId, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -37,6 +38,7 @@ interface CareerContextValue {
   signPlayer: (playerId: string) => boolean;
   transferPlayer: (playerId: string) => boolean;
   expandStadium: () => boolean;
+  upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -122,6 +124,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
 
+  const upgradeStadiumItem = useCallback((key: StadiumUpgradeKey) => {
+    if (!career) return false;
+    const next = upgradeStadiumFacility(career, key);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -138,9 +148,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     signPlayer,
     transferPlayer,
     expandStadium,
+    upgradeStadiumItem,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
