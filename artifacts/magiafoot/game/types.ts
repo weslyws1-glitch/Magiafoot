@@ -16,6 +16,7 @@ export type MatchPhase = 'pregame' | 'first_half' | 'halftime' | 'second_half' |
 export type Mentality = 'cautelosa' | 'equilibrada' | 'ofensiva';
 export type Intensity = 'baixa' | 'normal' | 'alta';
 export type StadiumUpgradeKey = 'stands' | 'pitch' | 'roof' | 'lighting' | 'seats' | 'boxes' | 'scoreboard' | 'security' | 'turnstiles' | 'parking' | 'drainage' | 'irrigation';
+export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' | 'technology' | 'marketing' | 'sponsors' | 'commercial' | 'store' | 'members' | 'museum' | 'press' | 'events' | 'history';
 
 export interface Player {
   id: string;
@@ -148,6 +149,7 @@ export interface Career {
   stadiumLevel: number;
   ticketPrice: number;
   stadiumUpgrades: Record<StadiumUpgradeKey, number>;
+  headquartersUpgrades: Record<HeadquartersUpgradeKey, number>;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
