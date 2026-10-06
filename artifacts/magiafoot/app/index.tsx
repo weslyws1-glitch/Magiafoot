@@ -1,116 +1,276 @@
-import React from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { CareerOverview, GameButton, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
-import { useCareer } from '@/context/CareerContext';
-import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen } from '@/components/ManagerUI';
+import { useCareer } from '@/context/CareerContext';
+import { CLUBS, getClub } from '@/game/data';
+import { effectiveStrength, getCurrentFixture } from '@/game/engine';
+import { useColors } from '@/hooks/useColors';
+
+type Shortcut = {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  route: string;
+};
+
+const SHORTCUTS: Shortcut[] = [
+  { label: 'Elenco', icon: 'users', route: '/squad' },
+  { label: 'Táticas', icon: 'cpu', route: '/tactics' },
+  { label: 'Jogos', icon: 'calendar', route: '/calendar' },
+  { label: 'Classificação', icon: 'columns', route: '/league' },
+  { label: 'Mercado', icon: 'search', route: '/market' },
+  { label: 'Finanças', icon: 'landmark', route: '/finances' },
+  { label: 'Estádio', icon: 'building', route: '/club' },
+  { label: 'Notícias', icon: 'file-text', route: '/club' },
+  { label: 'Competições', icon: 'award', route: '/league' },
+  { label: 'Carreira', icon: 'briefcase', route: '/club' },
+];
+
+function getPositionAndPoints(career: NonNullable<ReturnType<typeof useCareer>['career']>) {
+  const table = CLUBS.map((club) => ({ clubId: club.id, points: 0, gd: 0 }));
+  for (const result of career.results) {
+    const home = table.find((item) => item.clubId === result.homeClubId);
+    const away = table.find((item) => item.clubId === result.awayClubId);
+    if (!home || !away) continue;
+
+    home.gd += result.homeGoals - result.awayGoals;
+    away.gd += result.awayGoals - result.homeGoals;
+
+    if (result.homeGoals > result.awayGoals) home.points += 3;
+    else if (result.awayGoals > result.homeGoals) away.points += 3;
+    else {
+      home.points += 1;
+      away.points += 1;
+    }
+  }
+
+  table.sort((a, b) => b.points - a.points || b.gd - a.gd);
+  const index = table.findIndex((row) => row.clubId === career.clubId);
+  return {
+    position: index >= 0 ? index + 1 : 1,
+    points: table.find((row) => row.clubId === career.clubId)?.points ?? 0,
+  };
+}
 
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { career, isReady, storageWarning } = useCareer();
+  const { career, isReady } = useCareer();
 
-  const continueCareer = () => router.push(career?.liveMatch ? '/match' : '/club');
+  const dashboard = useMemo(() => {
+    if (!career) return null;
+    const club = getClub(career.clubId);
+    const fixture = getCurrentFixture(career);
+    const nextOpponentId = fixture
+      ? fixture.homeClubId === career.clubId
+        ? fixture.awayClubId
+        : fixture.homeClubId
+      : undefined;
+    const nextOpponent = nextOpponentId ? getClub(nextOpponentId) : undefined;
+    const squad = [...career.players]
+      .sort((a, b) => {
+        const posOrder = ['GOL', 'LD', 'ZAG', 'LE', 'VOL', 'MC', 'MEI', 'PE', 'PD', 'ATA'];
+        return posOrder.indexOf(a.position) - posOrder.indexOf(b.position) || b.strength - a.strength;
+      })
+      .slice(0, 8);
+
+    return {
+      club,
+      nextOpponent,
+      fixture,
+      squad,
+      table: getPositionAndPoints(career),
+    };
+  }, [career]);
+
+  if (!isReady) {
+    return (
+      <Screen style={[styles.loading, { paddingTop: insets.top + 24 }]}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Carregando carreira…</Text>
+      </Screen>
+    );
+  }
+
+  if (!career || !dashboard) {
+    return (
+      <Screen style={{ paddingTop: insets.top + (Platform.OS === 'web' ? 28 : 16) }}>
+        <View style={styles.brandLine}>
+          <Text style={[styles.brandName, { color: colors.foreground }]}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+          <Text style={[styles.seasonLine, { color: colors.mutedForeground }]}>Manager de futebol</Text>
+        </View>
+        <View style={[styles.emptyCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Sua carreira começa aqui.</Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Crie seu clube e assuma o comando do MagiaFoot.</Text>
+          <Pressable onPress={() => router.push('/new-career')} style={[styles.playButton, { backgroundColor: '#7df28e' }]}>
+            <Feather name="play" size={18} color="#07150d" />
+            <Text style={styles.playButtonText}>NOVA CARREIRA</Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
+  const currentRound = career.roundIndex + 1;
 
   return (
-    <Screen style={{ paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 15) }}>
-      <View style={styles.brandLine}>
-        <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
-          <Feather name="zap" size={19} color={colors.accentForeground} />
-        </View>
-        <View>
-          <Text style={[styles.brandName, { color: colors.foreground }]}>MAGIAFOOT</Text>
-          <Text style={[styles.brandCaption, { color: colors.mutedForeground }]}>MANAGER DE FUTEBOL</Text>
-        </View>
+    <Screen style={[styles.page, { paddingTop: insets.top + (Platform.OS === 'web' ? 24 : 14), backgroundColor: '#07150d' }]}>
+      <View style={styles.headerBlock}>
+        <Text style={styles.brandName}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+        <Text style={styles.seasonLine}>{2026 + career.season - 1} • 3ª Divisão • Rodada {currentRound}</Text>
       </View>
 
-      <Panel style={[styles.hero, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-        <View style={[styles.heroOrbit, { backgroundColor: colors.accent, opacity: 0.14 }]} />
-        <View style={[styles.heroBall, { borderColor: colors.primaryForeground }]}>
-          <Feather name="target" size={37} color={colors.accent} />
-        </View>
-        <View style={styles.heroTag}>
-          <View style={[styles.heroDot, { backgroundColor: colors.accent }]} />
-          <Text style={[styles.heroTagText, { color: colors.primaryForeground }]}>SUA PRÓXIMA HISTÓRIA COMEÇA AQUI</Text>
-        </View>
-        <Text style={[styles.heroTitle, { color: colors.primaryForeground }]}>Sua história.{'\n'}Seu clube.{'\n'}Sua magia.</Text>
-        <Text style={[styles.heroDescription, { color: colors.primaryForeground }]}>
-          Monte seu time, tome as decisões e escreva uma nova temporada.
-        </Text>
-      </Panel>
+      <View style={styles.shortcutGrid}>
+        {SHORTCUTS.map((item) => (
+          <Pressable key={item.label} onPress={() => router.push(item.route as never)} style={styles.shortcutCard}>
+            <Feather name={item.icon} size={34} color="#79ef91" />
+            <Text style={styles.shortcutLabel}>{item.label}</Text>
+          </Pressable>
+        ))}
+      </View>
 
-      {!isReady ? (
-        <View style={[styles.loadingRow, { backgroundColor: colors.secondary }]}>
-          <ActivityIndicator color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Carregando sua carreira salva…</Text>
-        </View>
-      ) : career ? (
-        <>
-          <CareerOverview career={career} />
-          <SectionLabel title="Sua carreira" />
-          <GameButton
-            label={career.liveMatch ? 'Retomar partida' : 'Continuar carreira'}
-            icon={career.liveMatch ? 'play' : 'arrow-right'}
-            onPress={continueCareer}
-          />
-          <GameButton
-            label="Começar uma nova carreira"
-            icon="plus"
-            variant="outline"
-            onPress={() => router.push('/new-career')}
-          />
-        </>
-      ) : (
-        <>
-          <View style={styles.startCopy}>
-            <Text style={[styles.startTitle, { color: colors.foreground }]}>Assuma o comando.</Text>
-            <Text style={[styles.startDescription, { color: colors.mutedForeground }]}>
-              Escolha seu clube fictício e transforme uma equipe em candidata ao título.
-            </Text>
+      <View style={styles.lowerGrid}>
+        <View style={[styles.panel, styles.squadPanel]}>
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelHeaderTitle}>PLANTEL</Text>
+            <Text style={styles.panelHeaderMeta}>{career.players.length} jogadores</Text>
           </View>
-          <GameButton label="Nova carreira" icon="play" onPress={() => router.push('/new-career')} />
-        </>
-      )}
-
-      {storageWarning ? (
-        <View style={[styles.storageNotice, { backgroundColor: colors.secondary }]}>
-          <Feather name="alert-circle" size={16} color={colors.destructive} />
-          <Text style={[styles.storageNoticeText, { color: colors.secondaryForeground }]}>
-            Não foi possível ler o salvamento anterior. Uma nova carreira pode ser criada neste aparelho.
-          </Text>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.colPos, styles.tableHeaderText]}>POS</Text>
+            <Text style={[styles.colName, styles.tableHeaderText]}>JOGADOR</Text>
+            <Text style={[styles.colAge, styles.tableHeaderText]}>IDADE</Text>
+            <Text style={[styles.colFor, styles.tableHeaderText]}>FOR</Text>
+          </View>
+          {dashboard.squad.map((player) => (
+            <View key={player.id} style={styles.playerRow}>
+              <Text style={[styles.colPos, styles.playerText]}>{player.position}</Text>
+              <Text numberOfLines={1} style={[styles.colName, styles.playerName]}>{player.name}</Text>
+              <Text style={[styles.colAge, styles.playerText]}>{player.age}</Text>
+              <Text style={[styles.colFor, styles.playerRating]}>{effectiveStrength(player)}</Text>
+            </View>
+          ))}
         </View>
-      ) : null}
 
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.mutedForeground }]}>UMA LIGA FICTÍCIA. DECISÕES SUAS. FUTEBOL DO SEU JEITO.</Text>
+        <View style={styles.sideColumn}>
+          <View style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <Text style={styles.panelHeaderTitle}>PRÓXIMO JOGO</Text>
+            </View>
+            <View style={styles.nextGameBody}>
+              <Text style={styles.nextTeam}>{dashboard.club?.name ?? 'Seu clube'}</Text>
+              <Text style={styles.versus}>×</Text>
+              <Text style={styles.nextTeam}>{dashboard.nextOpponent?.name ?? 'Adversário'}</Text>
+              <Text style={styles.roundLabel}>Rodada {currentRound}</Text>
+              <Pressable
+                onPress={() => router.push(career.liveMatch ? '/match' : '/match')}
+                style={styles.playButton}
+              >
+                <Feather name="play" size={20} color="#07150d" />
+                <Text style={styles.playButtonText}>{career.liveMatch ? 'CONTINUAR' : 'JOGAR'}</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <Text style={styles.panelHeaderTitle}>SITUAÇÃO</Text>
+            </View>
+            <View style={styles.situationGrid}>
+              <View style={styles.statBox}>
+                <Text style={styles.statLabel}>Posição</Text>
+                <Text style={styles.statValue}>{dashboard.table.position}º</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statLabel}>Pontos</Text>
+                <Text style={styles.statValue}>{dashboard.table.points}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  brandLine: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 17 },
-  brandMark: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  brandName: { fontSize: 16, fontWeight: '900', letterSpacing: 1 },
-  brandCaption: { fontSize: 9, fontWeight: '700', letterSpacing: 1.2, marginTop: 2 },
-  hero: { padding: 20, minHeight: 283, justifyContent: 'center', overflow: 'hidden', marginBottom: 3 },
-  heroOrbit: { position: 'absolute', width: 215, height: 215, borderRadius: 108, right: -85, top: -50 },
-  heroBall: { position: 'absolute', right: 19, top: 87, width: 69, height: 69, borderRadius: 35, borderWidth: 1, alignItems: 'center', justifyContent: 'center', opacity: 0.86 },
-  heroTag: { flexDirection: 'row', gap: 7, alignItems: 'center', marginBottom: 18, maxWidth: '75%' },
-  heroDot: { width: 7, height: 7, borderRadius: 4 },
-  heroTagText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.75 },
-  heroTitle: { fontSize: 32, lineHeight: 35, letterSpacing: -1.2, fontWeight: '900' },
-  heroDescription: { fontSize: 13, lineHeight: 19, marginTop: 13, maxWidth: 255, opacity: 0.82 },
-  startCopy: { gap: 5, marginTop: 5, marginBottom: 1 },
-  startTitle: { fontSize: 17, fontWeight: '800' },
-  startDescription: { fontSize: 13, lineHeight: 19 },
-  storageNotice: { flexDirection: 'row', gap: 9, padding: 12, borderRadius: 14, alignItems: 'center' },
-  storageNoticeText: { flex: 1, fontSize: 11, lineHeight: 16 },
-  footer: { alignItems: 'center', paddingTop: 13, paddingBottom: 6 },
-  footerText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.9, textAlign: 'center' },
-  loadingRow: { minHeight: 68, padding: 13, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { fontSize: 11, fontWeight: '600' },
+  page: { gap: 18, paddingHorizontal: 20, paddingBottom: 34 },
+  loading: { alignItems: 'center', justifyContent: 'center', minHeight: 420 },
+  loadingText: { marginTop: 10, fontSize: 12 },
+  headerBlock: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#234334' },
+  brandLine: { gap: 8, marginBottom: 12 },
+  brandName: { color: '#f3f7f3', fontSize: 37, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
+  seasonLine: { color: '#9fb2a5', fontSize: 18, fontWeight: '500', marginTop: 4 },
+  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  shortcutCard: {
+    width: '18%',
+    minWidth: 126,
+    flexGrow: 1,
+    minHeight: 136,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#264937',
+    backgroundColor: '#153426',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    padding: 12,
+  },
+  shortcutLabel: { color: '#f2f6f3', fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  lowerGrid: { flexDirection: 'row', alignItems: 'stretch', gap: 18, flexWrap: 'wrap' },
+  panel: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#2c503d',
+    backgroundColor: '#0b2117',
+    overflow: 'hidden',
+  },
+  squadPanel: { flex: 1.6, minWidth: 360 },
+  sideColumn: { flex: 0.9, minWidth: 260, gap: 16 },
+  panelHeader: {
+    minHeight: 64,
+    backgroundColor: '#29563a',
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  panelHeaderTitle: { color: '#f5f7f5', fontSize: 17, fontWeight: '900', letterSpacing: 0.6 },
+  panelHeaderMeta: { color: '#b9cbbf', fontSize: 15, fontWeight: '700' },
+  tableHeader: { flexDirection: 'row', paddingHorizontal: 16, minHeight: 48, alignItems: 'center', backgroundColor: '#10291d' },
+  tableHeaderText: { color: '#91aa99', fontSize: 12, fontWeight: '700' },
+  playerRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#1d3b2a' },
+  playerText: { color: '#e7efe9', fontSize: 15 },
+  playerName: { color: '#f4f7f5', fontSize: 15, fontWeight: '800' },
+  playerRating: { color: '#6ff08d', fontSize: 15, fontWeight: '900' },
+  colPos: { width: 62 },
+  colName: { flex: 1 },
+  colAge: { width: 78, textAlign: 'center' },
+  colFor: { width: 56, textAlign: 'right' },
+  nextGameBody: { alignItems: 'center', padding: 26, gap: 10 },
+  nextTeam: { color: '#f5f7f5', fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  versus: { color: '#6f8b78', fontSize: 26, fontWeight: '700' },
+  roundLabel: { color: '#9fb2a5', fontSize: 16, marginTop: 4 },
+  playButton: {
+    marginTop: 8,
+    minHeight: 58,
+    width: '100%',
+    borderRadius: 18,
+    backgroundColor: '#7df28e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+  },
+  playButtonText: { color: '#07150d', fontSize: 17, fontWeight: '900' },
+  situationGrid: { flexDirection: 'row', gap: 10, padding: 16 },
+  statBox: { flex: 1, minHeight: 110, borderRadius: 18, borderWidth: 1, borderColor: '#294536', justifyContent: 'center', padding: 14 },
+  statLabel: { color: '#a8b8ae', fontSize: 16, marginBottom: 8 },
+  statValue: { color: '#f6f8f6', fontSize: 28, fontWeight: '900' },
+  emptyCard: { borderWidth: 1, borderRadius: 20, padding: 20, gap: 10 },
+  emptyTitle: { fontSize: 22, fontWeight: '900' },
+  emptyText: { fontSize: 14, lineHeight: 20 },
 });
