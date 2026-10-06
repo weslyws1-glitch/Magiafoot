@@ -530,8 +530,33 @@ function sponsorshipMarketScore(career: Career): number {
   return clamp(Math.round(form * 0.42 + career.boardTrust * 0.18 + career.fanTrust * 0.18 + marketing * 4 + commercial * 4), 10, 100);
 }
 
+export const SPONSORSHIP_PLACEMENT_LABELS: Record<SponsorshipSlot, string> = {
+  principal: 'Peito do uniforme',
+  sleeve: 'Manga do uniforme',
+  back: 'Costas do uniforme',
+  shorts: 'Calção',
+  stadium: 'Placas e LED do estádio',
+  training_center: 'Centro de treinamento',
+  headquarters: 'Sede do clube',
+  media_wall: 'Painel de entrevistas',
+  institutional: 'Parceiro institucional',
+};
+
+export const SPONSORSHIP_PLACEMENT_FACTOR: Record<SponsorshipSlot, number> = {
+  principal: 1.85,
+  sleeve: 0.72,
+  back: 0.98,
+  shorts: 0.62,
+  stadium: 1.15,
+  training_center: 0.76,
+  headquarters: 0.58,
+  media_wall: 0.68,
+  institutional: 0.52,
+};
+
 function sponsorshipSlotForIndex(index: number): SponsorshipSlot {
-  return (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[])[index % 4]!;
+  const slots: SponsorshipSlot[] = ['principal','sleeve','back','shorts','stadium','training_center','headquarters','media_wall','institutional'];
+  return slots[index % slots.length]!;
 }
 
 export function refreshSponsorshipMarket(career: Career, force = false): Career {
@@ -542,7 +567,7 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
   const score = sponsorshipMarketScore(career);
   const count = score >= 88 ? 5 : score >= 75 ? 4 : score >= 58 ? 3 : score >= 38 ? 2 : 1;
   const occupied = new Set(state.contracts.map((item) => item.slot));
-  const slots = (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
+  const slots = (['principal','sleeve','back','shorts','stadium','training_center','headquarters','media_wall','institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
   const seed = hash(`sponsor-${career.clubId}-${career.season}-${currentRound}`);
   const pool = [...SPONSOR_POOL].sort((a, b) => ((hash(a.name) ^ seed) >>> 0) - ((hash(b.name) ^ seed) >>> 0));
   const commercial = career.headquartersInvestments?.commercial ?? 3;
@@ -554,7 +579,7 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
     const slot = score >= 82 && i === 1 && slots.includes('principal')
       ? 'principal'
       : (slots[i % slots.length] ?? sponsorshipSlotForIndex(i));
-    const slotFactor = slot === 'principal' ? 1.85 : slot === 'sleeve' ? 0.72 : slot === 'back' ? 0.98 : 0.60;
+    const slotFactor = SPONSORSHIP_PLACEMENT_FACTOR[slot];
     const strength = 0.58 + score / 100 + commercial * 0.085;
     const base = Math.round((80_000 + brand.prestige * 4_900) * slotFactor * strength);
     const durationMatches = score >= 75 ? 10 + ((seed + i) % 7) : 6 + ((seed + i) % 6);
@@ -613,35 +638,63 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
   return next;
 }
 
-export function negotiateSponsorshipProposal(career: Career, proposalId: string): Career {
+export function negotiateSponsorshipProposal(
+  career: Career,
+  proposalId: string,
+  requestedSlot?: SponsorshipSlot,
+  requestedMultiplier = 1.10,
+): Career {
   const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
   const proposal = state.proposals.find((item) => item.id === proposalId);
   if (!proposal || proposal.negotiationRound >= 2) return career;
 
-  const score = sponsorshipMarketScore(career);
+  const targetSlot = requestedSlot ?? proposal.slot;
+  if (state.contracts.some((item) => item.slot === targetSlot)) return career;
+
+  const safeMultiplier = clamp(requestedMultiplier, 0.82, 1.30);
+  const oldFactor = SPONSORSHIP_PLACEMENT_FACTOR[proposal.slot] ?? 1;
+  const newFactor = SPONSORSHIP_PLACEMENT_FACTOR[targetSlot] ?? 1;
+  const placementRatio = newFactor / Math.max(0.1, oldFactor);
   const commercial = career.headquartersInvestments?.commercial ?? 3;
-  const chance = clamp(35 + commercial * 9 + score * 0.28 - proposal.prestige * 0.22 - proposal.negotiationRound * 18, 18, 88);
-  const roll = (hash(`${proposal.id}-nego-${proposal.negotiationRound}-${career.roundIndex}`) % 100) + 1;
+  const score = sponsorshipMarketScore(career);
+
+  const requestedIncrease = Math.max(0, safeMultiplier - 1);
+  const relocationPenalty = targetSlot === proposal.slot ? 0 : Math.abs(newFactor - oldFactor) * 18;
+  const chance = clamp(
+    58 + commercial * 7 + score * 0.22
+      - proposal.prestige * 0.18
+      - proposal.negotiationRound * 17
+      - requestedIncrease * 115
+      - relocationPenalty,
+    10,
+    92,
+  );
+  const roll = (hash(`${proposal.id}-counter-${proposal.negotiationRound}-${targetSlot}-${safeMultiplier}-${career.roundIndex}`) % 100) + 1;
 
   if (roll <= chance) {
-    const improved = {
+    const adjusted = clamp(placementRatio * safeMultiplier, 0.72, 1.42);
+    const improved: SponsorshipProposal = {
       ...proposal,
-      signingBonus: Math.round(proposal.signingBonus * 1.10),
-      perMatch: Math.round(proposal.perMatch * 1.10),
-      winBonus: Math.round(proposal.winBonus * 1.08),
-      expectedValue: Math.round(proposal.expectedValue * 1.095),
+      slot: targetSlot,
+      signingBonus: Math.round(proposal.signingBonus * adjusted),
+      perMatch: Math.round(proposal.perMatch * adjusted),
+      winBonus: Math.round(proposal.winBonus * Math.max(0.85, adjusted)),
+      qualificationBonus: Math.round(proposal.qualificationBonus * Math.max(0.85, adjusted)),
+      titleBonus: Math.round(proposal.titleBonus * Math.max(0.85, adjusted)),
+      attendanceBonus: Math.round(proposal.attendanceBonus * Math.max(0.85, adjusted)),
+      expectedValue: Math.round(proposal.expectedValue * adjusted),
       negotiationRound: proposal.negotiationRound + 1,
-      note: 'A empresa aceitou melhorar a oferta após a contraproposta do clube.',
+      note: `A empresa aceitou a contraproposta para ${SPONSORSHIP_PLACEMENT_LABELS[targetSlot]} com valores revisados.`,
     };
     let next: Career = {
       ...career,
       sponsorships: {
         ...state,
         proposals: state.proposals.map((item) => item.id === proposalId ? improved : item),
-        history: [`${proposal.sponsorName} aceitou uma contraproposta.`, ...state.history].slice(0, 20),
+        history: [`${proposal.sponsorName} aceitou mudar para ${SPONSORSHIP_PLACEMENT_LABELS[targetSlot]} e revisar valores.`, ...state.history].slice(0, 20),
       },
     };
-    return addCareerNews(next, 'Patrocinador melhora proposta', `${proposal.sponsorName} aceitou a negociação e aumentou os valores oferecidos ao clube.`);
+    return addCareerNews(next, 'Contraproposta aceita', `${proposal.sponsorName} aceitou o novo espaço em ${SPONSORSHIP_PLACEMENT_LABELS[targetSlot]} e os valores foram recalculados.`);
   }
 
   const next: Career = {
@@ -650,10 +703,10 @@ export function negotiateSponsorshipProposal(career: Career, proposalId: string)
     sponsorships: {
       ...state,
       proposals: state.proposals.filter((item) => item.id !== proposalId),
-      history: [`${proposal.sponsorName} encerrou as conversas após a contraproposta.`, ...state.history].slice(0, 20),
+      history: [`${proposal.sponsorName} rejeitou a contraproposta e encerrou as conversas.`, ...state.history].slice(0, 20),
     },
   };
-  return addCareerNews(next, 'Negociação fracassa', `${proposal.sponsorName} não aceitou a contraproposta e deixou a mesa de negociação.`);
+  return addCareerNews(next, 'Fornecedor rejeita contraproposta', `${proposal.sponsorName} não aceitou a mudança para ${SPONSORSHIP_PLACEMENT_LABELS[targetSlot]} nos valores pedidos e saiu da negociação.`);
 }
 
 export function acceptSponsorshipProposal(career: Career, proposalId: string): Career {
@@ -686,12 +739,7 @@ export function acceptSponsorshipProposal(career: Career, proposalId: string): C
   return addCareerNews(next, 'Novo patrocinador anunciado', `${proposal.sponsorName} fechou contrato para ${SLOT_LABELS_ENGINE[proposal.slot]} por ${proposal.durationMatches} jogos. Luvas de ${formatCurrency(proposal.signingBonus)}.`);
 }
 
-const SLOT_LABELS_ENGINE: Record<SponsorshipSlot, string> = {
-  principal: 'patrocínio principal',
-  sleeve: 'manga',
-  back: 'costas',
-  institutional: 'parceria institucional',
-};
+const SLOT_LABELS_ENGINE: Record<SponsorshipSlot, string> = SPONSORSHIP_PLACEMENT_LABELS;
 
 export function declineSponsorshipProposal(career: Career, proposalId: string): Career {
   const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
