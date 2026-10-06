@@ -91,6 +91,7 @@ export default function SquadScreen() {
   const {
     career, chooseCaptain, transferPlayer, renewPlayer, updatePlayerMarketStatus,
     updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes,
+    acceptPlayerOffer, declinePlayerOffer,
   } = useCareer();
   const [tab, setTab] = useState<TabKey>('plantel');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -172,6 +173,46 @@ export default function SquadScreen() {
         {tab === 'treino' ? <SectionLabel title="Treino individual" /> : null}
         {tab === 'mercado' ? <SectionLabel title="Situação no mercado" /> : null}
 
+        {tab === 'mercado' && (career.playerTransferOffers ?? []).length > 0 ? (
+          <View style={styles.offerList}>
+            {(career.playerTransferOffers ?? []).map((offer) => {
+              const player = career.players.find((item) => item.id === offer.playerId);
+              if (!player) return null;
+              return (
+                <Panel key={offer.id} style={styles.offerCard}>
+                  <View style={styles.offerTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.offerKicker}>{offer.type === 'loan' ? 'PROPOSTA DE EMPRÉSTIMO' : 'PROPOSTA DE COMPRA'}</Text>
+                      <Text style={styles.offerPlayer}>{player.name}</Text>
+                      <Text style={styles.offerClub}>{offer.clubName}</Text>
+                    </View>
+                    <Text style={styles.offerAmount}>{formatCurrency(offer.amount)}</Text>
+                  </View>
+                  <Text style={styles.offerInfo}>
+                    {offer.type === 'loan'
+                      ? 'Empréstimo por ' + offer.durationRounds + ' rodadas. O atleta retorna automaticamente ao fim do período.'
+                      : 'Transferência definitiva. A proposta expira na rodada ' + (offer.expiresRound + 1) + '.'}
+                  </Text>
+                  <View style={styles.offerActions}>
+                    <Pressable style={styles.offerDecline} onPress={() => declinePlayerOffer(offer.id)}>
+                      <Text style={styles.offerDeclineText}>RECUSAR</Text>
+                    </Pressable>
+                    <Pressable style={styles.offerAccept} onPress={() => acceptPlayerOffer(offer.id)}>
+                      <Text style={styles.offerAcceptText}>ACEITAR</Text>
+                    </Pressable>
+                  </View>
+                </Panel>
+              );
+            })}
+          </View>
+        ) : tab === 'mercado' ? (
+          <Panel style={styles.noOffersPanel}>
+            <Feather name="inbox" size={22} color="#789080" />
+            <Text style={styles.noOffersTitle}>Nenhuma proposta no momento</Text>
+            <Text style={styles.noOffersText}>Marque jogadores como disponíveis ou para empréstimo para aumentar o interesse do mercado.</Text>
+          </Panel>
+        ) : null}
+
         {tab === 'plantel' ? (
           <Panel style={styles.tablePanel}>
             <View style={styles.tableHeader}>
@@ -241,7 +282,7 @@ export default function SquadScreen() {
                   <View style={styles.playerAvatar}><Text style={styles.playerAvatarText}>{selected.position}</Text></View>
                   <View style={styles.modalIdentity}>
                     <Text style={styles.modalName}>{selected.name}</Text>
-                    <Text style={styles.modalMeta}>{selected.age} anos · {ROLE_LABELS[selected.squadRole ?? 'rotacao']} · {PERSONALITY_LABELS[selected.personality ?? 'tranquilo']}</Text>
+                    <Text style={styles.modalMeta}>{selected.age} anos · {ROLE_LABELS[selected.squadRole ?? 'rotacao']} · {PERSONALITY_LABELS[selected.personality ?? 'tranquilo']}{selected.status === 'loaned' ? ' · Emprestado' : ''}</Text>
                   </View>
                   <Pressable style={styles.closeButton} onPress={() => setSelectedId(null)}><Feather name="x" size={20} color="#f5f7f5" /></Pressable>
                 </View>
@@ -348,12 +389,19 @@ export default function SquadScreen() {
                     >
                       <Text style={styles.secondaryButtonText}>{selected.id === career.captainId ? '★ CAPITÃO ATUAL' : 'DEFINIR COMO CAPITÃO'}</Text>
                     </Pressable>
-                    <Pressable
-                      onPress={() => transferPlayer(selected.id)}
-                      style={styles.dangerButton}
-                    >
-                      <Text style={styles.dangerButtonText}>NEGOCIAR SAÍDA</Text>
-                    </Pressable>
+                    {selected.status === 'loaned' ? (
+                      <View style={styles.loanInfoBox}>
+                        <Text style={styles.loanInfoTitle}>EMPRESTADO AO {selected.loanClubName ?? 'OUTRO CLUBE'}</Text>
+                        <Text style={styles.loanInfoText}>Retorno previsto em {Math.max(0,(selected.loanedOutUntilRound ?? career.roundIndex) - career.roundIndex)} rodadas.</Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={() => transferPlayer(selected.id)}
+                        style={styles.dangerButton}
+                      >
+                        <Text style={styles.dangerButtonText}>NEGOCIAR SAÍDA IMEDIATA</Text>
+                      </Pressable>
+                    )}
                   </Panel>
                 </ScrollView>
               </>
@@ -457,4 +505,23 @@ const styles=StyleSheet.create({
   historyTitle:{color:'#f5f7f5',fontSize:8,fontWeight:'900'},
   historyMeta:{color:'#75907f',fontSize:6.3,fontWeight:'800',marginTop:2},
   historyText:{color:'#9db0a3',fontSize:7.2,lineHeight:10.8,marginTop:2},
+  offerList:{gap:8},
+  offerCard:{gap:9,backgroundColor:'#10291d',borderColor:'#2c503d'},
+  offerTop:{flexDirection:'row',alignItems:'flex-start',gap:10},
+  offerKicker:{color:'#79ef91',fontSize:6.3,fontWeight:'900',letterSpacing:0.6},
+  offerPlayer:{color:'#f5f7f5',fontSize:11,fontWeight:'900',marginTop:2},
+  offerClub:{color:'#8fa394',fontSize:7.5,fontWeight:'800',marginTop:2},
+  offerAmount:{color:'#79ef91',fontSize:10,fontWeight:'900'},
+  offerInfo:{color:'#95a89b',fontSize:7.2,lineHeight:11},
+  offerActions:{flexDirection:'row',gap:7},
+  offerDecline:{flex:1,minHeight:36,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:'#2d1818',borderWidth:1,borderColor:'#633535'},
+  offerDeclineText:{color:'#efaaaa',fontSize:7.2,fontWeight:'900'},
+  offerAccept:{flex:1,minHeight:36,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:'#79ef91'},
+  offerAcceptText:{color:'#07150d',fontSize:7.2,fontWeight:'900'},
+  noOffersPanel:{alignItems:'center',gap:7,paddingVertical:18,backgroundColor:'#10291d',borderColor:'#2c503d'},
+  noOffersTitle:{color:'#f5f7f5',fontSize:10,fontWeight:'900'},
+  noOffersText:{color:'#879b8d',fontSize:7.2,lineHeight:11,textAlign:'center'},
+  loanInfoBox:{padding:9,borderRadius:8,backgroundColor:'#142b20',borderWidth:1,borderColor:'#356247'},
+  loanInfoTitle:{color:'#79ef91',fontSize:7.2,fontWeight:'900'},
+  loanInfoText:{color:'#9db0a3',fontSize:7.2,marginTop:3},
 });
