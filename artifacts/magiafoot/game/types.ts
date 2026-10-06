@@ -22,6 +22,22 @@ export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
 export type AdministrationDepartmentKey = 'board' | 'finance' | 'legal';
 export type TrainingCenterUpgradeKey = 'field' | 'medical' | 'physio' | 'gym' | 'analysis';
+export type PlayerPersonality = 'profissional' | 'lider' | 'ambicioso' | 'tranquilo' | 'temperamental' | 'festeiro';
+export type PlayerSquadRole = 'estrela' | 'titular' | 'rotacao' | 'reserva' | 'jovem';
+export type PlayerMarketStatus = 'inegociavel' | 'disponivel' | 'negociavel' | 'emprestimo';
+export type PlayerTrainingFocus = 'equilibrado' | 'fisico' | 'tecnica' | 'finalizacao' | 'passe' | 'marcacao';
+
+export interface PlayerSeasonStats {
+  appearances: number;
+  starts: number;
+  minutes: number;
+  goals: number;
+  assists: number;
+  yellowCards: number;
+  redCards: number;
+  ratingSum: number;
+  ratedMatches: number;
+}
 
 export interface AdministrativeProfessional {
   id: string;
@@ -99,6 +115,21 @@ export interface Player {
   suspendedUntilRound: number | null;
   value: number;
   wage: number;
+  potential?: number;
+  secondaryPositions?: Position[];
+  personality?: PlayerPersonality;
+  squadRole?: PlayerSquadRole;
+  marketStatus?: PlayerMarketStatus;
+  trainingFocus?: PlayerTrainingFocus;
+  contractEndRound?: number;
+  releaseClause?: number;
+  signingBonus?: number;
+  relationship?: number;
+  playingTimeSatisfaction?: number;
+  socialRisk?: number;
+  leadership?: number;
+  promisedMinutesUntilRound?: number | null;
+  seasonStats?: PlayerSeasonStats;
 }
 
 export interface Club {
