@@ -20,6 +20,21 @@ export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' |
 export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
 export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
+export type AdministrationDepartmentKey = 'board' | 'finance' | 'legal';
+
+export interface AdministrativeProfessional {
+  id: string;
+  name: string;
+  department: AdministrationDepartmentKey;
+  role: string;
+  quality: number;
+  salary: number;
+  hireCost: number;
+  fireCost: number;
+  hiredRound: number;
+}
+
+export type AdministrationStaff = Record<AdministrationDepartmentKey, AdministrativeProfessional[]>;
 export type SponsorshipSlot = 'principal' | 'sleeve' | 'back' | 'shorts' | 'stadium' | 'training_center' | 'headquarters' | 'media_wall' | 'institutional';
 
 export interface CareerNewsItem {
@@ -204,6 +219,7 @@ export interface Career {
   headquartersRevenuePricing: Record<HeadquartersRevenueKey, number>;
   headquartersImageAcquisition: Record<HeadquartersImageKey, number>;
   headquartersInvestments: Record<HeadquartersInvestmentKey, number>;
+  administrationStaff: AdministrationStaff;
   sponsorships: SponsorshipState;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
