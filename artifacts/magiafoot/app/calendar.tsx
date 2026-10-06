@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { GameButton, GameHeader, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
+import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
 import { LEAGUE_FIXTURES, LEAGUE_ROUNDS, getCurrentFixture } from '@/game/engine';
@@ -12,109 +11,73 @@ export default function CalendarScreen() {
   const colors = useColors();
   const router = useRouter();
   const { career, startCurrentMatch } = useCareer();
-  const [selectedRound, setSelectedRound] = useState(career?.roundIndex ?? 0);
-  if (!career) {
-    return <><GameHeader title="Calendário" /><Screen><GameButton label="Criar carreira" onPress={() => router.push('/new-career')} /></Screen></>;
-  }
-  const round = Math.min(Math.max(selectedRound, 0), LEAGUE_ROUNDS - 1);
-  const fixtures = LEAGUE_FIXTURES.filter((fixture) => fixture.roundIndex === round);
-  const currentFixture = getCurrentFixture(career);
-  const hasCurrentMatch = currentFixture?.roundIndex === round;
 
-  const enterMatch = () => {
-    if (!currentFixture) return;
+  if (!career) {
+    return <><GameHeader title="Jogos" /><Screen><GameButton label="Criar carreira" onPress={() => router.push('/new-career')} /></Screen></>;
+  }
+
+  const clubFixtures = useMemo(() => LEAGUE_FIXTURES
+    .filter((f) => f.homeClubId === career.clubId || f.awayClubId === career.clubId)
+    .sort((a, b) => a.roundIndex - b.roundIndex), [career.clubId]);
+
+  const current = getCurrentFixture(career);
+  const play = () => {
+    if (!current) return;
     if (!career.liveMatch) startCurrentMatch();
     router.push('/match');
   };
 
   return (
     <>
-      <GameHeader title="Calendário" eyebrow="TEMPORADA FICTÍCIA" />
+      <GameHeader title="Jogos" eyebrow={'TEMPORADA ' + career.season} />
       <Screen>
-        <Panel style={styles.roundSummary}>
-          <View style={[styles.calendarIcon, { backgroundColor: colors.accent }]}><Feather name="calendar" size={19} color={colors.accentForeground} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.roundHeading, { color: colors.foreground }]}>Rodada {round + 1}</Text>
-            <Text style={[styles.roundCaption, { color: colors.mutedForeground }]}>4 partidas · turno {round < 7 ? 'de ida' : 'de volta'}</Text>
-          </View>
-          {hasCurrentMatch ? <View style={[styles.nextTag, { backgroundColor: colors.secondary }]}><Text style={[styles.nextTagText, { color: colors.primary }]}>SEU JOGO</Text></View> : null}
+        <Panel style={styles.summary}>
+          <Text style={styles.summaryLabel}>CALENDÁRIO</Text>
+          <Text style={styles.summaryTitle}>{LEAGUE_ROUNDS} rodadas</Text>
+          <Text style={styles.summaryText}>Você está na rodada {career.roundIndex + 1}. Resultados concluídos ficam marcados abaixo.</Text>
         </Panel>
 
-        <SectionLabel title="Escolha a rodada" action={<Text style={[styles.roundCount, { color: colors.mutedForeground }]}>{LEAGUE_ROUNDS} RODADAS</Text>} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roundChips}>
-          {Array.from({ length: LEAGUE_ROUNDS }, (_, index) => (
-            <Pressable
-              key={index}
-              onPress={() => setSelectedRound(index)}
-              style={[styles.roundChip, { backgroundColor: round === index ? colors.primary : colors.card, borderColor: round === index ? colors.primary : colors.border }]}
-            >
-              <Text style={[styles.roundChipText, { color: round === index ? colors.primaryForeground : colors.foreground }]}>{index + 1}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <Panel style={styles.fixturesPanel}>
-          {fixtures.map((fixture) => {
+        <Panel style={styles.list}>
+          {clubFixtures.map((fixture) => {
             const home = getClub(fixture.homeClubId);
             const away = getClub(fixture.awayClubId);
-            const result = career.results.find((item) => item.id === fixture.id);
-            const myGame = fixture.homeClubId === career.clubId || fixture.awayClubId === career.clubId;
-            const isCurrent = currentFixture?.id === fixture.id;
-            const score = result ? `${result.homeGoals}  :  ${result.awayGoals}` : isCurrent ? 'VS' : '—';
+            const result = career.results.find((r) => r.id === fixture.id);
+            const currentRound = fixture.roundIndex === career.roundIndex;
             return (
-              <Pressable
-                key={fixture.id}
-                disabled={!isCurrent}
-                onPress={enterMatch}
-                style={({ pressed }) => [
-                  styles.fixtureRow,
-                  { borderBottomColor: colors.border, backgroundColor: myGame ? colors.secondary : 'transparent', opacity: pressed ? 0.72 : 1 },
-                ]}
-              >
-                <View style={[styles.fixtureTeam, { alignItems: 'flex-start' }]}>
-                  <View style={[styles.clubInitials, { backgroundColor: home?.color ?? colors.primary }]}><Text style={[styles.initialsText, { color: colors.inverse }]}>{home?.initials}</Text></View>
-                  <Text numberOfLines={1} style={[styles.fixtureTeamName, { color: colors.foreground }]}>{home?.name}</Text>
+              <Pressable key={fixture.id} onPress={currentRound ? play : undefined} style={[styles.row, currentRound && styles.rowCurrent]}>
+                <View style={styles.roundBox}><Text style={styles.roundSmall}>ROD</Text><Text style={styles.roundNumber}>{fixture.roundIndex + 1}</Text></View>
+                <View style={styles.teams}>
+                  <Text style={styles.team}>{home?.name ?? 'Casa'}</Text>
+                  <Text style={styles.vs}>{result ? result.homeGoals + '  ×  ' + result.awayGoals : '×'}</Text>
+                  <Text style={styles.team}>{away?.name ?? 'Fora'}</Text>
                 </View>
-                <View style={styles.fixtureCenter}>
-                  <Text style={[styles.fixtureScore, { color: result ? colors.foreground : isCurrent ? colors.primary : colors.mutedForeground }]}>{score}</Text>
-                  <Text style={[styles.fixtureStatus, { color: colors.mutedForeground }]}>{result ? 'FINAL' : isCurrent ? career.liveMatch ? 'RETOMAR' : 'JOGAR' : 'AGUARDANDO'}</Text>
-                </View>
-                <View style={[styles.fixtureTeam, { alignItems: 'flex-end' }]}>
-                  <Text numberOfLines={1} style={[styles.fixtureTeamName, { color: colors.foreground }]}>{away?.name}</Text>
-                  <View style={[styles.clubInitials, { backgroundColor: away?.color ?? colors.primary }]}><Text style={[styles.initialsText, { color: colors.inverse }]}>{away?.initials}</Text></View>
-                </View>
+                <Text style={[styles.status, result ? styles.done : currentRound ? styles.next : undefined]}>{result ? 'FINAL' : currentRound ? 'PRÓXIMO' : '—'}</Text>
               </Pressable>
             );
           })}
         </Panel>
-        {hasCurrentMatch && currentFixture ? (
-          <GameButton label={career.liveMatch ? 'Retomar sua partida' : 'Jogar sua partida'} icon="play" onPress={enterMatch} />
-        ) : null}
-        <Text style={[styles.calendarNote, { color: colors.mutedForeground }]}>Toque no seu jogo para acompanhar os 90 minutos. Os outros placares são simulados.</Text>
+
+        {current ? <GameButton label={career.liveMatch ? 'CONTINUAR PARTIDA' : 'JOGAR PRÓXIMA PARTIDA'} icon="play" onPress={play} /> : null}
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  roundSummary: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  calendarIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  roundHeading: { fontSize: 15, fontWeight: '900' },
-  roundCaption: { fontSize: 10, marginTop: 3 },
-  nextTag: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6 },
-  nextTagText: { fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
-  roundCount: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
-  roundChips: { flexDirection: 'row', gap: 7, paddingBottom: 3 },
-  roundChip: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  roundChipText: { fontSize: 11, fontWeight: '900' },
-  fixturesPanel: { paddingVertical: 3, paddingHorizontal: 9 },
-  fixtureRow: { minHeight: 63, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: 9, paddingHorizontal: 6, gap: 6 },
-  fixtureTeam: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  clubInitials: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  initialsText: { fontSize: 7, fontWeight: '900' },
-  fixtureTeamName: { fontSize: 8, fontWeight: '700', flexShrink: 1 },
-  fixtureCenter: { width: 59, alignItems: 'center', gap: 3 },
-  fixtureScore: { fontSize: 11, fontWeight: '900' },
-  fixtureStatus: { fontSize: 6, fontWeight: '800', letterSpacing: 0.45 },
-  calendarNote: { fontSize: 10, lineHeight: 15, textAlign: 'center', paddingHorizontal: 8, paddingBottom: 7 },
+  summary: { backgroundColor: '#153426', borderColor: '#356a4a', gap: 6 },
+  summaryLabel: { color: '#79ef91', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  summaryTitle: { color: '#f5f7f5', fontSize: 22, fontWeight: '900' },
+  summaryText: { color: '#9fb2a5', fontSize: 11, lineHeight: 17 },
+  list: { padding: 0, overflow: 'hidden' },
+  row: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  rowCurrent: { backgroundColor: '#153426' },
+  roundBox: { width: 44, alignItems: 'center' },
+  roundSmall: { color: '#708a78', fontSize: 7, fontWeight: '900' },
+  roundNumber: { color: '#eef5ef', fontSize: 18, fontWeight: '900' },
+  teams: { flex: 1, gap: 3 },
+  team: { color: '#f5f7f5', fontSize: 12, fontWeight: '800' },
+  vs: { color: '#7e9585', fontSize: 9, fontWeight: '700' },
+  status: { width: 55, textAlign: 'right', color: '#6f8b78', fontSize: 8, fontWeight: '900' },
+  done: { color: '#9fb2a5' },
+  next: { color: '#79ef91' },
 });
