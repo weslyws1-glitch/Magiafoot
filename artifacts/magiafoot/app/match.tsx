@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { GameButton, GameHeader, Panel, PlayerRow, Screen, SectionLabel } from '@/components/ManagerUI';
+import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
 import { effectiveStrength, formatCurrency, getCurrentFixture, LEAGUE_FIXTURES, matchPhaseLabel } from '@/game/engine';
@@ -48,8 +48,6 @@ export default function MatchScreen() {
   const { career, startCurrentMatch, advanceCurrentMatch, makeSubstitution, closeCurrentMatch } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
-  const [showSubs, setShowSubs] = useState(false);
-  const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const game = career?.liveMatch ?? null;
 
   useEffect(() => {
@@ -100,12 +98,7 @@ export default function MatchScreen() {
   const isLive = game.phase === 'first_half' || game.phase === 'second_half';
   const isFinal = game.phase === 'finished';
   const clock = game.phase === 'halftime' ? 'INTERVALO' : isFinal ? 'FIM' : game.phase === 'pregame' ? '0′' : game.minute + '′';
-  const activeSlots = game.userLineup.filter((slot) => !slot.sentOff);
-  const outgoing = outgoingId ? career.players.find((player) => player.id === outgoingId) : undefined;
-  const incomingPlayers = game.userBenchIds
-    .map((id) => career.players.find((player) => player.id === id))
-    .filter((player) => player?.status === 'available');
-  const recentEvents = [...game.events].slice(-10).reverse();
+  const recentEvents = [...game.events].slice(-6).reverse();
 
   const roundMatches = LEAGUE_FIXTURES
     .filter((fixture) => fixture.roundIndex === game.fixture.roundIndex)
@@ -125,8 +118,6 @@ export default function MatchScreen() {
       return { fixture, home: fixtureHome, away: fixtureAway, ...live, isUser };
     });
 
-  const fieldPlayers = useMemo(() => activeSlots.map((slot) => {
-    const player = career.players.find((p) => p.id === slot.playerId);
     return player ? { slot, player } : null;
   }).filter(Boolean) as Array<{ slot: typeof activeSlots[number]; player: typeof career.players[number] }>, [activeSlots, career.players]);
 
@@ -139,14 +130,6 @@ export default function MatchScreen() {
     advanceCurrentMatch(1);
   };
 
-  const substitute = (incomingId: string) => {
-    if (!outgoingId) return;
-    const success = makeSubstitution(outgoingId, incomingId);
-    if (success) {
-      setOutgoingId(null);
-      setShowSubs(false);
-    }
-  };
 
   if (game.phase === 'halftime') {
     return (
@@ -230,6 +213,20 @@ export default function MatchScreen() {
           </View>
         </View>
 
+        <Panel style={styles.commentaryPanel}>
+          <View style={styles.commentaryHeader}>
+            <Text style={styles.commentaryTitle}>LANCES DA PARTIDA</Text>
+            <Text style={styles.commentaryClock}>{game.minute}′</Text>
+          </View>
+          {recentEvents.length ? recentEvents.map((event) => (
+            <View key={event.id} style={styles.commentaryRow}>
+              <Text style={styles.commentaryMinute}>{event.minute}′</Text>
+              <Text style={styles.commentarySymbol}>{eventSymbol(event)}</Text>
+              <Text style={styles.commentaryText}>{event.text}</Text>
+            </View>
+          )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
+        </Panel>
+
         <Panel style={styles.allMatchesPanel}>
           <View style={styles.allMatchesHeader}>
             <Text style={styles.allMatchesTitle}>TODOS OS JOGOS DA RODADA</Text>
@@ -245,20 +242,6 @@ export default function MatchScreen() {
               <Text numberOfLines={1} style={[styles.allMatchClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
             </View>
           ))}
-        </Panel>
-
-        <Panel style={styles.commentaryPanel}>
-          <View style={styles.commentaryHeader}>
-            <Text style={styles.commentaryTitle}>LANCES DA PARTIDA</Text>
-            <Text style={styles.commentaryClock}>{game.minute}′</Text>
-          </View>
-          {recentEvents.length ? recentEvents.map((event) => (
-            <View key={event.id} style={styles.commentaryRow}>
-              <Text style={styles.commentaryMinute}>{event.minute}′</Text>
-              <Text style={styles.commentarySymbol}>{eventSymbol(event)}</Text>
-              <Text style={styles.commentaryText}>{event.text}</Text>
-            </View>
-          )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
         </Panel>
 
         <View style={styles.liveControls}>
@@ -282,36 +265,17 @@ export default function MatchScreen() {
           <Pressable onPress={() => router.push('/tactics')} style={styles.controlDark}>
             <Text style={styles.controlDarkText}>TÁTICA</Text>
           </Pressable>
-
-          <Pressable onPress={() => setShowSubs((v) => !v)} style={styles.controlDark}>
-            <Text style={styles.controlDarkText}>SUB {game.substitutionsUsed}/5</Text>
-          </Pressable>
         </View>
-        {showSubs ? (
-          <Panel style={styles.subPanel}>
-            <SectionLabel title={outgoing ? 'Entra no lugar de ' + outgoing.name : 'Escolha quem sai'} />
-            {!outgoing ? activeSlots.map((slot) => {
-              const player = career.players.find((p) => p.id === slot.playerId);
-              return player ? <Pressable key={slot.id} onPress={() => setOutgoingId(player.id)}><PlayerRow player={player} /></Pressable> : null;
-            }) : incomingPlayers.map((player) => player ? <Pressable key={player.id} onPress={() => substitute(player.id)}><PlayerRow player={player} /></Pressable> : null)}
-            {outgoing ? <GameButton label="VOLTAR" variant="outline" compact onPress={() => setOutgoingId(null)} /> : null}
-          </Panel>
-        ) : null}
-
-        {!isLive || !autoRunning ? (
-          <GameButton
-            label={isFinal ? 'ENCERRAR E ATUALIZAR CLASSIFICAÇÃO' : game.phase === 'halftime' ? 'COMEÇAR 2º TEMPO' : game.phase === 'pregame' ? 'APITO INICIAL' : 'AVANÇAR 1 MINUTO'}
-            icon={isFinal ? 'flag' : 'play'}
-            onPress={handleMain}
-          />
-        ) : null}
 
         {isFinal ? (
-          <Panel style={styles.finalPanel}>
+          <>
+            <GameButton label="ENCERRAR E ATUALIZAR CLASSIFICAÇÃO" icon="flag" onPress={handleMain} />
+            <Panel style={styles.finalPanel}>
             <Text style={styles.finalTitle}>Fim de jogo</Text>
             <Text style={styles.finalText}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
             <Text style={styles.finalText}>Caixa atual: {formatCurrency(career.balance)}</Text>
           </Panel>
+          </>
         ) : null}
       </Screen>
     </>
@@ -424,14 +388,14 @@ const styles = StyleSheet.create({
   allMatchScore: { width: 20, textAlign: 'center', color: '#ffffff', fontSize: 11, fontWeight: '900' },
   allMatchDash: { color: '#8ea595', fontSize: 9, fontWeight: '900' },
 
-  commentaryPanel: { padding: 0, overflow: 'hidden', backgroundColor: '#0b2117', borderColor: '#315f3f' },
+  commentaryPanel: { padding: 0, overflow: 'hidden', backgroundColor: '#0b2117', borderColor: '#315f3f', maxHeight: 210 },
   commentaryHeader: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, backgroundColor: '#14351f' },
   commentaryTitle: { color: '#dce8df', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   commentaryClock: { color: '#79ef91', fontSize: 10, fontWeight: '900' },
-  commentaryRow: { minHeight: 32, flexDirection: 'row', alignItems: 'flex-start', gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  commentaryRow: { minHeight: 28, flexDirection: 'row', alignItems: 'flex-start', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
   commentaryMinute: { width: 24, color: '#ffe66a', fontSize: 8, fontWeight: '900' },
   commentarySymbol: { width: 18, color: '#ffffff', fontSize: 9, textAlign: 'center' },
-  commentaryText: { flex: 1, color: '#dce8df', fontSize: 8, lineHeight: 12 },
+  commentaryText: { flex: 1, color: '#dce8df', fontSize: 7.5, lineHeight: 10 },
   commentaryEmpty: { color: '#8fa696', fontSize: 9, padding: 12 },
 
   liveControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
