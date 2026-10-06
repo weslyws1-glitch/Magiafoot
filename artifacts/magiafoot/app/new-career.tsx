@@ -32,7 +32,7 @@ export default function NewCareerScreen() {
       return;
     }
     createNewCareer(cleanName, clubId);
-    router.replace('/club');
+    router.replace('/');
   };
 
   if (!isReady) {
@@ -64,7 +64,7 @@ export default function NewCareerScreen() {
               setError('');
               setConfirmOverwrite(false);
             }}
-            placeholder="Ex.: Marina Costa"
+            placeholder="Ex.: Wesley"
             placeholderTextColor={colors.mutedForeground}
             maxLength={32}
             autoCapitalize="words"
@@ -134,7 +134,7 @@ export default function NewCareerScreen() {
         )}
 
         <Text style={[styles.fictionNote, { color: colors.mutedForeground }]}>
-          Liga, clubes e jogadores pertencem ao universo fictício de Magiafoot.
+          Liga, clubes e jogadores pertencem ao universo fictício do MagiaFoot.
         </Text>
       </Screen>
     </>
@@ -142,14 +142,14 @@ export default function NewCareerScreen() {
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: 5, marginBottom: 2 },
-  title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.7 },
+  intro: { gap: 6, marginBottom: 4 },
+  title: { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
   description: { fontSize: 12, lineHeight: 18, maxWidth: 320 },
   formPanel: { gap: 9 },
   inputLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, fontSize: 15, fontWeight: '600' },
   clubList: { gap: 9 },
-  clubChoice: { borderWidth: 1, borderRadius: 17, paddingHorizontal: 11, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  clubChoice: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
   clubCopy: { flex: 1, gap: 3 },
   clubName: { fontSize: 13, fontWeight: '800' },
   clubCity: { fontSize: 10 },
