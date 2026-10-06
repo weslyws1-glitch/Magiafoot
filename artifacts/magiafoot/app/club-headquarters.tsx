@@ -176,9 +176,6 @@ export default function ClubHeadquartersScreen() {
   const progress = Math.round((totalLevel / maxTotal) * 100);
   const marketingInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.marketing] ?? 65000;
   const commercialInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.commercial] ?? 65000;
-  const baseOperatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
-  const operatingCost = baseOperatingCost + adminPayroll;
-  const projectedNet = commercialRevenue - operatingCost;
   const reputation = Math.min(100, 25 + investments.marketing * 6 + (levels.press ?? 0) * 6 + (levels.museum ?? 0) * 5 + (levels.history ?? 0) * 4);
   const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
   const staffCapacity = administrationStaffCapacity(career);
@@ -189,6 +186,9 @@ export default function ClubHeadquartersScreen() {
   ];
   const management = Math.round(adminEfficiencies.reduce((sum, value) => sum + value, 0) / adminEfficiencies.length);
   const adminPayroll = [...staff.board, ...staff.finance, ...staff.legal].reduce((sum, person) => sum + person.salary, 0);
+  const baseOperatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
+  const operatingCost = baseOperatingCost + adminPayroll;
+  const projectedNet = commercialRevenue - operatingCost;
 
   return (
     <>
