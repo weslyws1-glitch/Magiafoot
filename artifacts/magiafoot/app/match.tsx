@@ -25,6 +25,7 @@ export default function MatchScreen() {
   const router = useRouter();
   const { career, startCurrentMatch, advanceCurrentMatch, makeSubstitution, closeCurrentMatch } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
+  const [speed, setSpeed] = useState<1 | 2 | 3>(1);
   const [showSubs, setShowSubs] = useState(false);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const game = career?.liveMatch ?? null;
@@ -32,9 +33,10 @@ export default function MatchScreen() {
   useEffect(() => {
     if (!game || !autoRunning) return;
     if (game.phase !== 'first_half' && game.phase !== 'second_half') return;
-    const timer = setInterval(() => advanceCurrentMatch(1), 900);
+    const intervalMs = speed === 1 ? 900 : speed === 2 ? 450 : 300;
+    const timer = setInterval(() => advanceCurrentMatch(1), intervalMs);
     return () => clearInterval(timer);
-  }, [game?.phase, game?.minute, autoRunning, advanceCurrentMatch]);
+  }, [game?.phase, game?.minute, autoRunning, speed, advanceCurrentMatch]);
 
   if (!career) {
     return <><GameHeader title="Partida" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira antes de entrar em campo.</Text></Screen></>;
@@ -111,6 +113,7 @@ export default function MatchScreen() {
       <GameHeader
         title="Partida"
         eyebrow={'3ª DIVISÃO · RODADA ' + (game.fixture.roundIndex + 1)}
+        back={false}
         right={<Text style={styles.headerClock}>{clock}</Text>}
       />
       <Screen>
@@ -148,6 +151,17 @@ export default function MatchScreen() {
                 <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
                 <Text style={styles.controlButtonText}>{autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
               </Pressable>
+              <View style={styles.speedGroup}>
+                {[1, 2, 3].map((value) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => setSpeed(value as 1 | 2 | 3)}
+                    style={[styles.speedButton, speed === value && styles.speedButtonActive]}
+                  >
+                    <Text style={[styles.speedText, speed === value && styles.speedTextActive]}>{value}x</Text>
+                  </Pressable>
+                ))}
+              </View>
               <Pressable onPress={() => router.push('/tactics')} style={styles.controlDark}>
                 <Text style={styles.controlDarkText}>TÁTICA</Text>
               </Pressable>
@@ -249,9 +263,14 @@ const styles = StyleSheet.create({
   shirt: { width: 28, height: 27, borderRadius: 7, backgroundColor: '#c9d97b', borderWidth: 1, borderColor: '#e7efb2', alignItems: 'center', justifyContent: 'center' },
   shirtRating: { color: '#22351a', fontSize: 8, fontWeight: '900' },
   pitchName: { color: '#ffffff', fontSize: 7, fontWeight: '800', marginTop: 2, textShadowColor: 'rgba(0,0,0,.75)', textShadowRadius: 2 },
-  pitchControls: { flexDirection: 'row', gap: 4, marginTop: 5 },
+  pitchControls: { flexDirection: 'row', gap: 4, marginTop: 5, alignItems: 'center' },
   controlButton: { flex: 1.2, minHeight: 34, borderRadius: 7, backgroundColor: '#79ef91', flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center' },
   controlButtonText: { color: '#07150d', fontSize: 8, fontWeight: '900' },
+  speedGroup: { flexDirection: 'row', gap: 3 },
+  speedButton: { minWidth: 31, minHeight: 34, borderRadius: 7, borderWidth: 1, borderColor: '#2c503d', backgroundColor: '#173326', alignItems: 'center', justifyContent: 'center' },
+  speedButtonActive: { backgroundColor: '#ffe66a', borderColor: '#ffe66a' },
+  speedText: { color: '#dce8df', fontSize: 8, fontWeight: '900' },
+  speedTextActive: { color: '#263411' },
   controlDark: { flex: 1, minHeight: 34, borderRadius: 7, backgroundColor: '#173326', borderWidth: 1, borderColor: '#2c503d', alignItems: 'center', justifyContent: 'center' },
   controlDarkText: { color: '#dce8df', fontSize: 8, fontWeight: '900' },
 
