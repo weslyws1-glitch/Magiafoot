@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { GameHeader, Panel, Screen, SectionLabel, formatCurrency } from '@/components/ManagerUI';
@@ -142,6 +142,7 @@ function riskLabel(risk: number) {
 export default function ClubHeadquartersScreen() {
   const colors = useColors();
   const router = useRouter();
+  const [selectedAdminDepartment, setSelectedAdminDepartment] = useState<AdministrationDepartmentKey | null>(null);
   const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, hireAdminProfessional, fireAdminProfessional } = useCareer();
 
   if (!career) {
@@ -295,60 +296,18 @@ export default function ClubHeadquartersScreen() {
                   <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>EFICIÊNCIA</Text><Text style={styles.adminDeptValue}>{efficiency}%</Text></View>
                 </View>
 
-                {people.length > 0 ? (
-                  <View style={styles.staffList}>
-                    {people.map((person) => (
-                      <View key={person.id} style={styles.staffRow}>
-                        <View style={styles.staffPerson}>
-                          <Text style={styles.staffName}>{person.name}</Text>
-                          <Text style={styles.staffRole}>{person.role} · Qualidade {person.quality}</Text>
-                          <Text style={styles.staffSalary}>{formatCurrency(person.salary)}/mês</Text>
-                          <Text style={styles.staffContract}>Contrato: {Math.max(0, person.contractEndRound - career.roundIndex)} jogos restantes</Text>
-                        </View>
-                        <Pressable
-                          onPress={() => fireAdminProfessional(item.key, person.id)}
-                          disabled={career.balance < person.fireCost}
-                          style={[styles.fireButton, career.balance < person.fireCost && styles.fireButtonDisabled]}
-                        >
-                          <Text style={styles.fireButtonText}>DEMITIR</Text>
-                          <Text style={styles.fireCost}>{formatCurrency(person.fireCost)}</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.noStaff}>Nenhum profissional contratado.</Text>
-                )}
-
-                {required === 0 && people.length > 0 ? (
-                  <View style={styles.savingHint}>
-                    <Feather name="trending-down" size={13} color="#d8c27c" />
-                    <Text style={styles.savingHintText}>O clube não precisa desse quadro agora. Demitir pode aliviar a folha, mas existe custo de rescisão.</Text>
-                  </View>
-                ) : excess > 0 ? (
-                  <View style={styles.savingHint}>
-                    <Feather name="alert-circle" size={13} color="#d8c27c" />
-                    <Text style={styles.savingHintText}>Há {excess} profissional(is) acima da necessidade atual. Você pode manter por segurança ou reduzir custos.</Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.candidateBox}>
-                  <View style={styles.candidateInfo}>
-                    <Text style={styles.candidateKicker}>PRÓXIMO CANDIDATO</Text>
-                    <Text style={styles.candidateName}>{candidate.name}</Text>
-                    <Text style={styles.candidateMeta}>{candidate.role} · Qualidade {candidate.quality}</Text>
-                    <Text style={styles.candidateMeta}>Salário {formatCurrency(candidate.salary)}/mês</Text>
-                    <Text style={styles.candidateMeta}>Contrato de {candidate.contractRounds} jogos</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => hireAdminProfessional(item.key)}
-                    disabled={!canHire}
-                    style={[styles.hireButton, !canHire && styles.hireButtonDisabled]}
-                  >
-                    <Text style={[styles.hireButtonText, !canHire && styles.hireButtonTextDisabled]}>
-                      {full ? 'SEM VAGA' : required === 0 ? 'CONTRATAR MESMO ASSIM' : 'CONTRATAR'}
+                <View style={styles.adminCompactSummary}>
+                  <View style={styles.adminCompactText}>
+                    <Text style={styles.adminCompactTitle}>
+                      {people.length === 0 ? 'Nenhum contrato ativo' : people.length + ' contrato(s) ativo(s)'}
                     </Text>
-                    {!full ? <Text style={styles.hireCost}>{formatCurrency(candidate.hireCost)}</Text> : null}
+                    <Text style={styles.adminCompactSub}>
+                      Folha: {formatCurrency(people.reduce((sum, person) => sum + person.salary, 0))}/mês
+                    </Text>
+                  </View>
+                  <Pressable style={styles.openContractsButton} onPress={() => setSelectedAdminDepartment(item.key)}>
+                    <Text style={styles.openContractsButtonText}>VER EQUIPE E CONTRATOS</Text>
+                    <Feather name="chevron-right" size={15} color="#07150d" />
                   </Pressable>
                 </View>
               </Panel>
@@ -679,6 +638,123 @@ export default function ClubHeadquartersScreen() {
         </Panel>
 
         <Text style={styles.note}>Os níveis de preço podem ser alterados a qualquer momento. Demanda e satisfação reagem à política comercial e ao desempenho recente do time.</Text>
+
+        <Modal
+          visible={selectedAdminDepartment !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSelectedAdminDepartment(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              {selectedAdminDepartment ? (() => {
+                const dept = ADMIN_STAFF_ITEMS.find((item) => item.key === selectedAdminDepartment)!;
+                const people = activeStaff[selectedAdminDepartment] ?? [];
+                const required = administrationRequiredStaff(career, selectedAdminDepartment);
+                const needScore = adminNeedScores[selectedAdminDepartment];
+                const efficiency = administrationDepartmentEfficiency(career, selectedAdminDepartment);
+                const candidate = previewAdministrativeCandidate(career, selectedAdminDepartment);
+                const full = people.length >= staffCapacity || people.length >= 10;
+                const canHire = !full && career.balance >= candidate.hireCost;
+                const excess = Math.max(0, people.length - required);
+
+                return (
+                  <>
+                    <View style={styles.modalHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalKicker}>EQUIPE E CONTRATOS</Text>
+                        <Text style={styles.modalTitle}>{dept.title}</Text>
+                      </View>
+                      <Pressable style={styles.modalClose} onPress={() => setSelectedAdminDepartment(null)}>
+                        <Feather name="x" size={20} color="#f5f7f5" />
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.modalNeedBox}>
+                      <View style={styles.needHeader}>
+                        <Text style={styles.needLabel}>NECESSIDADE ATUAL</Text>
+                        <Text style={styles.needValue}>{needScore}%</Text>
+                      </View>
+                      <View style={styles.needTrack}>
+                        <View style={[styles.needFill, { width: (needScore + '%') as any }]} />
+                      </View>
+                      <View style={styles.adminDeptMetrics}>
+                        <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>CONTRATADOS</Text><Text style={styles.adminDeptValue}>{people.length}/{staffCapacity}</Text></View>
+                        <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>NECESSÁRIO</Text><Text style={styles.adminDeptValue}>{required === 0 ? 'Nenhum' : required}</Text></View>
+                        <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>EFICIÊNCIA</Text><Text style={styles.adminDeptValue}>{efficiency}%</Text></View>
+                      </View>
+                    </View>
+
+                    <ScrollView contentContainerStyle={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
+                      <Text style={styles.modalSectionTitle}>CONTRATOS ATIVOS</Text>
+
+                      {people.length > 0 ? (
+                        <View style={styles.staffList}>
+                          {people.map((person) => (
+                            <View key={person.id} style={styles.staffRow}>
+                              <View style={styles.staffPerson}>
+                                <Text style={styles.staffName}>{person.name}</Text>
+                                <Text style={styles.staffRole}>{person.role} · Qualidade {person.quality}</Text>
+                                <Text style={styles.staffSalary}>{formatCurrency(person.salary)}/mês</Text>
+                                <Text style={styles.staffContract}>Contrato: {Math.max(0, person.contractEndRound - career.roundIndex)} jogos restantes</Text>
+                              </View>
+                              <Pressable
+                                onPress={() => fireAdminProfessional(selectedAdminDepartment, person.id)}
+                                disabled={career.balance < person.fireCost}
+                                style={[styles.fireButton, career.balance < person.fireCost && styles.fireButtonDisabled]}
+                              >
+                                <Text style={styles.fireButtonText}>DEMITIR</Text>
+                                <Text style={styles.fireCost}>{formatCurrency(person.fireCost)}</Text>
+                              </Pressable>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.emptyContracts}>
+                          <Feather name="users" size={24} color="#718579" />
+                          <Text style={styles.noStaff}>Nenhum profissional contratado.</Text>
+                        </View>
+                      )}
+
+                      {required === 0 && people.length > 0 ? (
+                        <View style={styles.savingHint}>
+                          <Feather name="trending-down" size={13} color="#d8c27c" />
+                          <Text style={styles.savingHintText}>Hoje o clube não precisa desse quadro. Você pode reduzir custos, lembrando que há rescisão.</Text>
+                        </View>
+                      ) : excess > 0 ? (
+                        <View style={styles.savingHint}>
+                          <Feather name="alert-circle" size={13} color="#d8c27c" />
+                          <Text style={styles.savingHintText}>Há {excess} profissional(is) acima da necessidade atual.</Text>
+                        </View>
+                      ) : null}
+
+                      <Text style={styles.modalSectionTitle}>MERCADO DE PROFISSIONAIS</Text>
+                      <View style={styles.candidateBox}>
+                        <View style={styles.candidateInfo}>
+                          <Text style={styles.candidateKicker}>PRÓXIMO CANDIDATO</Text>
+                          <Text style={styles.candidateName}>{candidate.name}</Text>
+                          <Text style={styles.candidateMeta}>{candidate.role} · Qualidade {candidate.quality}</Text>
+                          <Text style={styles.candidateMeta}>Salário {formatCurrency(candidate.salary)}/mês</Text>
+                          <Text style={styles.candidateMeta}>Contrato de {candidate.contractRounds} jogos</Text>
+                        </View>
+                        <Pressable
+                          onPress={() => hireAdminProfessional(selectedAdminDepartment)}
+                          disabled={!canHire}
+                          style={[styles.hireButton, !canHire && styles.hireButtonDisabled]}
+                        >
+                          <Text style={[styles.hireButtonText, !canHire && styles.hireButtonTextDisabled]}>
+                            {full ? 'SEM VAGA' : required === 0 ? 'CONTRATAR MESMO ASSIM' : 'CONTRATAR'}
+                          </Text>
+                          {!full ? <Text style={styles.hireCost}>{formatCurrency(candidate.hireCost)}</Text> : null}
+                        </Pressable>
+                      </View>
+                    </ScrollView>
+                  </>
+                );
+              })() : null}
+            </View>
+          </View>
+        </Modal>
       </Screen>
     </>
   );
@@ -726,6 +802,12 @@ const styles = StyleSheet.create({
   needTrack:{height:7,borderRadius:99,backgroundColor:'#08150e',overflow:'hidden',borderWidth:1,borderColor:'#294336'},
   needFill:{height:'100%',backgroundColor:'#79ef91'},
   adminDeptMetrics:{flexDirection:'row',gap:6},
+  adminCompactSummary:{flexDirection:'row',alignItems:'center',gap:8,paddingTop:2},
+  adminCompactText:{flex:1,minWidth:0},
+  adminCompactTitle:{color:'#dce6df',fontSize:8.5,fontWeight:'900'},
+  adminCompactSub:{color:'#89a091',fontSize:7.2,fontWeight:'800',marginTop:2},
+  openContractsButton:{minHeight:38,borderRadius:8,backgroundColor:'#79ef91',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:9},
+  openContractsButtonText:{color:'#07150d',fontSize:6.7,fontWeight:'900'},
   adminDeptMetric:{flex:1,minHeight:52,borderRadius:8,padding:7,justifyContent:'center',backgroundColor:'#0b2117',borderWidth:1,borderColor:'#2c503d'},
   adminDeptValue:{color:'#f5f7f5',fontSize:10,fontWeight:'900',marginTop:3},
   staffList:{gap:7},
@@ -813,4 +895,14 @@ const styles = StyleSheet.create({
   financeNegative: { color: '#f09d9d', fontSize: 10, fontWeight: '900' },
   financeTotalLabel: { color: '#79ef91', fontSize: 9, fontWeight: '900' },
   note: { color: '#819488', fontSize: 8, lineHeight: 12, textAlign: 'center', paddingHorizontal: 8 },
+  modalBackdrop:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,0.72)'},
+  modalSheet:{maxHeight:'88%',backgroundColor:'#0b1c13',borderTopLeftRadius:22,borderTopRightRadius:22,borderWidth:1,borderColor:'#355846',padding:14,paddingBottom:22},
+  modalHeader:{flexDirection:'row',alignItems:'center',gap:10,paddingBottom:12,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:'#2d4938'},
+  modalKicker:{color:'#79ef91',fontSize:7,fontWeight:'900',letterSpacing:0.9},
+  modalTitle:{color:'#f5f7f5',fontSize:18,fontWeight:'900',marginTop:2},
+  modalClose:{width:40,height:40,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:'#173326',borderWidth:1,borderColor:'#355846'},
+  modalNeedBox:{gap:8,paddingVertical:12},
+  modalScrollContent:{gap:10,paddingBottom:18},
+  modalSectionTitle:{color:'#90a898',fontSize:7,fontWeight:'900',letterSpacing:0.9,marginTop:4},
+  emptyContracts:{minHeight:90,borderRadius:10,alignItems:'center',justifyContent:'center',gap:7,backgroundColor:'#10251a',borderWidth:1,borderColor:'#2e4c3a'},
 });
