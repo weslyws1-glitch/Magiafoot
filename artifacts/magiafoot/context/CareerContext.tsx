@@ -10,6 +10,8 @@ import {
   negotiateSponsorshipProposal,
   declineSponsorshipProposal,
   acceptSponsorshipProposal,
+  declinePlayerTransferOffer,
+  acceptPlayerTransferOffer,
   advanceMatch,
   assignPlayerToSlot,
   changeFormation,
@@ -75,6 +77,8 @@ interface CareerContextValue {
   updatePlayerSquadRole: (playerId: string, role: PlayerSquadRole) => void;
   updatePlayerTrainingFocus: (playerId: string, focus: PlayerTrainingFocus) => void;
   promiseMinutes: (playerId: string) => void;
+  acceptPlayerOffer: (offerId: string) => boolean;
+  declinePlayerOffer: (offerId: string) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -264,6 +268,18 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => promisePlayerMinutes(current, playerId));
   }, [update]);
 
+  const acceptPlayerOffer = useCallback((offerId: string) => {
+    if (!career) return false;
+    const next = acceptPlayerTransferOffer(career, offerId);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
+  const declinePlayerOffer = useCallback((offerId: string) => {
+    update((current) => declinePlayerTransferOffer(current, offerId));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -299,9 +315,11 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     updatePlayerSquadRole,
     updatePlayerTrainingFocus,
     promiseMinutes,
+    acceptPlayerOffer,
+    declinePlayerOffer,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
