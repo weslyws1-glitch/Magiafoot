@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -89,6 +89,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     headquartersImageAcquisition: { museum: 1, press: 1, history: 1 },
     headquartersInvestments: { marketing: 3, commercial: 3 },
     administrationStaff: { board: [], finance: [], legal: [] },
+    trainingCenterUpgrades: { field: 1, medical: 1, physio: 1, gym: 1, analysis: 1 },
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     results: [],
     liveMatch: null,
@@ -483,6 +484,71 @@ function cpuScore(home: Club, away: Club, seed: number): [number, number] {
   const homeGoals = clamp(Math.floor(roll() * (0.9 + home.rating / 45)), 0, 4);
   const awayGoals = clamp(Math.floor(roll() * (0.9 + away.rating / 45)), 0, 4);
   return [homeGoals, awayGoals];
+}
+
+export const TRAINING_CENTER_BASE_COST: Record<TrainingCenterUpgradeKey, number> = {
+  field: 180000,
+  medical: 240000,
+  physio: 200000,
+  gym: 210000,
+  analysis: 160000,
+};
+
+export function trainingCenterUpgradeCost(key: TrainingCenterUpgradeKey, level: number): number {
+  return Math.round(TRAINING_CENTER_BASE_COST[key] * (1 + Math.max(0, level - 1) * 0.58));
+}
+
+export function trainingFieldCapacity(level: number): number {
+  const table = [0, 20, 23, 26, 29, 32, 35, 38, 41, 45, 50];
+  return table[clamp(Math.round(level), 1, 10)] ?? 20;
+}
+
+export function trainingCenterNeedScore(career: Career, key: TrainingCenterUpgradeKey): number {
+  const level = career.trainingCenterUpgrades?.[key] ?? 1;
+  const recentGames = career.results
+    .filter((result) => result.homeClubId === career.clubId || result.awayClubId === career.clubId)
+    .slice(-8).length;
+  const injured = career.players.filter((player) => player.status === 'injured').length;
+  const tired = career.players.filter((player) => player.fitness < 55).length;
+  const squadSize = career.players.length;
+
+  if (key === 'field') {
+    const capacity = trainingFieldCapacity(level);
+    if (squadSize <= capacity - 3) return 12;
+    if (squadSize <= capacity) return 38;
+    return clamp(65 + (squadSize - capacity) * 8, 0, 100);
+  }
+  if (key === 'medical') return clamp(Math.round(15 + recentGames * 5 + injured * 14 + tired * 2 - level * 4), 0, 100);
+  if (key === 'physio') return clamp(Math.round(12 + injured * 16 + tired * 4 + recentGames * 3 - level * 4), 0, 100);
+  if (key === 'gym') return clamp(Math.round(10 + recentGames * 4 + tired * 5 + Math.max(0, squadSize - 22) * 2 - level * 3), 0, 100);
+
+  const complexity = Math.max(0, career.season - 1) * 7 + Math.max(0, squadSize - 20) * 2 + recentGames * 2;
+  return clamp(Math.round(10 + complexity - level * 4), 0, 100);
+}
+
+export function upgradeTrainingCenterFacility(career: Career, key: TrainingCenterUpgradeKey): Career {
+  const current = career.trainingCenterUpgrades?.[key] ?? 1;
+  if (current >= 10) return career;
+  const cost = trainingCenterUpgradeCost(key, current);
+  if (career.balance < cost) return career;
+
+  const names: Record<TrainingCenterUpgradeKey, string> = {
+    field: 'Campo de treinamento',
+    medical: 'Departamento médico',
+    physio: 'Fisioterapia',
+    gym: 'Academia',
+    analysis: 'Análise de desempenho',
+  };
+
+  return addCareerNews({
+    ...career,
+    balance: career.balance - cost,
+    trainingCenterUpgrades: {
+      ...(career.trainingCenterUpgrades ?? { field: 1, medical: 1, physio: 1, gym: 1, analysis: 1 }),
+      [key]: current + 1,
+    },
+    lastNews: names[key] + ' do CT evoluiu para o nível ' + (current + 1) + '.',
+  }, 'Centro de treinamento evolui', names[key] + ' chegou ao nível ' + (current + 1) + ' após investimento de ' + formatCurrency(cost) + '.', 'club');
 }
 
 export const ADMIN_DEPARTMENT_LABELS: Record<AdministrationDepartmentKey, string> = {
