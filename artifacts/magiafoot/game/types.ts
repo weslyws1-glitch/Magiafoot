@@ -19,6 +19,7 @@ export type StadiumUpgradeKey = 'stands' | 'pitch' | 'roof' | 'lighting' | 'seat
 export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' | 'technology' | 'marketing' | 'sponsors' | 'commercial' | 'store' | 'members' | 'museum' | 'press' | 'events' | 'history';
 export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
 export type HeadquartersImageKey = 'museum' | 'press' | 'history';
+export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
 
 export interface Player {
   id: string;
@@ -154,6 +155,7 @@ export interface Career {
   headquartersUpgrades: Record<HeadquartersUpgradeKey, number>;
   headquartersRevenuePricing: Record<HeadquartersRevenueKey, number>;
   headquartersImageAcquisition: Record<HeadquartersImageKey, number>;
+  headquartersInvestments: Record<HeadquartersInvestmentKey, number>;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
