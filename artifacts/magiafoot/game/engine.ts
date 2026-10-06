@@ -518,7 +518,12 @@ export function administrationRequiredStaff(career: Career, department: Administ
   const organizationGrowth = Math.floor((meeting + technology) / 3);
   const seasonPressure = career.roundIndex >= 24 ? 2 : career.roundIndex >= 12 ? 1 : 0;
   const departmentExtra = department === 'board' ? 1 : 0;
-  return clamp(scale + organizationGrowth + seasonPressure + departmentExtra, 2, 10);
+  const idealNeed = clamp(scale + organizationGrowth + seasonPressure + departmentExtra, 2, 10);
+
+  // O clube nunca exige mais profissionais do que sua estrutura atual permite contratar.
+  // Conforme Sala de Reuniões e Tecnologia/TI evoluem, novas vagas são liberadas
+  // e a necessidade administrativa pode crescer junto.
+  return Math.min(idealNeed, administrationStaffCapacity(career));
 }
 
 function administrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
