@@ -1,104 +1,74 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { ClubBadge, GameButton, GameHeader, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
+import { GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { calculateStandings, getCurrentLeaguePosition } from '@/game/engine';
-import { LEAGUE_NAME } from '@/game/data';
-import { LEAGUE_ROUNDS } from '@/game/engine';
+import { calculateStandings } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 export default function LeagueScreen() {
   const colors = useColors();
-  const router = useRouter();
   const { career } = useCareer();
+
   if (!career) {
-    return <><GameHeader title="Classificação" /><Screen><GameButton label="Criar carreira" onPress={() => router.push('/new-career')} /></Screen></>;
+    return <><GameHeader title="Classificação" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para acompanhar a liga.</Text></Screen></>;
   }
+
   const standings = calculateStandings(career.results);
-  const position = getCurrentLeaguePosition(career);
 
   return (
     <>
-      <GameHeader title="Classificação" eyebrow={LEAGUE_NAME.toUpperCase()} />
+      <GameHeader title="Classificação" eyebrow="3ª DIVISÃO" />
       <Screen>
-        <Panel style={styles.summary}>
-          <View style={[styles.summaryIcon, { backgroundColor: colors.accent }]}><Feather name="award" size={20} color={colors.accentForeground} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.summaryTitle, { color: colors.foreground }]}>{career.season}ª temporada · {LEAGUE_NAME}</Text>
-            <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>{career.roundIndex} de {LEAGUE_ROUNDS} rodadas disputadas</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.positionValue, { color: colors.primary }]}>{position || '—'}º</Text>
-            <Text style={[styles.positionLabel, { color: colors.mutedForeground }]}>SEU CLUBE</Text>
-          </View>
-        </Panel>
-
-        <SectionLabel title="Tabela geral" action={<Text style={[styles.liveLabel, { color: colors.mutedForeground }]}>PONTOS · SALDO · GOLS</Text>} />
-        <Panel style={styles.tablePanel}>
-          <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.tableHeaderNumber, { color: colors.mutedForeground }]}>#</Text>
-            <Text style={[styles.tableHeaderClub, { color: colors.mutedForeground }]}>CLUBE</Text>
-            <Text style={[styles.tableHeaderNumber, { color: colors.mutedForeground }]}>PJ</Text>
-            <Text style={[styles.tableHeaderNumber, { color: colors.mutedForeground }]}>V</Text>
-            <Text style={[styles.tableHeaderNumber, { color: colors.mutedForeground }]}>SG</Text>
-            <Text style={[styles.tableHeaderPoints, { color: colors.mutedForeground }]}>PTS</Text>
+        <Panel style={styles.table}>
+          <View style={styles.header}>
+            <Text style={[styles.pos, styles.head]}>#</Text>
+            <Text style={[styles.club, styles.head]}>CLUBE</Text>
+            <Text style={[styles.num, styles.head]}>J</Text>
+            <Text style={[styles.num, styles.head]}>V</Text>
+            <Text style={[styles.num, styles.head]}>E</Text>
+            <Text style={[styles.num, styles.head]}>D</Text>
+            <Text style={[styles.sg, styles.head]}>SG</Text>
+            <Text style={[styles.pts, styles.head]}>PTS</Text>
           </View>
           {standings.map((row, index) => {
-            const selected = row.club.id === career.clubId;
-            const goalDifference = row.goalsFor - row.goalsAgainst;
+            const own = row.club.id === career.clubId;
             return (
-              <View key={row.club.id} style={[
-                styles.tableRow,
-                { borderBottomColor: colors.border, backgroundColor: selected ? colors.secondary : 'transparent' },
-              ]}>
-                <View style={styles.rank}>
-                  <Text style={[styles.rankText, { color: index < 3 ? colors.primary : colors.mutedForeground }]}>{index + 1}</Text>
+              <View key={row.club.id} style={[styles.row, own && styles.ownRow]}>
+                <Text style={[styles.pos, styles.posText, own && styles.ownText]}>{index + 1}º</Text>
+                <View style={styles.club}>
+                  <Text numberOfLines={1} style={[styles.clubName, own && styles.ownText]}>{row.club.name}</Text>
                 </View>
-                <View style={styles.clubCell}>
-                  <ClubBadge clubId={row.club.id} size={29} />
-                  <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={[styles.clubText, { color: selected ? colors.primary : colors.foreground }]}>{row.club.name}</Text>
-                    <Text style={[styles.clubSub, { color: colors.mutedForeground }]}>{row.wins}V · {row.draws}E · {row.losses}D</Text>
-                  </View>
-                </View>
-                <Text style={[styles.numberCell, { color: colors.mutedForeground }]}>{row.played}</Text>
-                <Text style={[styles.numberCell, { color: colors.mutedForeground }]}>{row.wins}</Text>
-                <Text style={[styles.numberCell, { color: goalDifference > 0 ? colors.primary : colors.mutedForeground }]}>{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</Text>
-                <Text style={[styles.pointsCell, { color: selected ? colors.primary : colors.foreground }]}>{row.points}</Text>
+                <Text style={[styles.num, styles.cell]}>{row.played}</Text>
+                <Text style={[styles.num, styles.cell]}>{row.wins}</Text>
+                <Text style={[styles.num, styles.cell]}>{row.draws}</Text>
+                <Text style={[styles.num, styles.cell]}>{row.losses}</Text>
+                <Text style={[styles.sg, styles.cell]}>{row.goalsFor - row.goalsAgainst}</Text>
+                <Text style={[styles.pts, styles.points, own && styles.ownText]}>{row.points}</Text>
               </View>
             );
           })}
         </Panel>
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>
-          A tabela é atualizada depois de cada rodada. Os resultados dos outros clubes também são simulados.
-        </Text>
+        <Text style={styles.legend}>1º colocado lidera a 3ª Divisão. Critérios: pontos, saldo de gols e gols marcados.</Text>
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  summary: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 13 },
-  summaryIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  summaryTitle: { fontSize: 12, fontWeight: '800' },
-  summarySub: { fontSize: 10, marginTop: 4 },
-  positionValue: { fontSize: 19, fontWeight: '900' },
-  positionLabel: { fontSize: 7, letterSpacing: 0.5, fontWeight: '900', marginTop: 1 },
-  liveLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 0.4 },
-  tablePanel: { paddingHorizontal: 8, paddingVertical: 4 },
-  tableHeader: { minHeight: 29, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingHorizontal: 4 },
-  tableHeaderNumber: { width: 25, textAlign: 'center', fontSize: 8, fontWeight: '800' },
-  tableHeaderClub: { flex: 1, fontSize: 8, fontWeight: '800', paddingLeft: 5 },
-  tableHeaderPoints: { width: 29, textAlign: 'center', fontSize: 8, fontWeight: '900' },
-  tableRow: { minHeight: 49, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, borderRadius: 7 },
-  rank: { width: 25, alignItems: 'center' },
-  rankText: { fontSize: 10, fontWeight: '800' },
-  clubCell: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 3 },
-  clubText: { fontSize: 9, fontWeight: '800' },
-  clubSub: { fontSize: 7, marginTop: 2 },
-  numberCell: { width: 25, textAlign: 'center', fontSize: 9, fontWeight: '600' },
-  pointsCell: { width: 29, textAlign: 'center', fontSize: 11, fontWeight: '900' },
-  note: { fontSize: 10, lineHeight: 15, textAlign: 'center', paddingHorizontal: 9, paddingBottom: 8 },
+  table: { padding: 0, overflow: 'hidden' },
+  header: { minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, backgroundColor: '#173326' },
+  head: { color: '#8ea595', fontSize: 9, fontWeight: '900' },
+  row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  ownRow: { backgroundColor: '#153426' },
+  ownText: { color: '#79ef91' },
+  pos: { width: 36 },
+  posText: { color: '#dce8df', fontSize: 11, fontWeight: '900' },
+  club: { flex: 1, paddingRight: 5 },
+  clubName: { color: '#f5f7f5', fontSize: 11, fontWeight: '800' },
+  num: { width: 28, textAlign: 'center' },
+  sg: { width: 34, textAlign: 'center' },
+  pts: { width: 42, textAlign: 'right' },
+  cell: { color: '#b9c8be', fontSize: 10 },
+  points: { color: '#f5f7f5', fontSize: 12, fontWeight: '900' },
+  legend: { color: '#839a8a', fontSize: 9, textAlign: 'center', lineHeight: 14 },
 });
