@@ -1,6 +1,6 @@
 import type { Club, FormationId, FormationOption, FormationSlot, Player, Position } from './types.ts';
 
-export const LEAGUE_NAME = 'Liga Prisma';
+export const LEAGUE_NAME = '3ª Divisão';
 
 export const CLUBS: Club[] = [
   { id: 'aurora-vale', name: 'Aurora do Vale', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
