@@ -20,6 +20,36 @@ export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' |
 export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
 export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
+export type SponsorshipSlot = 'principal' | 'sleeve' | 'back' | 'institutional';
+
+export interface SponsorshipProposal {
+  id: string;
+  sponsorName: string;
+  category: string;
+  slot: SponsorshipSlot;
+  signingBonus: number;
+  perMatch: number;
+  winBonus: number;
+  durationMatches: number;
+  expiresRound: number;
+  fanImpact: number;
+  boardImpact: number;
+  prestige: number;
+  note: string;
+}
+
+export interface SponsorshipContract extends SponsorshipProposal {
+  acceptedRound: number;
+  matchesRemaining: number;
+  totalEarned: number;
+}
+
+export interface SponsorshipState {
+  proposals: SponsorshipProposal[];
+  contracts: SponsorshipContract[];
+  lastMarketRound: number;
+  history: string[];
+}
 
 export interface Player {
   id: string;
@@ -148,6 +178,7 @@ export interface Career {
   captainId: string;
   tactics: Tactics;
   boardTrust: number;
+  fanTrust: number;
   balance: number;
   stadiumLevel: number;
   ticketPrice: number;
@@ -156,6 +187,7 @@ export interface Career {
   headquartersRevenuePricing: Record<HeadquartersRevenueKey, number>;
   headquartersImageAcquisition: Record<HeadquartersImageKey, number>;
   headquartersInvestments: Record<HeadquartersInvestmentKey, number>;
+  sponsorships: SponsorshipState;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
