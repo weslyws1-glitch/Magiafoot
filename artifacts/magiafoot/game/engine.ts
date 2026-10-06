@@ -513,9 +513,12 @@ export function administrationRequiredStaff(career: Career, department: Administ
   const club = getClub(career.clubId);
   const base = club?.rating ?? 60;
   const scale = base >= 78 ? 5 : base >= 70 ? 4 : base >= 62 ? 3 : 2;
-  const pressure = career.roundIndex >= 20 ? 1 : 0;
+  const meeting = career.headquartersUpgrades?.meeting ?? 0;
+  const technology = career.headquartersUpgrades?.technology ?? 0;
+  const organizationGrowth = Math.floor((meeting + technology) / 3);
+  const seasonPressure = career.roundIndex >= 24 ? 2 : career.roundIndex >= 12 ? 1 : 0;
   const departmentExtra = department === 'board' ? 1 : 0;
-  return clamp(scale + pressure + departmentExtra, 2, 8);
+  return clamp(scale + organizationGrowth + seasonPressure + departmentExtra, 2, 10);
 }
 
 function administrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
