@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StandingRow } from './types.ts';
+import type { Career, Club, Fixture, FormationId, FormationSlot, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -80,6 +80,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     boardTrust: 66,
     balance: club.balance,
     stadiumLevel: 0,
+    stadiumUpgrades: { stands: 1, pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0, scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0 },
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -484,7 +485,7 @@ export function finalizeMatch(career: Career): Career {
         ...fixture,
         homeGoals: userHome ? game.homeGoals : game.awayGoals,
         awayGoals: userHome ? game.awayGoals : game.homeGoals,
-        attendance: Math.round((home.stadiumCapacity + career.stadiumLevel * 4_000) * 0.53),
+        attendance: Math.round((home.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02)),
       };
     }
     const [homeGoals, awayGoals] = cpuScore(home, away, seed);
@@ -504,7 +505,7 @@ export function finalizeMatch(career: Career): Career {
   const trustDelta = isDraw ? 1 : userWon ? 7 : -5;
   const club = getClub(career.clubId);
   const attendance = club && game.fixture.homeClubId === career.clubId
-    ? Math.round((club.stadiumCapacity + career.stadiumLevel * 4_000) * 0.53)
+    ? Math.round((club.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02))
     : 0;
   const gateIncome = club ? attendance * club.ticketPrice : 0;
   const wageBill = career.players.reduce((sum, player) => sum + player.wage, 0);
@@ -594,7 +595,15 @@ export function parseCareer(saved: string | null): Career | null {
       || !Array.isArray(parsed.lineup)
       || !Array.isArray(parsed.results)
     ) return null;
-    return parsed as Career;
+    const fallbackUpgrades: Career['stadiumUpgrades'] = {
+      stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
+      pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
+      scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0,
+    };
+    return {
+      ...(parsed as Career),
+      stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
+    };
   } catch {
     return null;
   }
@@ -655,15 +664,59 @@ export function sellPlayer(career: Career, playerId: string): Career {
   };
 }
 
-export function upgradeStadium(career: Career): Career {
-  const cost = 850_000 + career.stadiumLevel * 350_000;
-  if (career.balance < cost || career.stadiumLevel >= 3) return career;
+export const STADIUM_UPGRADE_BASE_COST: Record<StadiumUpgradeKey, number> = {
+  stands: 850_000,
+  pitch: 320_000,
+  roof: 1_100_000,
+  lighting: 420_000,
+  seats: 280_000,
+  boxes: 900_000,
+  scoreboard: 460_000,
+  security: 240_000,
+  turnstiles: 210_000,
+  parking: 520_000,
+  drainage: 360_000,
+  irrigation: 260_000,
+};
+
+export function stadiumUpgradeCost(key: StadiumUpgradeKey, level: number): number {
+  const base = STADIUM_UPGRADE_BASE_COST[key];
+  return Math.round(base * (1 + Math.max(0, level) * 0.55));
+}
+
+export function upgradeStadiumFacility(career: Career, key: StadiumUpgradeKey): Career {
+  const current = career.stadiumUpgrades?.[key] ?? 0;
+  if (current >= 5) return career;
+  const cost = stadiumUpgradeCost(key, current);
+  if (career.balance < cost) return career;
+
+  const upgrades = { ...career.stadiumUpgrades, [key]: current + 1 };
+  const nextStadiumLevel = key === 'stands' ? Math.max(career.stadiumLevel, upgrades.stands - 1) : career.stadiumLevel;
+  const names: Record<StadiumUpgradeKey, string> = {
+    stands: 'arquibancadas',
+    pitch: 'gramado',
+    roof: 'cobertura',
+    lighting: 'iluminação',
+    seats: 'cadeiras',
+    boxes: 'camarotes',
+    scoreboard: 'placar eletrônico',
+    security: 'segurança',
+    turnstiles: 'catracas',
+    parking: 'estacionamento',
+    drainage: 'drenagem',
+    irrigation: 'irrigação',
+  };
   return {
     ...career,
     balance: career.balance - cost,
-    stadiumLevel: career.stadiumLevel + 1,
-    lastNews: 'A arquibancada ganhou novos lugares. A capacidade e a renda de bilheteria aumentaram.',
+    stadiumLevel: nextStadiumLevel,
+    stadiumUpgrades: upgrades,
+    lastNews: `O estádio recebeu uma melhoria em ${names[key]}. Estrutura agora no nível ${current + 1}.`,
   };
+}
+
+export function upgradeStadium(career: Career): Career {
+  return upgradeStadiumFacility(career, 'stands');
 }
 
 export function getRosterGroups(career: Career) {
