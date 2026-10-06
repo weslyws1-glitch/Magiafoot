@@ -15,6 +15,7 @@ import {
   setTicketPrice,
   setHeadquartersRevenuePricing,
   setHeadquartersImageAcquisition,
+  setHeadquartersInvestment,
   startMatch,
   substitutePlayer,
   updateTactics,
@@ -22,7 +23,7 @@ import {
   upgradeStadiumFacility,
   upgradeHeadquartersFacility,
 } from '@/game/engine';
-import type { Career, FormationId, HeadquartersImageKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
+import type { Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, StadiumUpgradeKey, Tactics } from '@/game/types';
 
 const STORAGE_KEY = 'magiafoot.saved-career.v1';
 
@@ -47,6 +48,7 @@ interface CareerContextValue {
   upgradeHeadquartersItem: (key: HeadquartersUpgradeKey) => boolean;
   updateHeadquartersRevenuePricing: (key: HeadquartersRevenueKey, level: number) => void;
   updateHeadquartersImageAcquisition: (key: HeadquartersImageKey, level: number) => void;
+  updateHeadquartersInvestment: (key: HeadquartersInvestmentKey, level: number) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -160,6 +162,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => setHeadquartersImageAcquisition(current, key, level));
   }, [update]);
 
+  const updateHeadquartersInvestment = useCallback((key: HeadquartersInvestmentKey, level: number) => {
+    update((current) => setHeadquartersInvestment(current, key, level));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -181,9 +187,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     upgradeHeadquartersItem,
     updateHeadquartersRevenuePricing,
     updateHeadquartersImageAcquisition,
+    updateHeadquartersInvestment,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
