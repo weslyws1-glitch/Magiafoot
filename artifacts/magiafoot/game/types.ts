@@ -32,6 +32,8 @@ export interface AdministrativeProfessional {
   hireCost: number;
   fireCost: number;
   hiredRound: number;
+  contractRounds: number;
+  contractEndRound: number;
 }
 
 export type AdministrationStaff = Record<AdministrationDepartmentKey, AdministrativeProfessional[]>;
@@ -211,6 +213,7 @@ export interface Career {
   tactics: Tactics;
   boardTrust: number;
   fanTrust: number;
+  legalWorkloadEvents: number;
   balance: number;
   stadiumLevel: number;
   ticketPrice: number;
