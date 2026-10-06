@@ -126,7 +126,7 @@ export default function HomeScreen() {
       <View style={styles.shortcutGrid}>
         {SHORTCUTS.map((item) => (
           <Pressable key={item.label} onPress={() => router.push(item.route as never)} style={styles.shortcutCard}>
-            <Feather name={item.icon} size={34} color="#79ef91" />
+            <Feather name={item.icon} size={26} color="#79ef91" />
             <Text style={styles.shortcutLabel}>{item.label}</Text>
           </Pressable>
         ))}
@@ -196,27 +196,28 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { gap: 18, paddingHorizontal: 20, paddingBottom: 34 },
+  page: { gap: 14, paddingHorizontal: 20, paddingBottom: 34 },
   loading: { alignItems: 'center', justifyContent: 'center', minHeight: 420 },
   loadingText: { marginTop: 10, fontSize: 12 },
   headerBlock: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#234334' },
   brandLine: { gap: 8, marginBottom: 12 },
   brandName: { color: '#f3f7f3', fontSize: 37, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
   seasonLine: { color: '#9fb2a5', fontSize: 18, fontWeight: '500', marginTop: 4 },
-  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, rowGap: 8 },
+  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
   shortcutCard: {
-    width: '18.7%',
-    minHeight: 92,
-    borderRadius: 14,
+    width: '19%',
+    minHeight: 78,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#264937',
     backgroundColor: '#153426',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 6,
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 7,
   },
-  shortcutLabel: { color: '#f2f6f3', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  shortcutLabel: { color: '#f2f6f3', fontSize: 8.5, lineHeight: 11, fontWeight: '800', textAlign: 'center' },
   lowerGrid: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   panel: {
     borderRadius: 18,
