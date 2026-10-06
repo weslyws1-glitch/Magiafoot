@@ -15,6 +15,7 @@ export type FormationId = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1';
 export type MatchPhase = 'pregame' | 'first_half' | 'halftime' | 'second_half' | 'finished';
 export type Mentality = 'cautelosa' | 'equilibrada' | 'ofensiva';
 export type Intensity = 'baixa' | 'normal' | 'alta';
+export type StadiumUpgradeKey = 'stands' | 'pitch' | 'roof' | 'lighting' | 'seats' | 'boxes' | 'scoreboard' | 'security' | 'turnstiles' | 'parking' | 'drainage' | 'irrigation';
 
 export interface Player {
   id: string;
@@ -145,6 +146,7 @@ export interface Career {
   boardTrust: number;
   balance: number;
   stadiumLevel: number;
+  stadiumUpgrades: Record<StadiumUpgradeKey, number>;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
