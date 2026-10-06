@@ -115,6 +115,7 @@ export interface Player {
   suspendedUntilRound: number | null;
   value: number;
   wage: number;
+  shirtNumber?: number;
   potential?: number;
   secondaryPositions?: Position[];
   personality?: PlayerPersonality;
