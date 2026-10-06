@@ -128,7 +128,7 @@ export default function StadiumDetailScreen() {
               disabled={currentTicketPrice >= maxTicket}
               style={[styles.ticketButton, currentTicketPrice >= maxTicket && styles.ticketButtonDisabled]}
             >
-              <Feather name="plus" size={18} color={currentTicketPrice >= maxTicket ? '#65756b' : '#07150d'} />
+              <Feather name="plus" size={18} color={currentTicketPrice >= maxTicket ? '#65756b' : '#f5f7f5'} />
               <Text style={[styles.ticketButtonTextPlus, currentTicketPrice >= maxTicket && styles.ticketButtonTextDisabled]}>R$ 5</Text>
             </Pressable>
           </View>
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   ticketButton: { width: 66, minHeight: 44, borderRadius: 10, backgroundColor: '#173326', borderWidth: 1, borderColor: '#356a4a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   ticketButtonDisabled: { backgroundColor: '#12231b', borderColor: '#26382f' },
   ticketButtonText: { color: '#f5f7f5', fontSize: 8, fontWeight: '900' },
-  ticketButtonTextPlus: { color: '#07150d', fontSize: 8, fontWeight: '900' },
+  ticketButtonTextPlus: { color: '#f5f7f5', fontSize: 8, fontWeight: '900' },
   ticketButtonTextDisabled: { color: '#65756b' },
   ticketRange: { flex: 1, minWidth: 0, gap: 5 },
   ticketRangeTrack: { height: 7, borderRadius: 99, backgroundColor: '#081a11', overflow: 'hidden', borderWidth: 1, borderColor: '#2c503d' },
