@@ -21,6 +21,7 @@ export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
 export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
 export type AdministrationDepartmentKey = 'board' | 'finance' | 'legal';
+export type TrainingCenterUpgradeKey = 'field' | 'medical' | 'physio' | 'gym' | 'analysis';
 
 export interface AdministrativeProfessional {
   id: string;
@@ -223,6 +224,7 @@ export interface Career {
   headquartersImageAcquisition: Record<HeadquartersImageKey, number>;
   headquartersInvestments: Record<HeadquartersInvestmentKey, number>;
   administrationStaff: AdministrationStaff;
+  trainingCenterUpgrades: Record<TrainingCenterUpgradeKey, number>;
   sponsorships: SponsorshipState;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
