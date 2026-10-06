@@ -3,6 +3,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ReactNode } from 'react';
 import {
   addTransferPlayer,
+  refreshSponsorshipMarket,
+  declineSponsorshipProposal,
+  acceptSponsorshipProposal,
   advanceMatch,
   assignPlayerToSlot,
   changeFormation,
@@ -49,6 +52,9 @@ interface CareerContextValue {
   updateHeadquartersRevenuePricing: (key: HeadquartersRevenueKey, level: number) => void;
   updateHeadquartersImageAcquisition: (key: HeadquartersImageKey, level: number) => void;
   updateHeadquartersInvestment: (key: HeadquartersInvestmentKey, level: number) => void;
+  refreshSponsors: (force?: boolean) => void;
+  acceptSponsor: (proposalId: string) => boolean;
+  declineSponsor: (proposalId: string) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -166,6 +172,22 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => setHeadquartersInvestment(current, key, level));
   }, [update]);
 
+  const refreshSponsors = useCallback((force = false) => {
+    update((current) => refreshSponsorshipMarket(current, force));
+  }, [update]);
+
+  const acceptSponsor = useCallback((proposalId: string) => {
+    if (!career) return false;
+    const next = acceptSponsorshipProposal(career, proposalId);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
+  const declineSponsor = useCallback((proposalId: string) => {
+    update((current) => declineSponsorshipProposal(current, proposalId));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -188,9 +210,12 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     updateHeadquartersRevenuePricing,
     updateHeadquartersImageAcquisition,
     updateHeadquartersInvestment,
+    refreshSponsors,
+    acceptSponsor,
+    declineSponsor,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
