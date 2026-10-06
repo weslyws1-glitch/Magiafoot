@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { GameHeader, Panel, Screen, SectionLabel, formatCurrency } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
@@ -9,8 +10,10 @@ import {
   HEADQUARTERS_REVENUE_PRICE_MULTIPLIER,
   headquartersRevenueLabel,
   headquartersUpgradeCost,
+  headquartersInvestmentLabel,
+  HEADQUARTERS_INVESTMENT_MONTHLY_COST,
 } from '@/game/engine';
-import type { HeadquartersImageKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
+import type { HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
 type HqItem = {
@@ -19,7 +22,7 @@ type HqItem = {
   text: string;
   icon: keyof typeof Feather.glyphMap;
   effect: string;
-  group: 'administracao' | 'comercial';
+  group: 'administracao';
 };
 
 type RevenueItem = {
@@ -44,10 +47,16 @@ const ITEMS: HqItem[] = [
   { key: 'meeting', title: 'Sala de reuniões', text: 'Apoia decisões estratégicas e planejamento da temporada.', icon: 'users', effect: 'Decisões mais eficientes', group: 'administracao' },
   { key: 'legal', title: 'Departamento jurídico', text: 'Reduz riscos contratuais, multas e problemas administrativos.', icon: 'shield', effect: 'Menos riscos e penalidades', group: 'administracao' },
   { key: 'technology', title: 'Tecnologia e TI', text: 'Moderniza processos e melhora eficiência dos departamentos.', icon: 'cpu', effect: 'Mais eficiência interna', group: 'administracao' },
+];
 
-  { key: 'marketing', title: 'Marketing', text: 'Aumenta exposição, alcance da torcida e valor da marca.', icon: 'radio', effect: 'Mais popularidade', group: 'comercial' },
-  { key: 'sponsors', title: 'Patrocínios', text: 'Melhora captação e valor dos contratos comerciais.', icon: 'award', effect: 'Mais receita comercial', group: 'comercial' },
-  { key: 'commercial', title: 'Departamento comercial', text: 'Amplia parcerias, ações promocionais e novos negócios.', icon: 'trending-up', effect: 'Mais oportunidades', group: 'comercial' },
+const COMMERCIAL_INVESTMENTS: Array<{
+  key: HeadquartersInvestmentKey;
+  title: string;
+  text: string;
+  icon: keyof typeof Feather.glyphMap;
+}> = [
+  { key: 'marketing', title: 'Marketing', text: 'Define quanto o clube investe mensalmente em campanhas, marca e aproximação com a torcida.', icon: 'radio' },
+  { key: 'commercial', title: 'Departamento comercial', text: 'Define o investimento em equipe comercial, parcerias, prospecção e novos negócios.', icon: 'trending-up' },
 ];
 
 const IMAGE_ITEMS: ImageItem[] = [
@@ -64,7 +73,6 @@ const REVENUE_ITEMS: RevenueItem[] = [
 
 const GROUPS = [
   ['administracao', 'Administração'],
-  ['comercial', 'Comercial'],
 ] as const;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -84,7 +92,8 @@ function fanSatisfaction(career: NonNullable<ReturnType<typeof useCareer>['caree
   }
 
   const levels = career.headquartersUpgrades;
-  const structuralBonus = (levels.marketing ?? 0) * 2 + (levels.press ?? 0) * 1.5 + (levels.history ?? 0);
+  const investmentMarketing = career.headquartersInvestments?.marketing ?? 3;
+  const structuralBonus = investmentMarketing * 2.5 + (levels.press ?? 0) * 1.5 + (levels.history ?? 0);
   const trustBonus = (career.boardTrust - 50) * 0.28;
   return clamp(Math.round(52 + formPoints + structuralBonus + trustBonus), 15, 100);
 }
@@ -118,7 +127,8 @@ function riskLabel(risk: number) {
 
 export default function ClubHeadquartersScreen() {
   const colors = useColors();
-  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition } = useCareer();
+  const router = useRouter();
+  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment } = useCareer();
 
   if (!career) {
     return <><GameHeader title="Sede do clube" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar a sede.</Text></Screen></>;
@@ -130,10 +140,11 @@ export default function ClubHeadquartersScreen() {
   const levels = career.headquartersUpgrades;
   const pricing = career.headquartersRevenuePricing ?? { store: 3, members: 3, events: 3 };
   const imageAcquisition = career.headquartersImageAcquisition ?? { museum: 1, press: 1, history: 1 };
+  const investments = career.headquartersInvestments ?? { marketing: 3, commercial: 3 };
   const satisfaction = fanSatisfaction(career);
   const satisfactionText = satisfactionLabel(satisfaction);
   const fanMultiplier = 0.72 + (satisfaction / 100) * 0.58;
-  const commercialBoost = 1 + (levels.marketing ?? 0) * 0.045 + (levels.commercial ?? 0) * 0.035;
+  const commercialBoost = 0.78 + (investments.marketing * 0.085) + (investments.commercial * 0.075);
 
   const revenueProjection = REVENUE_ITEMS.reduce((sum, item) => {
     const level = pricing[item.key] ?? 3;
@@ -146,15 +157,18 @@ export default function ClubHeadquartersScreen() {
   const structuralRevenue =
     (levels.sponsors ?? 0) * 42000 +
     (levels.museum ?? 0) * 9000 +
-    (levels.marketing ?? 0) * 12000;
+    investments.marketing * 9000 +
+    investments.commercial * 11000;
 
   const commercialRevenue = revenueProjection + structuralRevenue;
   const totalLevel = Object.values(levels).reduce((sum, level) => sum + level, 0);
   const maxTotal = Object.keys(levels).length * 5;
   const progress = Math.round((totalLevel / maxTotal) * 100);
-  const operatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500;
+  const marketingInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.marketing] ?? 65000;
+  const commercialInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.commercial] ?? 65000;
+  const operatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
   const projectedNet = commercialRevenue - operatingCost;
-  const reputation = Math.min(100, 25 + (levels.marketing ?? 0) * 7 + (levels.press ?? 0) * 6 + (levels.museum ?? 0) * 5 + (levels.history ?? 0) * 4);
+  const reputation = Math.min(100, 25 + investments.marketing * 6 + (levels.press ?? 0) * 6 + (levels.museum ?? 0) * 5 + (levels.history ?? 0) * 4);
   const management = Math.min(100, 30 + (levels.board ?? 0) * 8 + (levels.finance ?? 0) * 7 + (levels.meeting ?? 0) * 5 + (levels.legal ?? 0) * 4 + (levels.technology ?? 0) * 5);
 
   return (
@@ -219,6 +233,91 @@ export default function ClubHeadquartersScreen() {
           </React.Fragment>
         ))}
 
+        <SectionLabel title="Comercial" />
+        <View style={styles.list}>
+          {COMMERCIAL_INVESTMENTS.map((item) => {
+            const investmentLevel = investments[item.key] ?? 3;
+            const monthlyCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investmentLevel] ?? 65000;
+            const returnPotential = item.key === 'marketing'
+              ? Math.round(18000 + investmentLevel * 27000 + satisfaction * 650)
+              : Math.round(22000 + investmentLevel * 31000 + reputation * 720);
+
+            return (
+              <Panel key={item.key} style={styles.revenueCard}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardIcon}><Feather name={item.icon} size={19} color="#79ef91" /></View>
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardText}>{item.text}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.priceControl}>
+                  <Pressable
+                    onPress={() => updateHeadquartersInvestment(item.key, investmentLevel - 1)}
+                    disabled={investmentLevel <= 1}
+                    style={[styles.priceButton, investmentLevel <= 1 && styles.priceButtonDisabled]}
+                  >
+                    <Feather name="minus" size={18} color={investmentLevel <= 1 ? '#65756b' : '#f5f7f5'} />
+                  </Pressable>
+
+                  <View style={styles.priceCenter}>
+                    <Text style={styles.priceLabel}>NÍVEL DE INVESTIMENTO</Text>
+                    <Text style={styles.priceValue}>{headquartersInvestmentLabel(investmentLevel).toUpperCase()}</Text>
+                    <View style={styles.priceDots}>
+                      {[1,2,3,4,5].map((dot) => <View key={dot} style={[styles.priceDot, dot <= investmentLevel && styles.priceDotActive]} />)}
+                    </View>
+                  </View>
+
+                  <Pressable
+                    onPress={() => updateHeadquartersInvestment(item.key, investmentLevel + 1)}
+                    disabled={investmentLevel >= 5}
+                    style={[styles.priceButton, investmentLevel >= 5 && styles.priceButtonDisabled]}
+                  >
+                    <Feather name="plus" size={18} color={investmentLevel >= 5 ? '#65756b' : '#f5f7f5'} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.miniWindow}>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>INVESTIMENTO / MÊS</Text>
+                    <Text style={styles.miniValue}>{formatCurrency(monthlyCost)}</Text>
+                    <Text style={styles.miniHint}>{headquartersInvestmentLabel(investmentLevel)}</Text>
+                  </View>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>RETORNO POTENCIAL</Text>
+                    <Text style={styles.miniValue}>{formatCurrency(returnPotential)}</Text>
+                    <Text style={styles.miniHint}>estimativa indireta</Text>
+                  </View>
+                  <View style={styles.miniMetric}>
+                    <Text style={styles.miniLabel}>{item.key === 'marketing' ? 'IMPACTO NA TORCIDA' : 'FORÇA COMERCIAL'}</Text>
+                    <Text style={styles.miniValue}>{Math.min(100, 28 + investmentLevel * 13 + (item.key === 'marketing' ? satisfaction : reputation) * 0.28).toFixed(0)}%</Text>
+                    <Text style={styles.miniHint}>capacidade atual</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.revenueExplanation}>
+                  Investimento maior custa mais ao clube todos os meses, mas amplia a capacidade do departamento. O retorno não é garantido e depende da fase, reputação e resposta da torcida.
+                </Text>
+              </Panel>
+            );
+          })}
+
+          <Panel style={styles.sponsorCard}>
+            <View style={styles.cardTop}>
+              <View style={styles.cardIcon}><Feather name="award" size={19} color="#79ef91" /></View>
+              <View style={styles.cardBody}>
+                <Text style={styles.cardTitle}>Patrocínios</Text>
+                <Text style={styles.cardText}>Gerencie propostas, contratos, valores e duração dos patrocinadores em uma área própria.</Text>
+              </View>
+            </View>
+            <Pressable style={styles.sponsorButton} onPress={() => router.push('/sponsorships' as any)}>
+              <Text style={styles.sponsorButtonText}>ABRIR PATROCÍNIOS</Text>
+              <Feather name="chevron-right" size={17} color="#07150d" />
+            </Pressable>
+          </Panel>
+        </View>
+
         <SectionLabel title="Imagem do clube" />
         <Panel style={styles.fanPanel}>
           <View style={styles.fanHeader}>
@@ -236,7 +335,7 @@ export default function ClubHeadquartersScreen() {
             const acquisitionLevel = imageAcquisition[item.key] ?? 1;
             const formFactor = satisfaction / 100;
             const reputationFactor = reputation / 100;
-            const marketingFactor = 0.85 + (levels.marketing ?? 0) * 0.06;
+            const marketingFactor = 0.82 + investments.marketing * 0.075;
             const ambitionRisk = acquisitionLevel === 1 ? 18 : acquisitionLevel === 2 ? 39 : 62;
             const poorFormRisk = Math.max(0, 55 - satisfaction) * 0.55;
             const reputationRelief = reputation * 0.18;
@@ -245,7 +344,7 @@ export default function ClubHeadquartersScreen() {
             const successChance = clamp(100 - risk, 15, 92);
             const reachMultiplier = acquisitionLevel === 1 ? 0.85 : acquisitionLevel === 2 ? 1.35 : 2.0;
             const projectedFans = Math.max(0, Math.round(item.baseFans * reachMultiplier * (0.55 + formFactor * 0.65) * (0.65 + reputationFactor * 0.55) * marketingFactor * (successChance / 100)));
-            const demand = clamp(Math.round((satisfaction * 0.52) + (reputation * 0.28) + ((levels.marketing ?? 0) * 4)), 10, 100);
+            const demand = clamp(Math.round((satisfaction * 0.52) + (reputation * 0.28) + (investments.marketing * 4)), 10, 100);
 
             return (
               <Panel key={item.key} style={styles.revenueCard}>
@@ -485,6 +584,9 @@ const styles = StyleSheet.create({
   miniValue: { color: '#f5f7f5', fontSize: 9, fontWeight: '900', marginTop: 4 },
   miniHint: { color: '#79ef91', fontSize: 6.5, fontWeight: '800', marginTop: 3 },
   revenueExplanation: { color: '#9fb2a5', fontSize: 8.2, lineHeight: 12.5 },
+  sponsorCard: { gap: 12, backgroundColor: '#10291d', borderColor: '#2c503d' },
+  sponsorButton: { minHeight: 42, borderRadius: 9, backgroundColor: '#79ef91', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  sponsorButtonText: { color: '#07150d', fontSize: 9, fontWeight: '900' },
   riskBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 9, borderRadius: 9, backgroundColor: '#171f19', borderWidth: 1, borderColor: '#3b463e' },
   riskText: { flex: 1, color: '#b9c7bd', fontSize: 8, lineHeight: 12 },
   riskLow: { color: '#79ef91' },
