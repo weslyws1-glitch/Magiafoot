@@ -30,7 +30,7 @@ export default function CompetitionsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>3ª Divisão</Text>
             <Text style={styles.meta}>Liga nacional · {LEAGUE_ROUNDS} rodadas</Text>
-            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: progress + '%' }]} /></View>
+            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: (progress + '%') as any }]} /></View>
             <Text style={styles.progressText}>Rodada {career.roundIndex + 1} · {position}º lugar · {points} pts</Text>
           </View>
         </Pressable>
