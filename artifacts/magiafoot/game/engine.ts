@@ -1202,13 +1202,56 @@ export function finalizeMatch(career: Career): Career {
     : 0;
   const gateIncome = club ? attendance * (career.ticketPrice ?? club.ticketPrice) : 0;
   const wageBill = career.players.reduce((sum, player) => sum + player.wage, 0);
+  const finalLineupIds = new Set(game.userLineup.map((slot) => slot.playerId));
+  const eventPlayerIds = new Set(game.events.filter((item) => item.playerId && item.clubId === career.clubId).map((item) => item.playerId as string));
+  const appearedIds = new Set([...finalLineupIds, ...eventPlayerIds]);
   const updatedPlayers = career.players.map((player) => {
-    const event = game.events.find((item) => item.type === 'red' && item.playerId === player.id && item.clubId === career.clubId);
-    const moraleDelta = userWon ? 4 : isDraw ? 1 : -3;
+    const redEvent = game.events.find((item) => item.type === 'red' && item.playerId === player.id && item.clubId === career.clubId);
+    const appeared = appearedIds.has(player.id);
+    const started = finalLineupIds.has(player.id);
+    const goals = game.events.filter((item) => item.type === 'goal' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const yellows = game.events.filter((item) => item.type === 'yellow' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const reds = redEvent ? 1 : 0;
+    const role = player.squadRole ?? 'rotacao';
+    const expectedToPlay = role === 'estrela' || role === 'titular';
+    const playingDelta = appeared ? (started ? 4 : 2) : expectedToPlay ? -6 : -1;
+    const promiseActive = typeof player.promisedMinutesUntilRound === 'number' && player.promisedMinutesUntilRound >= career.roundIndex;
+    const promiseDelta = promiseActive ? (appeared ? 5 : -8) : 0;
+    const moraleDelta = (userWon ? 4 : isDraw ? 1 : -3) + (appeared ? 1 : expectedToPlay ? -2 : 0);
+    const baseStats = player.seasonStats ?? { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedMatches: 0 };
+    const rating = appeared
+      ? clamp(6.2 + goals * 1.1 - yellows * 0.25 - reds * 1.2 + (userWon ? 0.45 : isDraw ? 0.05 : -0.35), 3.5, 10)
+      : 0;
+    const trainingLevel = career.trainingCenterUpgrades?.field ?? 1;
+    const canDevelop = appeared && (player.potential ?? player.strength) > player.strength;
+    const developmentChance = canDevelop ? Math.min(0.32, 0.035 + trainingLevel * 0.014 + (player.age <= 21 ? 0.08 : player.age <= 25 ? 0.035 : 0)) : 0;
+    const seedRoll = (hash(player.id + '-' + career.season + '-' + career.roundIndex) % 1000) / 1000;
+    const strengthGain = seedRoll < developmentChance ? 1 : 0;
+    const nextStrength = clamp(player.strength + strengthGain, 1, player.potential ?? 95);
+    const formValueFactor = appeared ? (rating - 6) * 0.025 : -0.005;
+    const ageValueFactor = player.age <= 23 ? 0.008 : player.age >= 31 ? -0.012 : 0;
+    const nextValue = Math.max(50000, Math.round(player.value * (1 + formValueFactor + ageValueFactor)));
+
     return {
       ...player,
-      morale: clamp(player.morale + moraleDelta, 10, 100),
-      ...(event ? { status: 'suspended' as const, suspendedUntilRound: game.fixture.roundIndex + 1 } : {}),
+      strength: nextStrength,
+      value: nextValue,
+      morale: clamp(player.morale + moraleDelta + promiseDelta, 10, 100),
+      playingTimeSatisfaction: clamp((player.playingTimeSatisfaction ?? 70) + playingDelta + promiseDelta, 0, 100),
+      relationship: clamp((player.relationship ?? 60) + (promiseActive ? (appeared ? 2 : -5) : 0), 0, 100),
+      seasonStats: appeared ? {
+        appearances: baseStats.appearances + 1,
+        starts: baseStats.starts + (started ? 1 : 0),
+        minutes: baseStats.minutes + (started ? 90 : 30),
+        goals: baseStats.goals + goals,
+        assists: baseStats.assists,
+        yellowCards: baseStats.yellowCards + yellows,
+        redCards: baseStats.redCards + reds,
+        ratingSum: baseStats.ratingSum + rating,
+        ratedMatches: baseStats.ratedMatches + 1,
+      } : baseStats,
+      ...(redEvent ? { status: 'suspended' as const, suspendedUntilRound: game.fixture.roundIndex + 1 } : {}),
+      ...(promiseActive && player.promisedMinutesUntilRound === career.roundIndex ? { promisedMinutesUntilRound: null } : {}),
     };
   });
   const revenue = gateIncome - wageBill;
