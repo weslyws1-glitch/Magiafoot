@@ -20,7 +20,7 @@ export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' |
 export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
 export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 export type HeadquartersInvestmentKey = 'marketing' | 'commercial';
-export type SponsorshipSlot = 'principal' | 'sleeve' | 'back' | 'institutional';
+export type SponsorshipSlot = 'principal' | 'sleeve' | 'back' | 'shorts' | 'stadium' | 'training_center' | 'headquarters' | 'media_wall' | 'institutional';
 
 export interface CareerNewsItem {
   id: string;
