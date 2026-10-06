@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -69,6 +69,7 @@ export default function MatchScreen() {
     career, startCurrentMatch, advanceCurrentMatch, makeSubstitution, closeCurrentMatch,
   } = useCareer();
   const [stepSize, setStepSize] = useState<1 | 5>(5);
+  const [autoRunning, setAutoRunning] = useState(true);
   const [showSubs, setShowSubs] = useState(false);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
@@ -113,6 +114,18 @@ export default function MatchScreen() {
   if (!home || !away) return null;
   const isFinal = game.phase === 'finished';
   const isLive = game.phase === 'first_half' || game.phase === 'second_half';
+  useEffect(() => {
+    if (!game || !autoRunning) return;
+    const live = game.phase === 'first_half' || game.phase === 'second_half';
+    if (!live) return;
+
+    const timer = setInterval(() => {
+      advanceCurrentMatch(1);
+    }, 900);
+
+    return () => clearInterval(timer);
+  }, [game?.phase, game?.minute, autoRunning, advanceCurrentMatch]);
+
   const substitutions = game.substitutionsUsed;
   const activeSlots = game.userLineup.filter((slot) => !slot.sentOff);
   const outgoing = outgoingId ? career.players.find((player) => player.id === outgoingId) : undefined;
@@ -168,14 +181,21 @@ export default function MatchScreen() {
           <View style={[styles.progressTrack, { backgroundColor: colors.secondary }]}><View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${progress}%` }]} /></View>
           {isLive ? (
             <View style={styles.stepLine}>
-              <Text style={[styles.stepLabel, { color: colors.mutedForeground }]}>Avançar:</Text>
-              {[1, 5].map((step) => {
-                const selected = stepSize === step;
-                return <Pressable key={step} onPress={() => setStepSize(step as 1 | 5)} style={[styles.stepChip, { backgroundColor: selected ? colors.primary : colors.secondary }]}><Text style={[styles.stepChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{step} min</Text></Pressable>;
-              })}
+              <Pressable
+                onPress={() => setAutoRunning((value) => !value)}
+                style={[styles.autoChip, { backgroundColor: autoRunning ? colors.accent : colors.secondary }]}
+              >
+                <Feather name={autoRunning ? 'pause' : 'play'} size={14} color={autoRunning ? colors.accentForeground : colors.foreground} />
+                <Text style={[styles.autoChipText, { color: autoRunning ? colors.accentForeground : colors.foreground }]}>
+                  {autoRunning ? 'PAUSAR' : 'CONTINUAR'}
+                </Text>
+              </Pressable>
+              <Text style={[styles.autoHint, { color: colors.mutedForeground }]}>Relógio automático · 1 min a cada 0,9 s</Text>
             </View>
           ) : null}
-          <GameButton label={primaryLabel} icon={isFinal ? 'flag' : game.phase === 'halftime' ? 'play' : 'fast-forward'} onPress={handlePrimary} />
+          {!isLive || !autoRunning ? (
+            <GameButton label={primaryLabel} icon={isFinal ? 'flag' : game.phase === 'halftime' ? 'play' : 'fast-forward'} onPress={handlePrimary} />
+          ) : null}
           {isLive || game.phase === 'halftime' ? (
             <GameButton label={`Substituições · ${substitutions}/5`} icon="repeat" variant="outline" onPress={() => { setShowSubs((value) => !value); setOutgoingId(null); }} />
           ) : null}
@@ -258,6 +278,9 @@ const styles = StyleSheet.create({
   stepLabel: { fontSize: 10, fontWeight: '700', marginRight: 2 },
   stepChip: { paddingHorizontal: 12, minHeight: 29, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   stepChipText: { fontSize: 10, fontWeight: '800' },
+  autoChip: { minHeight: 34, borderRadius: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  autoChipText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  autoHint: { flex: 1, fontSize: 9, lineHeight: 13 },
   subPanel: { gap: 9 },
   closeSub: { fontSize: 10, fontWeight: '800' },
   choiceList: { gap: 1 },
