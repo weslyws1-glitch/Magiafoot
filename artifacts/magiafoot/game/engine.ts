@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -83,6 +83,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     ticketPrice: club.ticketPrice,
     stadiumUpgrades: { stands: 1, pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0, scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0 },
     headquartersUpgrades: { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 },
+    headquartersRevenuePricing: { store: 3, members: 3, events: 3 },
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -619,6 +620,7 @@ export function parseCareer(saved: string | null): Career | null {
       || !Array.isArray(parsed.results)
     ) return null;
     const fallbackHeadquarters: Career['headquartersUpgrades'] = { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 };
+    const fallbackHeadquartersRevenuePricing: Career['headquartersRevenuePricing'] = { store: 3, members: 3, events: 3 };
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
@@ -629,6 +631,7 @@ export function parseCareer(saved: string | null): Career | null {
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
       stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
       headquartersUpgrades: { ...fallbackHeadquarters, ...((parsed as Career).headquartersUpgrades ?? {}) },
+      headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
     };
   } catch {
     return null;
@@ -687,6 +690,41 @@ export function sellPlayer(career: Career, playerId: string): Career {
     balance: career.balance + saleValue,
     players: career.players.filter((item) => item.id !== playerId),
     lastNews: `${player.name} foi negociado por ${formatCurrency(saleValue)}.`,
+  };
+}
+
+export const HEADQUARTERS_REVENUE_PRICE_MULTIPLIER: Record<number, number> = {
+  1: 0.70,
+  2: 0.85,
+  3: 1.00,
+  4: 1.25,
+  5: 1.55,
+};
+
+export const HEADQUARTERS_REVENUE_DEMAND_MULTIPLIER: Record<number, number> = {
+  1: 1.28,
+  2: 1.14,
+  3: 1.00,
+  4: 0.78,
+  5: 0.56,
+};
+
+export function headquartersRevenueLabel(level: number): string {
+  return ({ 1: 'Muito baixo', 2: 'Baixo', 3: 'Normal', 4: 'Alto', 5: 'Muito alto' } as Record<number, string>)[clamp(Math.round(level), 1, 5)] ?? 'Normal';
+}
+
+export function headquartersRevenueDemandLabel(level: number): string {
+  return ({ 1: 'Muito alta', 2: 'Alta', 3: 'Normal', 4: 'Baixa', 5: 'Muito baixa' } as Record<number, string>)[clamp(Math.round(level), 1, 5)] ?? 'Normal';
+}
+
+export function setHeadquartersRevenuePricing(career: Career, key: HeadquartersRevenueKey, level: number): Career {
+  const safeLevel = clamp(Math.round(level), 1, 5);
+  return {
+    ...career,
+    headquartersRevenuePricing: {
+      ...(career.headquartersRevenuePricing ?? { store: 3, members: 3, events: 3 }),
+      [key]: safeLevel,
+    },
   };
 }
 
