@@ -80,6 +80,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     boardTrust: 66,
     balance: club.balance,
     stadiumLevel: 0,
+    ticketPrice: club.ticketPrice,
     stadiumUpgrades: { stands: 1, pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0, scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0 },
     results: [],
     liveMatch: null,
@@ -469,6 +470,27 @@ function cpuScore(home: Club, away: Club, seed: number): [number, number] {
   return [homeGoals, awayGoals];
 }
 
+export function ticketDemandMultiplier(ticketPrice: number, referencePrice: number): number {
+  const safeReference = Math.max(1, referencePrice);
+  const ratio = ticketPrice / safeReference;
+  if (ratio <= 0.7) return 1.18;
+  if (ratio <= 0.85) return 1.10;
+  if (ratio <= 1.0) return 1.0;
+  if (ratio <= 1.15) return 0.90;
+  if (ratio <= 1.3) return 0.78;
+  if (ratio <= 1.5) return 0.64;
+  return 0.48;
+}
+
+export function setTicketPrice(career: Career, price: number): Career {
+  const club = getClub(career.clubId);
+  const base = club?.ticketPrice ?? 25;
+  const min = Math.max(5, Math.round(base * 0.45));
+  const max = Math.max(min + 1, Math.round(base * 2.2));
+  const nextPrice = clamp(Math.round(price), min, max);
+  return { ...career, ticketPrice: nextPrice };
+}
+
 export function finalizeMatch(career: Career): Career {
   const game = career.liveMatch;
   if (!game || game.phase !== 'finished') return career;
@@ -485,7 +507,7 @@ export function finalizeMatch(career: Career): Career {
         ...fixture,
         homeGoals: userHome ? game.homeGoals : game.awayGoals,
         awayGoals: userHome ? game.awayGoals : game.homeGoals,
-        attendance: Math.round((home.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02)),
+        attendance: Math.round((home.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.92, Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02) * ticketDemandMultiplier(career.ticketPrice ?? home.ticketPrice, home.ticketPrice))),
       };
     }
     const [homeGoals, awayGoals] = cpuScore(home, away, seed);
@@ -505,9 +527,9 @@ export function finalizeMatch(career: Career): Career {
   const trustDelta = isDraw ? 1 : userWon ? 7 : -5;
   const club = getClub(career.clubId);
   const attendance = club && game.fixture.homeClubId === career.clubId
-    ? Math.round((club.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02))
+    ? Math.round((club.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.92, Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02) * ticketDemandMultiplier(career.ticketPrice ?? club.ticketPrice, club.ticketPrice)))
     : 0;
-  const gateIncome = club ? attendance * club.ticketPrice : 0;
+  const gateIncome = club ? attendance * (career.ticketPrice ?? club.ticketPrice) : 0;
   const wageBill = career.players.reduce((sum, player) => sum + player.wage, 0);
   const updatedPlayers = career.players.map((player) => {
     const event = game.events.find((item) => item.type === 'red' && item.playerId === player.id && item.clubId === career.clubId);
@@ -602,6 +624,7 @@ export function parseCareer(saved: string | null): Career | null {
     };
     return {
       ...(parsed as Career),
+      ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
       stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
     };
   } catch {
