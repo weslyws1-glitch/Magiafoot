@@ -144,7 +144,7 @@ export default function ClubHeadquartersScreen() {
   const satisfaction = fanSatisfaction(career);
   const satisfactionText = satisfactionLabel(satisfaction);
   const fanMultiplier = 0.72 + (satisfaction / 100) * 0.58;
-  const commercialBoost = 0.78 + (investments.marketing * 0.085) + (investments.commercial * 0.075);
+  const commercialBoost = 1;
 
   const revenueProjection = REVENUE_ITEMS.reduce((sum, item) => {
     const level = pricing[item.key] ?? 3;
@@ -156,9 +156,7 @@ export default function ClubHeadquartersScreen() {
 
   const structuralRevenue =
     (levels.sponsors ?? 0) * 42000 +
-    (levels.museum ?? 0) * 9000 +
-    investments.marketing * 9000 +
-    investments.commercial * 11000;
+    (levels.museum ?? 0) * 9000;
 
   const commercialRevenue = revenueProjection + structuralRevenue;
   const totalLevel = Object.values(levels).reduce((sum, level) => sum + level, 0);
@@ -238,9 +236,13 @@ export default function ClubHeadquartersScreen() {
           {COMMERCIAL_INVESTMENTS.map((item) => {
             const investmentLevel = investments[item.key] ?? 3;
             const monthlyCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investmentLevel] ?? 65000;
-            const returnPotential = item.key === 'marketing'
-              ? Math.round(18000 + investmentLevel * 27000 + satisfaction * 650)
-              : Math.round(22000 + investmentLevel * 31000 + reputation * 720);
+            const baseRisk = investmentLevel === 1 ? 12 : investmentLevel === 2 ? 22 : investmentLevel === 3 ? 36 : investmentLevel === 4 ? 54 : 72;
+            const badMomentPenalty = Math.max(0, 58 - satisfaction) * 0.35;
+            const reputationRelief = reputation * 0.12;
+            const risk = clamp(Math.round(baseRisk + badMomentPenalty - reputationRelief), 8, 88);
+            const publicImpact = item.key === 'marketing'
+              ? Math.round((650 + investmentLevel * 900) * (0.55 + satisfaction / 100) * (1 - risk / 140))
+              : Math.round((420 + investmentLevel * 760) * (0.55 + reputation / 100) * (1 - risk / 145));
 
             return (
               <Panel key={item.key} style={styles.revenueCard}>
@@ -285,19 +287,21 @@ export default function ClubHeadquartersScreen() {
                     <Text style={styles.miniHint}>{headquartersInvestmentLabel(investmentLevel)}</Text>
                   </View>
                   <View style={styles.miniMetric}>
-                    <Text style={styles.miniLabel}>RETORNO POTENCIAL</Text>
-                    <Text style={styles.miniValue}>{formatCurrency(returnPotential)}</Text>
-                    <Text style={styles.miniHint}>estimativa indireta</Text>
+                    <Text style={styles.miniLabel}>PÚBLICO PROJETADO</Text>
+                    <Text style={styles.miniValue}>+{publicImpact.toLocaleString('pt-BR')}</Text>
+                    <Text style={styles.miniHint}>alcance / mês</Text>
                   </View>
                   <View style={styles.miniMetric}>
-                    <Text style={styles.miniLabel}>{item.key === 'marketing' ? 'IMPACTO NA TORCIDA' : 'FORÇA COMERCIAL'}</Text>
-                    <Text style={styles.miniValue}>{Math.min(100, 28 + investmentLevel * 13 + (item.key === 'marketing' ? satisfaction : reputation) * 0.28).toFixed(0)}%</Text>
-                    <Text style={styles.miniHint}>capacidade atual</Text>
+                    <Text style={styles.miniLabel}>RISCO</Text>
+                    <Text style={[styles.miniValue, risk >= 68 ? styles.riskHigh : risk >= 38 ? styles.riskMedium : styles.riskLow]}>
+                      {risk >= 68 ? 'Alto' : risk >= 38 ? 'Médio' : 'Baixo'}
+                    </Text>
+                    <Text style={styles.miniHint}>{risk}%</Text>
                   </View>
                 </View>
 
                 <Text style={styles.revenueExplanation}>
-                  Investimento maior custa mais ao clube todos os meses, mas amplia a capacidade do departamento. O retorno não é garantido e depende da fase, reputação e resposta da torcida.
+                  O investimento não gera dinheiro diretamente. Ele serve para ampliar o público, alcance e captação de torcedores. Quanto maior o investimento, maior o potencial — mas também aumenta o risco de gastar muito e converter pouco se o clube estiver em má fase.
                 </Text>
               </Panel>
             );
@@ -335,7 +339,7 @@ export default function ClubHeadquartersScreen() {
             const acquisitionLevel = imageAcquisition[item.key] ?? 1;
             const formFactor = satisfaction / 100;
             const reputationFactor = reputation / 100;
-            const marketingFactor = 0.82 + investments.marketing * 0.075;
+            const marketingFactor = 0.76 + investments.marketing * 0.07 + investments.commercial * 0.045;
             const ambitionRisk = acquisitionLevel === 1 ? 18 : acquisitionLevel === 2 ? 39 : 62;
             const poorFormRisk = Math.max(0, 55 - satisfaction) * 0.55;
             const reputationRelief = reputation * 0.18;
@@ -344,7 +348,7 @@ export default function ClubHeadquartersScreen() {
             const successChance = clamp(100 - risk, 15, 92);
             const reachMultiplier = acquisitionLevel === 1 ? 0.85 : acquisitionLevel === 2 ? 1.35 : 2.0;
             const projectedFans = Math.max(0, Math.round(item.baseFans * reachMultiplier * (0.55 + formFactor * 0.65) * (0.65 + reputationFactor * 0.55) * marketingFactor * (successChance / 100)));
-            const demand = clamp(Math.round((satisfaction * 0.52) + (reputation * 0.28) + (investments.marketing * 4)), 10, 100);
+            const demand = clamp(Math.round((satisfaction * 0.50) + (reputation * 0.24) + (investments.marketing * 4) + (investments.commercial * 3)), 10, 100);
 
             return (
               <Panel key={item.key} style={styles.revenueCard}>
