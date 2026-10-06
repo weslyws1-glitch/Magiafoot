@@ -12,8 +12,12 @@ import {
   headquartersUpgradeCost,
   headquartersInvestmentLabel,
   HEADQUARTERS_INVESTMENT_MONTHLY_COST,
+  administrationStaffCapacity,
+  administrationRequiredStaff,
+  administrationDepartmentEfficiency,
+  previewAdministrativeCandidate,
 } from '@/game/engine';
-import type { HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
+import type { AdministrationDepartmentKey, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
 type HqItem = {
@@ -42,11 +46,19 @@ type ImageItem = {
 };
 
 const ITEMS: HqItem[] = [
-  { key: 'board', title: 'Diretoria', text: 'Melhora organização, planejamento e capacidade administrativa.', icon: 'briefcase', effect: 'Gestão mais eficiente', group: 'administracao' },
-  { key: 'finance', title: 'Departamento financeiro', text: 'Aprimora controle de gastos e planejamento do caixa.', icon: 'dollar-sign', effect: 'Melhor controle financeiro', group: 'administracao' },
-  { key: 'meeting', title: 'Sala de reuniões', text: 'Apoia decisões estratégicas e planejamento da temporada.', icon: 'users', effect: 'Decisões mais eficientes', group: 'administracao' },
-  { key: 'legal', title: 'Departamento jurídico', text: 'Reduz riscos contratuais, multas e problemas administrativos.', icon: 'shield', effect: 'Menos riscos e penalidades', group: 'administracao' },
-  { key: 'technology', title: 'Tecnologia e TI', text: 'Moderniza processos e melhora eficiência dos departamentos.', icon: 'cpu', effect: 'Mais eficiência interna', group: 'administracao' },
+  { key: 'meeting', title: 'Sala de reuniões', text: 'Estrutura de decisão e coordenação. Evoluir libera capacidade para equipes administrativas maiores.', icon: 'users', effect: 'Libera mais vagas de funcionários', group: 'administracao' },
+  { key: 'technology', title: 'Tecnologia e TI', text: 'Sistemas, dados e ferramentas usados por todos os departamentos administrativos.', icon: 'cpu', effect: 'Libera mais vagas e melhora eficiência', group: 'administracao' },
+];
+
+const ADMIN_STAFF_ITEMS: Array<{
+  key: AdministrationDepartmentKey;
+  title: string;
+  text: string;
+  icon: keyof typeof Feather.glyphMap;
+}> = [
+  { key: 'board', title: 'Diretoria', text: 'Executivos e gestores responsáveis pela organização e decisões administrativas.', icon: 'briefcase' },
+  { key: 'finance', title: 'Departamento financeiro', text: 'Profissionais que cuidam de orçamento, controle e planejamento financeiro.', icon: 'dollar-sign' },
+  { key: 'legal', title: 'Departamento jurídico', text: 'Equipe responsável por contratos, compliance e riscos jurídicos do clube.', icon: 'shield' },
 ];
 
 const COMMERCIAL_INVESTMENTS: Array<{
@@ -72,7 +84,7 @@ const REVENUE_ITEMS: RevenueItem[] = [
 ];
 
 const GROUPS = [
-  ['administracao', 'Administração'],
+  ['administracao', 'Estrutura de apoio'],
 ] as const;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -128,7 +140,7 @@ function riskLabel(risk: number) {
 export default function ClubHeadquartersScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment } = useCareer();
+  const { career, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, hireAdminProfessional, fireAdminProfessional } = useCareer();
 
   if (!career) {
     return <><GameHeader title="Sede do clube" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para administrar a sede.</Text></Screen></>;
@@ -164,10 +176,19 @@ export default function ClubHeadquartersScreen() {
   const progress = Math.round((totalLevel / maxTotal) * 100);
   const marketingInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.marketing] ?? 65000;
   const commercialInvestmentCost = HEADQUARTERS_INVESTMENT_MONTHLY_COST[investments.commercial] ?? 65000;
-  const operatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
+  const baseOperatingCost = 42000 + totalLevel * 6200 + (levels.technology ?? 0) * 7000 + (levels.press ?? 0) * 4500 + marketingInvestmentCost + commercialInvestmentCost;
+  const operatingCost = baseOperatingCost + adminPayroll;
   const projectedNet = commercialRevenue - operatingCost;
   const reputation = Math.min(100, 25 + investments.marketing * 6 + (levels.press ?? 0) * 6 + (levels.museum ?? 0) * 5 + (levels.history ?? 0) * 4);
-  const management = Math.min(100, 30 + (levels.board ?? 0) * 8 + (levels.finance ?? 0) * 7 + (levels.meeting ?? 0) * 5 + (levels.legal ?? 0) * 4 + (levels.technology ?? 0) * 5);
+  const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
+  const staffCapacity = administrationStaffCapacity(career);
+  const adminEfficiencies = [
+    administrationDepartmentEfficiency(career, 'board'),
+    administrationDepartmentEfficiency(career, 'finance'),
+    administrationDepartmentEfficiency(career, 'legal'),
+  ];
+  const management = Math.round(adminEfficiencies.reduce((sum, value) => sum + value, 0) / adminEfficiencies.length);
+  const adminPayroll = [...staff.board, ...staff.finance, ...staff.legal].reduce((sum, person) => sum + person.salary, 0);
 
   return (
     <>
@@ -196,6 +217,99 @@ export default function ClubHeadquartersScreen() {
           <Panel style={styles.metric}><Text style={styles.metricLabel}>TORCIDA</Text><Text style={styles.metricValueSmall}>{satisfactionText}</Text><Text style={styles.metricHint}>{satisfaction}/100 satisfação</Text></Panel>
         </View>
 
+        <SectionLabel title="Administração" />
+        <Panel style={styles.adminOverview}>
+          <View style={styles.adminOverviewTop}>
+            <View>
+              <Text style={styles.adminOverviewKicker}>ESTRUTURA ADMINISTRATIVA</Text>
+              <Text style={styles.adminOverviewTitle}>{staffCapacity} vagas por departamento</Text>
+            </View>
+            <Text style={styles.adminOverviewScore}>Gestão {management}/100</Text>
+          </View>
+          <Text style={styles.adminOverviewText}>Sala de reuniões e Tecnologia/TI trabalham em conjunto e liberam mais vagas. Cada departamento pode chegar a no máximo 10 profissionais.</Text>
+          <View style={styles.adminOverviewMetrics}>
+            <View style={styles.adminMini}><Text style={styles.adminMiniLabel}>FOLHA ADMIN.</Text><Text style={styles.adminMiniValue}>{formatCurrency(adminPayroll)}/mês</Text></View>
+            <View style={styles.adminMini}><Text style={styles.adminMiniLabel}>CAPACIDADE</Text><Text style={styles.adminMiniValue}>{staffCapacity}/10</Text></View>
+          </View>
+        </Panel>
+
+        <View style={styles.list}>
+          {ADMIN_STAFF_ITEMS.map((item) => {
+            const people = staff[item.key] ?? [];
+            const required = administrationRequiredStaff(career, item.key);
+            const efficiency = administrationDepartmentEfficiency(career, item.key);
+            const candidate = previewAdministrativeCandidate(career, item.key);
+            const full = people.length >= staffCapacity || people.length >= 10;
+            const canHire = !full && career.balance >= candidate.hireCost;
+            const status = people.length < required ? 'DEFICIENTE' : efficiency >= 82 ? 'EXCELENTE' : efficiency >= 65 ? 'BOA' : 'ADEQUADA';
+
+            return (
+              <Panel key={item.key} style={styles.adminDeptCard}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardIcon}><Feather name={item.icon} size={19} color="#79ef91" /></View>
+                  <View style={styles.cardBody}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.cardTitle}>{item.title}</Text>
+                      <Text style={[styles.adminStatus, people.length < required && styles.adminStatusBad]}>{status}</Text>
+                    </View>
+                    <Text style={styles.cardText}>{item.text}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.adminDeptMetrics}>
+                  <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>CONTRATADOS</Text><Text style={styles.adminDeptValue}>{people.length}/{staffCapacity}</Text></View>
+                  <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>NECESSÁRIO</Text><Text style={styles.adminDeptValue}>{required}</Text></View>
+                  <View style={styles.adminDeptMetric}><Text style={styles.miniLabel}>EFICIÊNCIA</Text><Text style={styles.adminDeptValue}>{efficiency}%</Text></View>
+                </View>
+
+                {people.length > 0 ? (
+                  <View style={styles.staffList}>
+                    {people.map((person) => (
+                      <View key={person.id} style={styles.staffRow}>
+                        <View style={styles.staffPerson}>
+                          <Text style={styles.staffName}>{person.name}</Text>
+                          <Text style={styles.staffRole}>{person.role} · Qualidade {person.quality}</Text>
+                          <Text style={styles.staffSalary}>{formatCurrency(person.salary)}/mês</Text>
+                        </View>
+                        <Pressable
+                          onPress={() => fireAdminProfessional(item.key, person.id)}
+                          disabled={career.balance < person.fireCost}
+                          style={[styles.fireButton, career.balance < person.fireCost && styles.fireButtonDisabled]}
+                        >
+                          <Text style={styles.fireButtonText}>DEMITIR</Text>
+                          <Text style={styles.fireCost}>{formatCurrency(person.fireCost)}</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.noStaff}>Nenhum profissional contratado.</Text>
+                )}
+
+                <View style={styles.candidateBox}>
+                  <View style={styles.candidateInfo}>
+                    <Text style={styles.candidateKicker}>PRÓXIMO CANDIDATO</Text>
+                    <Text style={styles.candidateName}>{candidate.name}</Text>
+                    <Text style={styles.candidateMeta}>{candidate.role} · Qualidade {candidate.quality}</Text>
+                    <Text style={styles.candidateMeta}>Salário {formatCurrency(candidate.salary)}/mês</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => hireAdminProfessional(item.key)}
+                    disabled={!canHire}
+                    style={[styles.hireButton, !canHire && styles.hireButtonDisabled]}
+                  >
+                    <Text style={[styles.hireButtonText, !canHire && styles.hireButtonTextDisabled]}>
+                      {full ? 'SEM VAGA' : 'CONTRATAR'}
+                    </Text>
+                    {!full ? <Text style={styles.hireCost}>{formatCurrency(candidate.hireCost)}</Text> : null}
+                  </Pressable>
+                </View>
+              </Panel>
+            );
+          })}
+        </View>
+
+        <SectionLabel title="Estrutura de apoio administrativo" />
         {GROUPS.map(([group, label]) => (
           <React.Fragment key={group}>
             <SectionLabel title={label} />
@@ -545,6 +659,43 @@ const styles = StyleSheet.create({
   metricHint: { color: '#74897b', fontSize: 7.5, fontWeight: '800' },
 
   list: { gap: 9 },
+  adminOverview:{gap:10,backgroundColor:'#153426',borderColor:'#356a4a'},
+  adminOverviewTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:10},
+  adminOverviewKicker:{color:'#90a898',fontSize:7,fontWeight:'900',letterSpacing:0.8},
+  adminOverviewTitle:{color:'#f5f7f5',fontSize:15,fontWeight:'900',marginTop:3},
+  adminOverviewScore:{color:'#79ef91',fontSize:9,fontWeight:'900'},
+  adminOverviewText:{color:'#c0d0c5',fontSize:8.3,lineHeight:12.5},
+  adminOverviewMetrics:{flexDirection:'row',gap:7},
+  adminMini:{flex:1,minHeight:48,borderRadius:8,padding:7,justifyContent:'center',backgroundColor:'#0b2117',borderWidth:1,borderColor:'#2c503d'},
+  adminMiniLabel:{color:'#789080',fontSize:6.2,fontWeight:'900'},
+  adminMiniValue:{color:'#f5f7f5',fontSize:9,fontWeight:'900',marginTop:3},
+  adminDeptCard:{gap:11,backgroundColor:'#10291d',borderColor:'#2c503d'},
+  adminStatus:{color:'#79ef91',fontSize:7,fontWeight:'900'},
+  adminStatusBad:{color:'#f09d9d'},
+  adminDeptMetrics:{flexDirection:'row',gap:6},
+  adminDeptMetric:{flex:1,minHeight:52,borderRadius:8,padding:7,justifyContent:'center',backgroundColor:'#0b2117',borderWidth:1,borderColor:'#2c503d'},
+  adminDeptValue:{color:'#f5f7f5',fontSize:10,fontWeight:'900',marginTop:3},
+  staffList:{gap:7},
+  staffRow:{flexDirection:'row',alignItems:'center',gap:8,padding:8,borderRadius:8,backgroundColor:'#0b2117',borderWidth:1,borderColor:'#284635'},
+  staffPerson:{flex:1,minWidth:0},
+  staffName:{color:'#f5f7f5',fontSize:9.5,fontWeight:'900'},
+  staffRole:{color:'#8fa195',fontSize:7,lineHeight:10.5,marginTop:2},
+  staffSalary:{color:'#79ef91',fontSize:7,fontWeight:'800',marginTop:3},
+  fireButton:{minWidth:68,minHeight:38,borderRadius:7,alignItems:'center',justifyContent:'center',backgroundColor:'#2a1a1a',borderWidth:1,borderColor:'#624141',paddingHorizontal:6},
+  fireButtonDisabled:{opacity:0.4},
+  fireButtonText:{color:'#efb2b2',fontSize:6.5,fontWeight:'900'},
+  fireCost:{color:'#c99797',fontSize:5.8,fontWeight:'800',marginTop:2},
+  noStaff:{color:'#73877a',fontSize:8,fontStyle:'italic'},
+  candidateBox:{flexDirection:'row',alignItems:'center',gap:8,padding:9,borderRadius:9,backgroundColor:'#13251b',borderWidth:1,borderColor:'#355846'},
+  candidateInfo:{flex:1,minWidth:0},
+  candidateKicker:{color:'#789080',fontSize:6.2,fontWeight:'900',letterSpacing:0.6},
+  candidateName:{color:'#f5f7f5',fontSize:9.5,fontWeight:'900',marginTop:2},
+  candidateMeta:{color:'#9fb2a5',fontSize:6.8,lineHeight:10.5,marginTop:2},
+  hireButton:{minWidth:78,minHeight:42,borderRadius:8,alignItems:'center',justifyContent:'center',backgroundColor:'#79ef91',paddingHorizontal:7},
+  hireButtonDisabled:{backgroundColor:'#23382c'},
+  hireButtonText:{color:'#07150d',fontSize:7,fontWeight:'900'},
+  hireButtonTextDisabled:{color:'#75867b'},
+  hireCost:{color:'#12301e',fontSize:6,fontWeight:'800',marginTop:2},
   card: { gap: 10, backgroundColor: '#10291d', borderColor: '#2c503d' },
   cardTop: { flexDirection: 'row', gap: 10 },
   cardIcon: { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b2117', borderWidth: 1, borderColor: '#2c503d' },
