@@ -31,7 +31,7 @@ function formScore(career: NonNullable<ReturnType<typeof useCareer>['career']>) 
 
 export default function SponsorshipsScreen() {
   const colors = useColors();
-  const { career, refreshSponsors, acceptSponsor, declineSponsor } = useCareer();
+  const { career, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor } = useCareer();
 
   useEffect(() => {
     if (career) refreshSponsors(false);
@@ -100,6 +100,16 @@ export default function SponsorshipsScreen() {
                   <View style={styles.offerItem}><Text style={styles.offerLabel}>POR JOGO</Text><Text style={styles.offerValue}>{formatCurrency(proposal.perMatch)}</Text></View>
                   <View style={styles.offerItem}><Text style={styles.offerLabel}>BÔNUS VITÓRIA</Text><Text style={styles.offerValue}>{formatCurrency(proposal.winBonus)}</Text></View>
                   <View style={styles.offerItem}><Text style={styles.offerLabel}>DURAÇÃO</Text><Text style={styles.offerValue}>{proposal.durationMatches} jogos</Text></View>
+                  <View style={styles.offerItem}><Text style={styles.offerLabel}>BÔNUS G4</Text><Text style={styles.offerValue}>{formatCurrency(proposal.qualificationBonus)}</Text></View>
+                  <View style={styles.offerItem}><Text style={styles.offerLabel}>BÔNUS TÍTULO</Text><Text style={styles.offerValue}>{formatCurrency(proposal.titleBonus)}</Text></View>
+                </View>
+
+                <View style={styles.clauseBox}>
+                  <Text style={styles.clauseTitle}>CLÁUSULAS</Text>
+                  <Text style={styles.clauseText}>• Público de {proposal.attendanceTarget.toLocaleString('pt-BR')}+: bônus de {formatCurrency(proposal.attendanceBonus)}</Text>
+                  <Text style={styles.clauseText}>• Cláusula de imagem: saída se torcida cair abaixo de {proposal.exitFanTrustBelow}/100</Text>
+                  <Text style={styles.clauseText}>• {proposal.exclusivityCategory ? 'Exclusividade por categoria ativa' : 'Sem exclusividade por categoria'}</Text>
+                  <Text style={styles.clauseText}>• Valor estimado do acordo: {formatCurrency(proposal.expectedValue)}</Text>
                 </View>
 
                 <View style={styles.impactRow}>
@@ -113,8 +123,15 @@ export default function SponsorshipsScreen() {
                   <Pressable style={styles.declineButton} onPress={() => declineSponsor(proposal.id)}>
                     <Text style={styles.declineText}>RECUSAR</Text>
                   </Pressable>
+                  <Pressable
+                    style={[styles.negotiateButton, proposal.negotiationRound >= 2 && styles.negotiateDisabled]}
+                    disabled={proposal.negotiationRound >= 2}
+                    onPress={() => negotiateSponsor(proposal.id)}
+                  >
+                    <Text style={styles.negotiateText}>{proposal.negotiationRound >= 2 ? 'LIMITE' : 'NEGOCIAR +10%'}</Text>
+                  </Pressable>
                   <Pressable style={styles.acceptButton} onPress={() => acceptSponsor(proposal.id)}>
-                    <Text style={styles.acceptText}>ACEITAR PROPOSTA</Text>
+                    <Text style={styles.acceptText}>ACEITAR</Text>
                   </Pressable>
                 </View>
               </Panel>
@@ -143,11 +160,34 @@ export default function SponsorshipsScreen() {
                     <Text style={styles.contractMoney}>+{formatCurrency(contract.perMatch)} / jogo</Text>
                     <Text style={styles.contractEarned}>Total recebido: {formatCurrency(contract.totalEarned)}</Text>
                   </View>
+                  <View style={styles.contractClauses}>
+                    <Text style={styles.contractClause}>Vitória: +{formatCurrency(contract.winBonus)}</Text>
+                    <Text style={styles.contractClause}>G4: +{formatCurrency(contract.qualificationBonus)}</Text>
+                    <Text style={styles.contractClause}>Título: +{formatCurrency(contract.titleBonus)}</Text>
+                  </View>
+                  {contract.matchesRemaining <= 2 ? (
+                    <Pressable style={styles.renewButton} onPress={() => renewSponsor(contract.id)}>
+                      <Feather name="refresh-cw" size={14} color="#07150d" />
+                      <Text style={styles.renewText}>NEGOCIAR RENOVAÇÃO</Text>
+                    </Pressable>
+                  ) : null}
                 </Panel>
               );
             })}
           </View>
         )}
+
+        <SectionLabel title="Histórico comercial" />
+        <Panel style={styles.historyPanel}>
+          {(career.sponsorships?.history ?? []).length === 0 ? (
+            <Text style={styles.emptyText}>Nenhum movimento comercial registrado ainda.</Text>
+          ) : (career.sponsorships?.history ?? []).slice(0, 8).map((item, index) => (
+            <View key={item + index} style={styles.historyRow}>
+              <View style={styles.historyDot} />
+              <Text style={styles.historyText}>{item}</Text>
+            </View>
+          ))}
+        </Panel>
 
         <SectionLabel title="Como o mercado reage" />
         <Panel style={styles.timeline}>
@@ -200,11 +240,18 @@ const styles = StyleSheet.create({
   positive:{color:'#79ef91',fontWeight:'900'},
   negative:{color:'#f09d9d',fontWeight:'900'},
   expiry:{color:'#d8c27c',fontSize:7.5,fontWeight:'800'},
-  actions:{flexDirection:'row',gap:8},
-  declineButton:{flex:0.38,minHeight:40,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#2a1a1a',borderWidth:1,borderColor:'#624141'},
-  declineText:{color:'#efb2b2',fontSize:8,fontWeight:'900'},
-  acceptButton:{flex:0.62,minHeight:40,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#79ef91'},
-  acceptText:{color:'#07150d',fontSize:8,fontWeight:'900'},
+  actions:{flexDirection:'row',gap:6},
+  declineButton:{flex:0.28,minHeight:40,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#2a1a1a',borderWidth:1,borderColor:'#624141'},
+  declineText:{color:'#efb2b2',fontSize:7.5,fontWeight:'900'},
+  negotiateButton:{flex:0.36,minHeight:40,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#1a3327',borderWidth:1,borderColor:'#426a52'},
+  negotiateDisabled:{opacity:0.45},
+  negotiateText:{color:'#d8e5dc',fontSize:7.2,fontWeight:'900'},
+  acceptButton:{flex:0.36,minHeight:40,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#79ef91'},
+  acceptText:{color:'#07150d',fontSize:7.5,fontWeight:'900'},
+  clauseBox:{gap:4,padding:8,borderRadius:8,backgroundColor:'#0b1711',borderWidth:1,borderColor:'#2a4032'},
+  clauseTitle:{color:'#79ef91',fontSize:7,fontWeight:'900',letterSpacing:0.8},
+  clauseText:{color:'#a7b6ac',fontSize:7.3,lineHeight:11.5},
+
   contractCard:{gap:9,backgroundColor:'#12271c',borderColor:'#31513f'},
   contractTop:{flexDirection:'row',justifyContent:'space-between',gap:8},
   contractName:{color:'#f5f7f5',fontSize:12,fontWeight:'900'},
@@ -215,6 +262,14 @@ const styles = StyleSheet.create({
   contractFinance:{flexDirection:'row',justifyContent:'space-between',gap:8,flexWrap:'wrap'},
   contractMoney:{color:'#79ef91',fontSize:8.5,fontWeight:'900'},
   contractEarned:{color:'#a8baae',fontSize:7.5,fontWeight:'800'},
+  contractClauses:{flexDirection:'row',gap:6,flexWrap:'wrap'},
+  contractClause:{color:'#c3d0c7',fontSize:7.2,fontWeight:'800'},
+  renewButton:{minHeight:36,borderRadius:8,backgroundColor:'#79ef91',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},
+  renewText:{color:'#07150d',fontSize:7.5,fontWeight:'900'},
+  historyPanel:{gap:8,backgroundColor:'#0f2118',borderColor:'#2d4938'},
+  historyRow:{flexDirection:'row',alignItems:'flex-start',gap:8},
+  historyDot:{width:6,height:6,borderRadius:3,backgroundColor:'#79ef91',marginTop:3},
+  historyText:{flex:1,color:'#aab9af',fontSize:8.1,lineHeight:12.3},
   timeline:{gap:10,backgroundColor:'#0f2118',borderColor:'#2d4938'},
   timelineItem:{flexDirection:'row',alignItems:'flex-start',gap:8},
   dot:{width:7,height:7,borderRadius:4,backgroundColor:'#79ef91',marginTop:3},
