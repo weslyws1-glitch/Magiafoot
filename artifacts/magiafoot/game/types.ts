@@ -18,6 +18,7 @@ export type Intensity = 'baixa' | 'normal' | 'alta';
 export type StadiumUpgradeKey = 'stands' | 'pitch' | 'roof' | 'lighting' | 'seats' | 'boxes' | 'scoreboard' | 'security' | 'turnstiles' | 'parking' | 'drainage' | 'irrigation';
 export type HeadquartersUpgradeKey = 'board' | 'finance' | 'meeting' | 'legal' | 'technology' | 'marketing' | 'sponsors' | 'commercial' | 'store' | 'members' | 'museum' | 'press' | 'events' | 'history';
 export type HeadquartersRevenueKey = 'store' | 'members' | 'events';
+export type HeadquartersImageKey = 'museum' | 'press' | 'history';
 
 export interface Player {
   id: string;
@@ -152,6 +153,7 @@ export interface Career {
   stadiumUpgrades: Record<StadiumUpgradeKey, number>;
   headquartersUpgrades: Record<HeadquartersUpgradeKey, number>;
   headquartersRevenuePricing: Record<HeadquartersRevenueKey, number>;
+  headquartersImageAcquisition: Record<HeadquartersImageKey, number>;
   results: LeagueResult[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
