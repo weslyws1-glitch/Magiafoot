@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, PlayerRow, Screen, SectionLabel } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { effectiveStrength, formatCurrency, getCurrentFixture, matchPhaseLabel } from '@/game/engine';
+import { effectiveStrength, formatCurrency, getCurrentFixture, LEAGUE_FIXTURES, matchPhaseLabel } from '@/game/engine';
 import type { MatchEvent } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -18,6 +18,28 @@ function eventSymbol(event: MatchEvent) {
   if (event.type === 'halftime') return 'Ⅱ';
   if (event.type === 'fulltime') return '■';
   return '•';
+}
+
+function hashText(value: string) {
+  return [...value].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 29);
+}
+
+function cpuLiveScore(fixtureId: string, season: number, minute: number, homeRating: number, awayRating: number) {
+  let seed = hashText(fixtureId + '-' + season) >>> 0;
+  const roll = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  let homeGoals = 0;
+  let awayGoals = 0;
+  const safeMinute = Math.max(0, Math.min(90, minute));
+  for (let m = 1; m <= safeMinute; m += 1) {
+    const homeChance = Math.max(0.004, Math.min(0.026, 0.012 + (homeRating - awayRating) * 0.00045));
+    const awayChance = Math.max(0.004, Math.min(0.024, 0.010 + (awayRating - homeRating) * 0.00042));
+    if (roll() < homeChance) homeGoals += 1;
+    if (roll() < awayChance) awayGoals += 1;
+  }
+  return { homeGoals, awayGoals };
 }
 
 export default function MatchScreen() {
@@ -85,6 +107,24 @@ export default function MatchScreen() {
     .filter((player) => player?.status === 'available');
   const recentEvents = [...game.events].slice(-10).reverse();
 
+  const roundMatches = LEAGUE_FIXTURES
+    .filter((fixture) => fixture.roundIndex === game.fixture.roundIndex)
+    .map((fixture) => {
+      const fixtureHome = getClub(fixture.homeClubId);
+      const fixtureAway = getClub(fixture.awayClubId);
+      const isUser = fixture.id === game.fixture.id;
+      const live = isUser
+        ? { homeGoals: game.homeGoals, awayGoals: game.awayGoals }
+        : cpuLiveScore(
+            fixture.id,
+            career.season,
+            game.phase === 'halftime' ? 45 : game.minute,
+            fixtureHome?.rating ?? 64,
+            fixtureAway?.rating ?? 64,
+          );
+      return { fixture, home: fixtureHome, away: fixtureAway, ...live, isUser };
+    });
+
   const fieldPlayers = useMemo(() => activeSlots.map((slot) => {
     const player = career.players.find((p) => p.id === slot.playerId);
     return player ? { slot, player } : null;
@@ -107,6 +147,45 @@ export default function MatchScreen() {
       setShowSubs(false);
     }
   };
+
+  if (game.phase === 'halftime') {
+    return (
+      <>
+        <GameHeader
+          title="Intervalo"
+          eyebrow={'3ª DIVISÃO · RODADA ' + (game.fixture.roundIndex + 1)}
+          back={false}
+          right={<Text style={styles.headerClock}>45′</Text>}
+        />
+        <Screen>
+          <Panel style={styles.halftimeHero}>
+            <Text style={styles.halftimeKicker}>INTERVALO</Text>
+            <Text style={styles.halftimeScore}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
+            <Text style={styles.halftimeText}>Confira todos os jogos da rodada antes do segundo tempo.</Text>
+          </Panel>
+
+          <Panel style={styles.roundBoard}>
+            <View style={styles.roundBoardHeader}>
+              <Text style={styles.roundBoardTitle}>PLACAR DA RODADA</Text>
+              <Text style={styles.roundBoardMinute}>45′</Text>
+            </View>
+            {roundMatches.map((item) => (
+              <View key={item.fixture.id} style={[styles.roundGameRow, item.isUser && styles.roundGameRowUser]}>
+                <Text numberOfLines={1} style={styles.roundClub}>{item.home?.name ?? 'Casa'}</Text>
+                <Text style={styles.roundScore}>{item.homeGoals} - {item.awayGoals}</Text>
+                <Text numberOfLines={1} style={[styles.roundClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
+              </View>
+            ))}
+          </Panel>
+
+          <View style={styles.halftimeActions}>
+            <GameButton label="AJUSTAR TÁTICA" icon="layout" variant="outline" onPress={() => router.push('/tactics')} />
+            <GameButton label="COMEÇAR 2º TEMPO" icon="play" onPress={() => advanceCurrentMatch(1)} />
+          </View>
+        </Screen>
+      </>
+    );
+  }
 
   return (
     <>
@@ -185,6 +264,20 @@ export default function MatchScreen() {
                 <Text numberOfLines={1} style={[styles.teamName, { textAlign: 'right' }]}>{away.name}</Text>
                 <Text style={styles.score}>{game.awayGoals}</Text>
               </View>
+            </View>
+
+            <View style={styles.liveRoundHeader}>
+              <Text style={styles.liveRoundTitle}>OUTROS JOGOS</Text>
+              <Text style={styles.liveRoundMinute}>{game.minute}′</Text>
+            </View>
+            <View style={styles.liveRoundList}>
+              {roundMatches.map((item) => (
+                <View key={item.fixture.id} style={[styles.liveRoundRow, item.isUser && styles.liveRoundRowUser]}>
+                  <Text numberOfLines={1} style={styles.liveRoundClub}>{item.home?.name ?? 'Casa'}</Text>
+                  <Text style={styles.liveRoundScore}>{item.homeGoals}-{item.awayGoals}</Text>
+                  <Text numberOfLines={1} style={[styles.liveRoundClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
+                </View>
+              ))}
             </View>
 
             <View style={styles.eventHeader}>
@@ -293,6 +386,29 @@ const styles = StyleSheet.create({
   noEvent: { color: '#e4efad', fontSize: 8 },
   compactStats: { padding: 8, gap: 3, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,.18)', backgroundColor: '#5f7e24' },
   statLine: { color: '#edf3c9', fontSize: 7, fontWeight: '700' },
+
+  liveRoundHeader: { minHeight: 28, paddingHorizontal: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#526f20', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,.16)' },
+  liveRoundTitle: { color: '#f3f7cc', fontSize: 7, fontWeight: '900', letterSpacing: 0.6 },
+  liveRoundMinute: { color: '#ffe66a', fontSize: 9, fontWeight: '900' },
+  liveRoundList: { backgroundColor: '#688827', paddingVertical: 3 },
+  liveRoundRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 4 },
+  liveRoundRowUser: { backgroundColor: 'rgba(255,230,106,.13)' },
+  liveRoundClub: { flex: 1, minWidth: 0, color: '#eef5c8', fontSize: 6.5, fontWeight: '700' },
+  liveRoundScore: { width: 28, textAlign: 'center', color: '#fff6a3', fontSize: 8, fontWeight: '900' },
+
+  halftimeHero: { alignItems: 'center', gap: 7, paddingVertical: 22, backgroundColor: '#153426', borderColor: '#356a4a' },
+  halftimeKicker: { color: '#79ef91', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  halftimeScore: { color: '#f5f7f5', fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  halftimeText: { color: '#9fb2a5', fontSize: 10, textAlign: 'center' },
+  roundBoard: { padding: 0, overflow: 'hidden', backgroundColor: '#6c8e29', borderColor: '#5e7c2d' },
+  roundBoardHeader: { minHeight: 42, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#526f20' },
+  roundBoardTitle: { color: '#f3f7cc', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  roundBoardMinute: { color: '#ffe66a', fontSize: 13, fontWeight: '900' },
+  roundGameRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,.16)' },
+  roundGameRowUser: { backgroundColor: 'rgba(255,230,106,.16)' },
+  roundClub: { flex: 1, minWidth: 0, color: '#f3f7cc', fontSize: 11, fontWeight: '800' },
+  roundScore: { width: 52, textAlign: 'center', color: '#ffffff', fontSize: 15, fontWeight: '900' },
+  halftimeActions: { gap: 8 },
 
   subPanel: { gap: 4 },
   finalPanel: { alignItems: 'center', gap: 6 },
