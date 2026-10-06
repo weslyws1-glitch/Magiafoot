@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
+import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -52,10 +52,43 @@ function makeLeagueSchedule(): Fixture[] {
 export const LEAGUE_FIXTURES = makeLeagueSchedule();
 export const LEAGUE_ROUNDS = CLUBS.length * 2 - 2;
 
+function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 0): Player {
+  const seed = hash(player.id + '-' + player.name);
+  const personalities = ['profissional','lider','ambicioso','tranquilo','temperamental','festeiro'] as const;
+  const role: PlayerSquadRole =
+    player.strength >= 78 ? 'estrela' :
+    player.strength >= 72 ? 'titular' :
+    player.age <= 21 ? 'jovem' :
+    player.strength >= 66 ? 'rotacao' : 'reserva';
+  const secondaryByPosition: Partial<Record<Position, Position[]>> = {
+    LD: ['LE','ZAG'], LE: ['LD','ZAG'], ZAG: ['VOL'], VOL: ['MC','ZAG'],
+    MC: ['VOL','MEI'], MEI: ['MC','PE','PD'], PE: ['PD','ATA'], PD: ['PE','ATA'], ATA: ['PE','PD'],
+  };
+  const contractRounds = 18 + (seed % 35);
+  return {
+    ...player,
+    potential: player.potential ?? clamp(player.strength + (player.age <= 21 ? 8 + (seed % 8) : player.age <= 25 ? 4 + (seed % 5) : 1 + (seed % 3)), player.strength, 95),
+    secondaryPositions: player.secondaryPositions ?? (secondaryByPosition[player.position] ?? []).slice(0, 1 + (seed % 2)),
+    personality: player.personality ?? personalities[seed % personalities.length],
+    squadRole: player.squadRole ?? role,
+    marketStatus: player.marketStatus ?? 'negociavel',
+    trainingFocus: player.trainingFocus ?? 'equilibrado',
+    contractEndRound: player.contractEndRound ?? roundIndex + contractRounds,
+    releaseClause: player.releaseClause ?? Math.round(player.value * (1.45 + (seed % 55) / 100)),
+    signingBonus: player.signingBonus ?? Math.round(player.wage * (2 + (seed % 5))),
+    relationship: player.relationship ?? (58 + (seed % 25)),
+    playingTimeSatisfaction: player.playingTimeSatisfaction ?? (role === 'estrela' || role === 'titular' ? 72 : 78),
+    socialRisk: player.socialRisk ?? (8 + (seed % 55)),
+    leadership: player.leadership ?? (25 + (seed % 70)),
+    promisedMinutesUntilRound: player.promisedMinutesUntilRound ?? null,
+    seasonStats: player.seasonStats ?? { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedMatches: 0 },
+  };
+}
+
 export function createCareer(coachName: string, clubId: string): Career {
   const club = getClub(clubId);
   if (!club) throw new Error('Escolha um clube disponível.');
-  const roster = makeRoster(club);
+  const roster = makeRoster(club).map((player) => initializePlayerCareerProfile(player, 1, 0));
   const formationId: FormationId = '4-3-3';
   const lineup = buildBestLineup(roster, formationId);
   const benchIds = buildBench(roster, lineup);
@@ -71,7 +104,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     season: 1,
     roundIndex: 0,
     players: roster,
-    market: makeCareerMarket(club),
+    market: makeCareerMarket(club).map((player) => initializePlayerCareerProfile(player, 1, 0)),
     formationId,
     lineup,
     benchIds,
@@ -1307,6 +1340,8 @@ export function parseCareer(saved: string | null): Career | null {
     };
     return {
       ...(parsed as Career),
+      players: (parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
+      market: ((parsed as Career).market ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
       stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
       headquartersUpgrades: { ...fallbackHeadquarters, ...((parsed as Career).headquartersUpgrades ?? {}) },
@@ -1383,7 +1418,7 @@ export function addTransferPlayer(career: Career, playerId: string): Career {
   return {
     ...career,
     balance: career.balance - player.value,
-    players: [...career.players, { ...player, status: 'available', fitness: 90, morale: 70 }],
+    players: [...career.players, initializePlayerCareerProfile({ ...player, status: 'available', fitness: 90, morale: 70 }, career.season, career.roundIndex)],
     market: career.market.filter((item) => item.id !== playerId),
     lastNews: `${player.name} assinou com ${getClubName(career.clubId)}.`,
   };
@@ -1399,6 +1434,63 @@ export function sellPlayer(career: Career, playerId: string): Career {
     balance: career.balance + saleValue,
     players: career.players.filter((item) => item.id !== playerId),
     lastNews: `${player.name} foi negociado por ${formatCurrency(saleValue)}.`,
+  };
+}
+
+export function setPlayerMarketStatus(career: Career, playerId: string, status: PlayerMarketStatus): Career {
+  return {
+    ...career,
+    players: career.players.map((player) => player.id === playerId ? { ...player, marketStatus: status } : player),
+  };
+}
+
+export function setPlayerSquadRole(career: Career, playerId: string, role: PlayerSquadRole): Career {
+  return {
+    ...career,
+    players: career.players.map((player) => player.id === playerId ? { ...player, squadRole: role } : player),
+  };
+}
+
+export function setPlayerTrainingFocus(career: Career, playerId: string, focus: PlayerTrainingFocus): Career {
+  return {
+    ...career,
+    players: career.players.map((player) => player.id === playerId ? { ...player, trainingFocus: focus } : player),
+  };
+}
+
+export function renewPlayerContract(career: Career, playerId: string, seasons = 2): Career {
+  const player = career.players.find((item) => item.id === playerId);
+  if (!player) return career;
+  const signingCost = Math.max(player.signingBonus ?? player.wage * 3, Math.round(player.wage * (2.5 + seasons * 0.7)));
+  if (career.balance < signingCost) return career;
+  const newWage = Math.round(player.wage * (1.06 + seasons * 0.025));
+  const extension = LEAGUE_ROUNDS * seasons;
+  const currentEnd = player.contractEndRound ?? career.roundIndex + LEAGUE_ROUNDS;
+  return addCareerNews({
+    ...career,
+    balance: career.balance - signingCost,
+    players: career.players.map((item) => item.id === playerId ? {
+      ...item,
+      wage: newWage,
+      contractEndRound: Math.max(currentEnd, career.roundIndex) + extension,
+      relationship: clamp((item.relationship ?? 60) + 6, 0, 100),
+      morale: clamp(item.morale + 5, 0, 100),
+    } : item),
+    lastNews: player.name + ' renovou contrato com o clube.',
+  }, 'Contrato renovado', player.name + ' renovou por mais ' + seasons + ' temporada(s).', 'club');
+}
+
+export function promisePlayerMinutes(career: Career, playerId: string): Career {
+  const player = career.players.find((item) => item.id === playerId);
+  if (!player) return career;
+  return {
+    ...career,
+    players: career.players.map((item) => item.id === playerId ? {
+      ...item,
+      promisedMinutesUntilRound: career.roundIndex + 5,
+      relationship: clamp((item.relationship ?? 60) + 3, 0, 100),
+    } : item),
+    lastNews: 'Você prometeu mais minutos a ' + player.name + '.',
   };
 }
 
