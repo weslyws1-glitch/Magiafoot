@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import {
   addTransferPlayer,
   refreshSponsorshipMarket,
+  renewSponsorshipContract,
+  negotiateSponsorshipProposal,
   declineSponsorshipProposal,
   acceptSponsorshipProposal,
   advanceMatch,
@@ -55,6 +57,8 @@ interface CareerContextValue {
   refreshSponsors: (force?: boolean) => void;
   acceptSponsor: (proposalId: string) => boolean;
   declineSponsor: (proposalId: string) => void;
+  negotiateSponsor: (proposalId: string) => void;
+  renewSponsor: (contractId: string) => void;
 }
 
 const CareerContext = createContext<CareerContextValue | null>(null);
@@ -188,6 +192,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     update((current) => declineSponsorshipProposal(current, proposalId));
   }, [update]);
 
+  const negotiateSponsor = useCallback((proposalId: string) => {
+    update((current) => negotiateSponsorshipProposal(current, proposalId));
+  }, [update]);
+
+  const renewSponsor = useCallback((contractId: string) => {
+    update((current) => renewSponsorshipContract(current, contractId));
+  }, [update]);
+
   const value = useMemo(() => ({
     career,
     isReady,
@@ -213,9 +225,11 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     refreshSponsors,
     acceptSponsor,
     declineSponsor,
+    negotiateSponsor,
+    renewSponsor,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, isReady, makeSubstitution, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
