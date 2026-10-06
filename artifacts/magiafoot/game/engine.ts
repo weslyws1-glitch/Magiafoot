@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -78,6 +78,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     captainId: captain?.id ?? lineup[0]?.playerId ?? '',
     tactics: { mentality: 'equilibrada', pressure: 'normal', tempo: 'normal' },
     boardTrust: 66,
+    fanTrust: 60,
     balance: club.balance,
     stadiumLevel: 0,
     ticketPrice: club.ticketPrice,
@@ -86,6 +87,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     headquartersRevenuePricing: { store: 3, members: 3, events: 3 },
     headquartersImageAcquisition: { museum: 1, press: 1, history: 1 },
     headquartersInvestments: { marketing: 3, commercial: 3 },
+    sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -474,6 +476,164 @@ function cpuScore(home: Club, away: Club, seed: number): [number, number] {
   return [homeGoals, awayGoals];
 }
 
+const SPONSOR_POOL = [
+  { name: 'Aurora Energia', category: 'Energia', prestige: 74, fanImpact: 2, boardImpact: 3 },
+  { name: 'Vitta Saúde', category: 'Saúde', prestige: 70, fanImpact: 4, boardImpact: 2 },
+  { name: 'Nexa Telecom', category: 'Tecnologia', prestige: 78, fanImpact: 2, boardImpact: 4 },
+  { name: 'MobiPay', category: 'Financeiro', prestige: 66, fanImpact: -1, boardImpact: 4 },
+  { name: 'Brava Alimentos', category: 'Alimentos', prestige: 62, fanImpact: 3, boardImpact: 2 },
+  { name: 'Titan Sports', category: 'Esportes', prestige: 82, fanImpact: 5, boardImpact: 3 },
+  { name: 'Orbe Logística', category: 'Logística', prestige: 61, fanImpact: 0, boardImpact: 3 },
+  { name: 'Pulse Mobile', category: 'Tecnologia', prestige: 72, fanImpact: 3, boardImpact: 3 },
+];
+
+function recentFormScore(career: Career): number {
+  const recent = [...career.results]
+    .filter((result) => result.homeClubId === career.clubId || result.awayClubId === career.clubId)
+    .sort((a, b) => b.roundIndex - a.roundIndex)
+    .slice(0, 5);
+  if (!recent.length) return 50;
+  let points = 0;
+  for (const result of recent) {
+    const home = result.homeClubId === career.clubId;
+    const gf = home ? result.homeGoals : result.awayGoals;
+    const ga = home ? result.awayGoals : result.homeGoals;
+    points += gf > ga ? 3 : gf === ga ? 1 : 0;
+  }
+  return Math.round((points / (recent.length * 3)) * 100);
+}
+
+function sponsorshipMarketScore(career: Career): number {
+  const form = recentFormScore(career);
+  const marketing = career.headquartersInvestments?.marketing ?? 3;
+  const commercial = career.headquartersInvestments?.commercial ?? 3;
+  return clamp(Math.round(form * 0.42 + career.boardTrust * 0.18 + career.fanTrust * 0.18 + marketing * 4 + commercial * 4), 10, 100);
+}
+
+function sponsorshipSlotForIndex(index: number): SponsorshipSlot {
+  return (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[])[index % 4]!;
+}
+
+export function refreshSponsorshipMarket(career: Career, force = false): Career {
+  const currentRound = career.roundIndex;
+  if (!force && career.sponsorships?.lastMarketRound === currentRound) return career;
+
+  const score = sponsorshipMarketScore(career);
+  const count = score >= 82 ? 4 : score >= 65 ? 3 : score >= 45 ? 2 : 1;
+  const occupied = new Set((career.sponsorships?.contracts ?? []).map((item) => item.slot));
+  const availableSlots = (['principal', 'sleeve', 'back', 'institutional'] as SponsorshipSlot[]).filter((slot) => !occupied.has(slot));
+  const proposalCount = Math.min(count, Math.max(1, availableSlots.length));
+  const seed = hash(`sponsor-${career.clubId}-${career.season}-${currentRound}`);
+  const pool = [...SPONSOR_POOL].sort((a, b) => ((hash(a.name) ^ seed) >>> 0) - ((hash(b.name) ^ seed) >>> 0));
+  const commercial = career.headquartersInvestments?.commercial ?? 3;
+  const proposals: SponsorshipProposal[] = [];
+
+  for (let i = 0; i < proposalCount; i += 1) {
+    const brand = pool[i % pool.length]!;
+    const slot = availableSlots[i] ?? sponsorshipSlotForIndex(i);
+    const slotFactor = slot === 'principal' ? 1.75 : slot === 'sleeve' ? 0.72 : slot === 'back' ? 0.95 : 0.58;
+    const strength = 0.62 + score / 100 + commercial * 0.08;
+    const base = Math.round((85_000 + brand.prestige * 4_700) * slotFactor * strength);
+    const durationMatches = score >= 75 ? 10 + ((seed + i) % 5) : 6 + ((seed + i) % 5);
+    const signingBonus = Math.round(base * (0.75 + ((seed >> (i + 1)) % 25) / 100));
+    const perMatch = Math.round(base * 0.18);
+    const winBonus = Math.round(base * 0.07);
+    proposals.push({
+      id: `sp-${currentRound}-${i}-${brand.name.replace(/\s+/g, '-').toLowerCase()}`,
+      sponsorName: brand.name,
+      category: brand.category,
+      slot,
+      signingBonus,
+      perMatch,
+      winBonus,
+      durationMatches,
+      expiresRound: currentRound + 2,
+      fanImpact: brand.fanImpact,
+      boardImpact: brand.boardImpact,
+      prestige: brand.prestige,
+      note: score >= 75 ? 'A marca quer aproveitar a boa fase e crescer junto com o clube.' : score <= 40 ? 'A empresa vê potencial, mas oferece valores conservadores pelo momento do time.' : 'Proposta compatível com o momento esportivo e comercial do clube.',
+    });
+  }
+
+  return {
+    ...career,
+    sponsorships: {
+      proposals,
+      contracts: career.sponsorships?.contracts ?? [],
+      lastMarketRound: currentRound,
+      history: career.sponsorships?.history ?? [],
+    },
+  };
+}
+
+export function acceptSponsorshipProposal(career: Career, proposalId: string): Career {
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+  const proposal = state.proposals.find((item) => item.id === proposalId);
+  if (!proposal || state.contracts.some((item) => item.slot === proposal.slot)) return career;
+
+  const contract: SponsorshipContract = {
+    ...proposal,
+    acceptedRound: career.roundIndex,
+    matchesRemaining: proposal.durationMatches,
+    totalEarned: proposal.signingBonus,
+  };
+
+  return {
+    ...career,
+    balance: career.balance + proposal.signingBonus,
+    boardTrust: clamp(career.boardTrust + proposal.boardImpact, 0, 100),
+    fanTrust: clamp(career.fanTrust + proposal.fanImpact, 0, 100),
+    sponsorships: {
+      proposals: state.proposals.filter((item) => item.id !== proposalId && item.slot !== proposal.slot),
+      contracts: [...state.contracts, contract],
+      lastMarketRound: state.lastMarketRound,
+      history: [`${proposal.sponsorName} assinou por ${proposal.durationMatches} jogos.`, ...state.history].slice(0, 20),
+    },
+    lastNews: `${proposal.sponsorName} é o novo patrocinador do clube. Acordo de ${proposal.durationMatches} jogos.`,
+  };
+}
+
+export function declineSponsorshipProposal(career: Career, proposalId: string): Career {
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+  const proposal = state.proposals.find((item) => item.id === proposalId);
+  if (!proposal) return career;
+  return {
+    ...career,
+    sponsorships: {
+      ...state,
+      proposals: state.proposals.filter((item) => item.id !== proposalId),
+      history: [`Proposta de ${proposal.sponsorName} recusada.`, ...state.history].slice(0, 20),
+    },
+  };
+}
+
+function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
+  const state = career.sponsorships ?? { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+  if (!state.contracts.length) return refreshSponsorshipMarket(career, true);
+
+  let sponsorIncome = 0;
+  const active: SponsorshipContract[] = [];
+  const history = [...state.history];
+
+  for (const contract of state.contracts) {
+    const payment = contract.perMatch + (won ? contract.winBonus : 0);
+    sponsorIncome += payment;
+    const remaining = Math.max(0, contract.matchesRemaining - 1);
+    if (remaining > 0) {
+      active.push({ ...contract, matchesRemaining: remaining, totalEarned: contract.totalEarned + payment });
+    } else {
+      history.unshift(`Contrato com ${contract.sponsorName} chegou ao fim após ${contract.durationMatches} jogos.`);
+    }
+  }
+
+  const updated: Career = {
+    ...career,
+    balance: career.balance + sponsorIncome,
+    sponsorships: { proposals: [], contracts: active, lastMarketRound: -1, history: history.slice(0, 20) },
+  };
+  return refreshSponsorshipMarket(updated, true);
+}
+
 export function ticketDemandMultiplier(ticketPrice: number, referencePrice: number): number {
   const safeReference = Math.max(1, referencePrice);
   const ratio = ticketPrice / safeReference;
@@ -547,17 +707,19 @@ export function finalizeMatch(career: Career): Career {
   const revenue = gateIncome - wageBill;
   const leagueResult = { ...result, attendance };
   const resultText = isDraw ? 'Um ponto para cada lado.' : userWon ? 'Vitória! A torcida comemora.' : 'A diretoria espera uma reação na próxima rodada.';
-  return {
+  const afterMatch: Career = {
     ...career,
     players: updatedPlayers,
     results: [...career.results.filter((item) => item.roundIndex !== game.fixture.roundIndex), ...newResults],
     roundIndex: career.roundIndex + 1,
     balance: Math.max(0, career.balance + revenue),
     boardTrust: clamp(career.boardTrust + trustDelta, 0, 100),
+    fanTrust: clamp(career.fanTrust + (userWon ? 3 : isDraw ? 0 : -3), 0, 100),
     liveMatch: null,
     lastResult: leagueResult,
     lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
   };
+  return settleSponsorshipsAfterMatch(afterMatch, userWon);
 }
 
 export function calculateStandings(results: LeagueResult[]): StandingRow[] {
@@ -625,6 +787,7 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackHeadquartersRevenuePricing: Career['headquartersRevenuePricing'] = { store: 3, members: 3, events: 3 };
     const fallbackHeadquartersImageAcquisition: Career['headquartersImageAcquisition'] = { museum: 1, press: 1, history: 1 };
     const fallbackHeadquartersInvestments: Career['headquartersInvestments'] = { marketing: 3, commercial: 3 };
+    const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
@@ -638,6 +801,8 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
       headquartersImageAcquisition: { ...fallbackHeadquartersImageAcquisition, ...((parsed as Career).headquartersImageAcquisition ?? {}) },
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
+      fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
+      sponsorships: { ...fallbackSponsorships, ...((parsed as Career).sponsorships ?? {}) },
     };
   } catch {
     return null;
