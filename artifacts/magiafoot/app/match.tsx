@@ -73,11 +73,23 @@ export default function MatchScreen() {
   const [showSubs, setShowSubs] = useState(false);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const game = career?.liveMatch ?? null;
+
+  useEffect(() => {
+    if (!game || !autoRunning) return;
+    const live = game.phase === 'first_half' || game.phase === 'second_half';
+    if (!live) return;
+
+    const timer = setInterval(() => {
+      advanceCurrentMatch(1);
+    }, 900);
+
+    return () => clearInterval(timer);
+  }, [game?.phase, game?.minute, autoRunning, advanceCurrentMatch]);
 
   if (!career) {
     return <><GameHeader title="Partida" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira antes de entrar em campo.</Text><GameButton label="Criar carreira" onPress={() => router.push('/new-career')} /></Screen></>;
   }
-  const game = career.liveMatch;
   if (!game) {
     const fixture = getCurrentFixture(career);
     const home = fixture ? getClub(fixture.homeClubId) : undefined;
@@ -114,17 +126,6 @@ export default function MatchScreen() {
   if (!home || !away) return null;
   const isFinal = game.phase === 'finished';
   const isLive = game.phase === 'first_half' || game.phase === 'second_half';
-  useEffect(() => {
-    if (!game || !autoRunning) return;
-    const live = game.phase === 'first_half' || game.phase === 'second_half';
-    if (!live) return;
-
-    const timer = setInterval(() => {
-      advanceCurrentMatch(1);
-    }, 900);
-
-    return () => clearInterval(timer);
-  }, [game?.phase, game?.minute, autoRunning, advanceCurrentMatch]);
 
   const substitutions = game.substitutionsUsed;
   const activeSlots = game.userLineup.filter((slot) => !slot.sentOff);
