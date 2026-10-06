@@ -512,18 +512,22 @@ export function administrationStaffCapacity(career: Career): number {
 export function administrationRequiredStaff(career: Career, department: AdministrationDepartmentKey): number {
   const club = getClub(career.clubId);
   const base = club?.rating ?? 60;
-  const scale = base >= 78 ? 5 : base >= 70 ? 4 : base >= 62 ? 3 : 2;
-  const meeting = career.headquartersUpgrades?.meeting ?? 0;
-  const technology = career.headquartersUpgrades?.technology ?? 0;
-  const organizationGrowth = Math.floor((meeting + technology) / 3);
-  const seasonPressure = career.roundIndex >= 24 ? 2 : career.roundIndex >= 12 ? 1 : 0;
-  const departmentExtra = department === 'board' ? 1 : 0;
-  const idealNeed = clamp(scale + organizationGrowth + seasonPressure + departmentExtra, 2, 10);
 
-  // O clube nunca exige mais profissionais do que sua estrutura atual permite contratar.
-  // Conforme Sala de Reuniões e Tecnologia/TI evoluem, novas vagas são liberadas
-  // e a necessidade administrativa pode crescer junto.
-  return Math.min(idealNeed, administrationStaffCapacity(career));
+  // A necessidade é independente das vagas liberadas: um clube pode estar
+  // administrativamente deficiente mesmo sem ter estrutura para contratar mais.
+  // Porém, no início da temporada a exigência é menor e cresce com o calendário.
+  const earlyScale = base >= 80 ? 4 : base >= 70 ? 3 : base >= 62 ? 2 : 2;
+  const seasonPressure =
+    career.roundIndex >= 24 ? 3 :
+    career.roundIndex >= 16 ? 2 :
+    career.roundIndex >= 8 ? 1 : 0;
+
+  const departmentExtra =
+    department === 'board' && career.roundIndex >= 8 ? 1 :
+    department === 'finance' && career.roundIndex >= 16 ? 1 :
+    0;
+
+  return clamp(earlyScale + seasonPressure + departmentExtra, 2, 10);
 }
 
 function administrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
