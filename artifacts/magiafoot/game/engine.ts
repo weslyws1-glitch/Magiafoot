@@ -79,6 +79,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     tactics: { mentality: 'equilibrada', pressure: 'normal', tempo: 'normal' },
     boardTrust: 66,
     fanTrust: 60,
+    legalWorkloadEvents: 0,
     balance: club.balance,
     stadiumLevel: 0,
     ticketPrice: club.ticketPrice,
@@ -509,34 +510,99 @@ export function administrationStaffCapacity(career: Career): number {
   return clamp(2 + meeting + technology, 2, 10);
 }
 
-export function administrationRequiredStaff(career: Career, department: AdministrationDepartmentKey): number {
+function activeAdministrativeStaff(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional[] {
+  const people = career.administrationStaff?.[department] ?? [];
+  return people.filter((person) => {
+    const end = typeof person.contractEndRound === 'number'
+      ? person.contractEndRound
+      : person.hiredRound + (person.contractRounds ?? 12);
+    return career.roundIndex < end;
+  });
+}
+
+function recentClubForm(career: Career): { score: number; losses: number } {
+  const recent = [...career.results]
+    .filter((r) => r.homeClubId === career.clubId || r.awayClubId === career.clubId)
+    .sort((a, b) => b.roundIndex - a.roundIndex)
+    .slice(0, 6);
+  if (!recent.length) return { score: 70, losses: 0 };
+  let points = 0;
+  let losses = 0;
+  for (const r of recent) {
+    const home = r.homeClubId === career.clubId;
+    const gf = home ? r.homeGoals : r.awayGoals;
+    const ga = home ? r.awayGoals : r.homeGoals;
+    if (gf > ga) points += 3;
+    else if (gf === ga) points += 1;
+    else losses += 1;
+  }
+  return { score: Math.round((points / (recent.length * 3)) * 100), losses };
+}
+
+export function administrationNeedScore(career: Career, department: AdministrationDepartmentKey): number {
   const club = getClub(career.clubId);
-  const base = club?.rating ?? 60;
+  const form = recentClubForm(career);
+  const satisfaction = (career.boardTrust + career.fanTrust) / 2;
+  const stabilityRelief = satisfaction >= 80 && form.score >= 65 ? 20 : satisfaction >= 68 && form.score >= 50 ? 10 : 0;
+  const crisisPressure = satisfaction < 45 ? 16 : satisfaction < 60 ? 7 : 0;
+  const poorFormPressure = form.losses >= 4 ? 15 : form.losses >= 2 ? 7 : 0;
+  const seasonGrowth = Math.max(0, career.season - 1) * 8;
 
-  // A necessidade é independente das vagas liberadas: um clube pode estar
-  // administrativamente deficiente mesmo sem ter estrutura para contratar mais.
-  // Porém, no início da temporada a exigência é menor e cresce com o calendário.
-  const earlyScale = base >= 80 ? 4 : base >= 70 ? 3 : base >= 62 ? 2 : 2;
-  const seasonPressure =
-    career.roundIndex >= 24 ? 3 :
-    career.roundIndex >= 16 ? 2 :
-    career.roundIndex >= 8 ? 1 : 0;
+  if (department === 'board') {
+    const stadiumGrowth = Object.values(career.stadiumUpgrades ?? {}).reduce((sum, level) => sum + level, 0);
+    const hqGrowth = Object.values(career.headquartersUpgrades ?? {}).reduce((sum, level) => sum + level, 0);
+    const commercialComplexity = (career.sponsorships?.contracts?.length ?? 0) * 4 + (career.players.length > 28 ? 5 : 0);
+    const clubGrowth = Math.round((stadiumGrowth + hqGrowth) * 1.15) + commercialComplexity + Math.max(0, (club?.rating ?? 60) - 68);
+    return clamp(Math.round(8 + seasonGrowth + clubGrowth + crisisPressure + poorFormPressure - stabilityRelief), 0, 100);
+  }
 
-  const departmentExtra =
-    department === 'board' && career.roundIndex >= 8 ? 1 :
-    department === 'finance' && career.roundIndex >= 16 ? 1 :
-    0;
+  if (department === 'finance') {
+    const initialBalance = Math.max(1, club?.balance ?? 1_000_000);
+    const balanceScale = career.balance / initialBalance;
+    const wageBill = career.players.reduce((sum, player) => sum + player.wage, 0);
+    const sponsorContracts = career.sponsorships?.contracts?.length ?? 0;
+    const sponsorEarned = (career.sponsorships?.contracts ?? []).reduce((sum, contract) => sum + contract.totalEarned, 0);
+    const moneyScale =
+      (balanceScale >= 2 ? 28 : balanceScale >= 1.35 ? 18 : balanceScale >= 0.8 ? 10 : 4)
+      + Math.min(20, Math.round(wageBill / 75_000))
+      + sponsorContracts * 4
+      + Math.min(12, Math.round(sponsorEarned / 500_000));
+    return clamp(Math.round(5 + seasonGrowth + moneyScale + crisisPressure - stabilityRelief), 0, 100);
+  }
 
-  return clamp(earlyScale + seasonPressure + departmentExtra, 2, 10);
+  const activeContracts =
+    career.players.length
+    + (career.sponsorships?.contracts?.length ?? 0)
+    + (career.sponsorships?.proposals?.length ?? 0);
+  const suspendedPlayers = career.players.filter((player) => player.status === 'suspended').length;
+  const troubledPlayers = career.players.filter((player) => player.morale < 35).length;
+  const legalEvents = career.legalWorkloadEvents ?? 0;
+  const contractPressure = Math.min(34, Math.round(activeContracts * 0.72));
+  const disciplinePressure = Math.min(30, suspendedPlayers * 8 + troubledPlayers * 4 + legalEvents * 3);
+  return clamp(Math.round(4 + seasonGrowth + contractPressure + disciplinePressure + crisisPressure + poorFormPressure - stabilityRelief), 0, 100);
+}
+
+export function administrationRequiredStaff(career: Career, department: AdministrationDepartmentKey): number {
+  const need = administrationNeedScore(career, department);
+  if (need < 22) return 0;
+  if (need < 38) return 1;
+  if (need < 52) return 2;
+  if (need < 65) return 3;
+  if (need < 76) return 4;
+  if (need < 84) return 5;
+  if (need < 90) return 6;
+  if (need < 95) return 7;
+  return 8 + (need >= 98 ? 2 : 1);
 }
 
 function administrativeCandidate(career: Career, department: AdministrationDepartmentKey): AdministrativeProfessional {
-  const current = career.administrationStaff?.[department]?.length ?? 0;
+  const current = activeAdministrativeStaff(career, department).length;
   const seed = hash(`staff-${career.id}-${department}-${current}-${career.roundIndex}`);
   const quality = clamp(52 + (seed % 37), 50, 88);
   const salary = Math.round((18_000 + quality * 720) / 1000) * 1000;
-  const hireCost = Math.round((salary * (1.6 + quality / 100)) / 1000) * 1000;
-  const fireCost = Math.round((salary * (0.75 + quality / 220)) / 1000) * 1000;
+  const contractRounds = 8 + ((seed >> 3) % 13);
+  const hireCost = Math.round((salary * (1.4 + quality / 115)) / 1000) * 1000;
+  const fireCost = Math.round((salary * (0.7 + contractRounds / 30)) / 1000) * 1000;
   const roles = ADMIN_ROLES[department];
   return {
     id: `staff-${department}-${career.roundIndex}-${current}-${seed}`,
@@ -548,6 +614,8 @@ function administrativeCandidate(career: Career, department: AdministrationDepar
     hireCost,
     fireCost,
     hiredRound: career.roundIndex,
+    contractRounds,
+    contractEndRound: career.roundIndex + contractRounds,
   };
 }
 
@@ -557,7 +625,7 @@ export function previewAdministrativeCandidate(career: Career, department: Admin
 
 export function hireAdministrativeProfessional(career: Career, department: AdministrationDepartmentKey): Career {
   const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
-  const current = staff[department] ?? [];
+  const current = activeAdministrativeStaff(career, department);
   const capacity = administrationStaffCapacity(career);
   if (current.length >= capacity || current.length >= 10) return career;
 
@@ -573,12 +641,12 @@ export function hireAdministrativeProfessional(career: Career, department: Admin
     },
     lastNews: `${candidate.name} foi contratado para ${ADMIN_DEPARTMENT_LABELS[department]}.`,
   };
-  return addCareerNews(next, 'Novo profissional na administração', `${candidate.name}, ${candidate.role}, chegou para reforçar ${ADMIN_DEPARTMENT_LABELS[department]} por ${formatCurrency(candidate.hireCost)}.`, 'club');
+  return addCareerNews(next, 'Novo profissional na administração', `${candidate.name}, ${candidate.role}, assinou por ${candidate.contractRounds} jogos com ${ADMIN_DEPARTMENT_LABELS[department]}.`, 'club');
 }
 
 export function fireAdministrativeProfessional(career: Career, department: AdministrationDepartmentKey, professionalId: string): Career {
   const staff = career.administrationStaff ?? { board: [], finance: [], legal: [] };
-  const current = staff[department] ?? [];
+  const current = activeAdministrativeStaff(career, department);
   const professional = current.find((item) => item.id === professionalId);
   if (!professional || career.balance < professional.fireCost) return career;
 
@@ -596,11 +664,12 @@ export function fireAdministrativeProfessional(career: Career, department: Admin
 }
 
 export function administrationDepartmentEfficiency(career: Career, department: AdministrationDepartmentKey): number {
-  const people = career.administrationStaff?.[department] ?? [];
+  const people = activeAdministrativeStaff(career, department);
   const required = administrationRequiredStaff(career, department);
-  if (!people.length) return 15;
+  if (required === 0 && people.length === 0) return 100;
+  if (!people.length) return required === 0 ? 100 : 20;
   const averageQuality = people.reduce((sum, person) => sum + person.quality, 0) / people.length;
-  const staffing = clamp(people.length / Math.max(1, required), 0.35, 1.15);
+  const staffing = required === 0 ? 1 : clamp(people.length / Math.max(1, required), 0.35, 1.15);
   const tech = career.headquartersUpgrades?.technology ?? 0;
   const meetings = career.headquartersUpgrades?.meeting ?? 0;
   return clamp(Math.round(averageQuality * staffing + tech * 3 + meetings * 2), 10, 100);
@@ -1036,6 +1105,8 @@ export function finalizeMatch(career: Career): Career {
   const revenue = gateIncome - wageBill;
   const leagueResult = { ...result, attendance };
   const resultText = isDraw ? 'Um ponto para cada lado.' : userWon ? 'Vitória! A torcida comemora.' : 'A diretoria espera uma reação na próxima rodada.';
+  const redCardsThisMatch = game.events.filter((event) => event.type === 'red' && event.clubId === career.clubId).length;
+  const lowMoraleCases = updatedPlayers.filter((player) => player.morale < 30).length;
   const afterMatch: Career = {
     ...career,
     players: updatedPlayers,
@@ -1044,6 +1115,7 @@ export function finalizeMatch(career: Career): Career {
     balance: Math.max(0, career.balance + revenue),
     boardTrust: clamp(career.boardTrust + trustDelta, 0, 100),
     fanTrust: clamp(career.fanTrust + (userWon ? 3 : isDraw ? 0 : -3), 0, 100),
+    legalWorkloadEvents: Math.max(0, (career.legalWorkloadEvents ?? 0) + redCardsThisMatch + (lowMoraleCases > 0 ? 1 : 0)),
     liveMatch: null,
     lastResult: leagueResult,
     lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
@@ -1164,7 +1236,24 @@ export function parseCareer(saved: string | null): Career | null {
       headquartersRevenuePricing: { ...fallbackHeadquartersRevenuePricing, ...((parsed as Career).headquartersRevenuePricing ?? {}) },
       headquartersImageAcquisition: { ...fallbackHeadquartersImageAcquisition, ...((parsed as Career).headquartersImageAcquisition ?? {}) },
       headquartersInvestments: { ...fallbackHeadquartersInvestments, ...((parsed as Career).headquartersInvestments ?? {}) },
-      administrationStaff: { ...fallbackAdministrationStaff, ...((parsed as Career).administrationStaff ?? {}) },
+      administrationStaff: {
+        board: (((parsed as Career).administrationStaff?.board ?? [])).map((person) => ({
+          ...person,
+          contractRounds: typeof person.contractRounds === 'number' ? person.contractRounds : 12,
+          contractEndRound: typeof person.contractEndRound === 'number' ? person.contractEndRound : (person.hiredRound ?? 0) + 12,
+        })),
+        finance: (((parsed as Career).administrationStaff?.finance ?? [])).map((person) => ({
+          ...person,
+          contractRounds: typeof person.contractRounds === 'number' ? person.contractRounds : 12,
+          contractEndRound: typeof person.contractEndRound === 'number' ? person.contractEndRound : (person.hiredRound ?? 0) + 12,
+        })),
+        legal: (((parsed as Career).administrationStaff?.legal ?? [])).map((person) => ({
+          ...person,
+          contractRounds: typeof person.contractRounds === 'number' ? person.contractRounds : 12,
+          contractEndRound: typeof person.contractEndRound === 'number' ? person.contractEndRound : (person.hiredRound ?? 0) + 12,
+        })),
+      },
+      legalWorkloadEvents: typeof (parsed as Career).legalWorkloadEvents === 'number' ? (parsed as Career).legalWorkloadEvents : 0,
       fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
       sponsorships: {
         ...fallbackSponsorships,
