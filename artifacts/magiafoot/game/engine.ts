@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { Career, Club, Fixture, FormationId, FormationSlot, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
+import type { Career, Club, Fixture, FormationId, FormationSlot, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, Position, StadiumUpgradeKey, StandingRow } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -82,6 +82,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     stadiumLevel: 0,
     ticketPrice: club.ticketPrice,
     stadiumUpgrades: { stands: 1, pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0, scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0 },
+    headquartersUpgrades: { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 },
     results: [],
     liveMatch: null,
     lastResult: null,
@@ -617,6 +618,7 @@ export function parseCareer(saved: string | null): Career | null {
       || !Array.isArray(parsed.lineup)
       || !Array.isArray(parsed.results)
     ) return null;
+    const fallbackHeadquarters: Career['headquartersUpgrades'] = { board: 1, finance: 1, meeting: 1, legal: 0, technology: 0, marketing: 1, sponsors: 0, commercial: 0, store: 0, members: 0, museum: 0, press: 1, events: 0, history: 1 };
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
@@ -626,6 +628,7 @@ export function parseCareer(saved: string | null): Career | null {
       ...(parsed as Career),
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
       stadiumUpgrades: { ...fallbackUpgrades, ...((parsed as Career).stadiumUpgrades ?? {}) },
+      headquartersUpgrades: { ...fallbackHeadquarters, ...((parsed as Career).headquartersUpgrades ?? {}) },
     };
   } catch {
     return null;
@@ -684,6 +687,47 @@ export function sellPlayer(career: Career, playerId: string): Career {
     balance: career.balance + saleValue,
     players: career.players.filter((item) => item.id !== playerId),
     lastNews: `${player.name} foi negociado por ${formatCurrency(saleValue)}.`,
+  };
+}
+
+export const HEADQUARTERS_UPGRADE_BASE_COST: Record<HeadquartersUpgradeKey, number> = {
+  board: 300_000,
+  finance: 260_000,
+  meeting: 180_000,
+  legal: 240_000,
+  technology: 320_000,
+  marketing: 360_000,
+  sponsors: 420_000,
+  commercial: 340_000,
+  store: 280_000,
+  members: 300_000,
+  museum: 520_000,
+  press: 250_000,
+  events: 430_000,
+  history: 160_000,
+};
+
+export function headquartersUpgradeCost(key: HeadquartersUpgradeKey, level: number): number {
+  return Math.round(HEADQUARTERS_UPGRADE_BASE_COST[key] * (1 + Math.max(0, level) * 0.52));
+}
+
+export function upgradeHeadquartersFacility(career: Career, key: HeadquartersUpgradeKey): Career {
+  const current = career.headquartersUpgrades?.[key] ?? 0;
+  if (current >= 5) return career;
+  const cost = headquartersUpgradeCost(key, current);
+  if (career.balance < cost) return career;
+  const names: Record<HeadquartersUpgradeKey, string> = {
+    board: 'diretoria', finance: 'departamento financeiro', meeting: 'sala de reuniões',
+    legal: 'departamento jurídico', technology: 'tecnologia e TI', marketing: 'marketing',
+    sponsors: 'patrocínios', commercial: 'departamento comercial', store: 'loja oficial',
+    members: 'sócio-torcedor', museum: 'museu', press: 'centro de imprensa',
+    events: 'auditório e eventos', history: 'arquivo histórico',
+  };
+  return {
+    ...career,
+    balance: career.balance - cost,
+    headquartersUpgrades: { ...career.headquartersUpgrades, [key]: current + 1 },
+    lastNews: `A sede recebeu investimento em ${names[key]}. Estrutura agora no nível ${current + 1}.`,
   };
 }
 
