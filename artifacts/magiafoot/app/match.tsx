@@ -196,112 +196,97 @@ export default function MatchScreen() {
         right={<Text style={styles.headerClock}>{clock}</Text>}
       />
       <Screen>
-        <View style={styles.matchShell}>
-          <View style={styles.pitchWrap}>
-            <View style={styles.pitch}>
-              <View style={styles.pitchBorder} />
-              <View style={styles.halfLine} />
-              <View style={styles.centerCircle} />
-              <View style={styles.centerDot} />
-              <View style={styles.boxTop} />
-              <View style={styles.boxBottom} />
-              {fieldPlayers.map(({ slot, player }) => (
-                <View
-                  key={slot.id}
-                  style={[
-                    styles.pitchPlayer,
-                    {
-                      left: slot.x + '%',
-                      top: slot.y + '%',
-                      transform: [{ translateX: -24 }, { translateY: -19 }],
-                    },
-                  ]}
-                >
-                  <View style={styles.shirt}>
-                    <Text style={styles.shirtRating}>{effectiveStrength(player, slot.position)}</Text>
-                  </View>
-                  <Text numberOfLines={1} style={styles.pitchName}>{player.name.split(' ')[0]}</Text>
-                </View>
-              ))}
+        <View style={styles.liveTopCard}>
+          <View style={styles.liveTopBar}>
+            <Text style={styles.liveCompetition}>3ª DIVISÃO · RODADA {game.fixture.roundIndex + 1}</Text>
+            <View style={styles.liveProgress}>
+              <View style={[styles.liveProgressFill, { width: ((game.minute / 90) * 100 + '%') as any }]} />
+            </View>
+            <Text style={styles.livePeriod}>{clock} · {game.phase === 'second_half' ? '2º tempo' : '1º tempo'}</Text>
+          </View>
+
+          <View style={styles.featuredMatch}>
+            <View style={styles.featuredTeam}>
+              <Text numberOfLines={1} style={styles.featuredTeamName}>{home.name}</Text>
+              <Text style={styles.featuredScore}>{game.homeGoals}</Text>
             </View>
 
-            <View style={styles.pitchControls}>
-              <Pressable onPress={() => setAutoRunning((v) => !v)} style={styles.controlButton}>
-                <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
-                <Text style={styles.controlButtonText}>{autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
-              </Pressable>
-              <View style={styles.speedGroup}>
-                {[1, 2, 3].map((value) => (
-                  <Pressable
-                    key={value}
-                    onPress={() => setSpeed(value as 1 | 2 | 3)}
-                    style={[styles.speedButton, speed === value && styles.speedButtonActive]}
-                  >
-                    <Text style={[styles.speedText, speed === value && styles.speedTextActive]}>{value}x</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Pressable onPress={() => router.push('/tactics')} style={styles.controlDark}>
-                <Text style={styles.controlDarkText}>TÁTICA</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowSubs((v) => !v)} style={styles.controlDark}>
-                <Text style={styles.controlDarkText}>SUB {game.substitutionsUsed}/5</Text>
-              </Pressable>
+            <View style={styles.featuredCenter}>
+              <Text style={styles.featuredClock}>{clock}</Text>
+              <Text style={styles.featuredVs}>×</Text>
+              <Text style={styles.featuredStatus}>{autoRunning ? speed + 'x' : 'PAUSADO'}</Text>
+            </View>
+
+            <View style={[styles.featuredTeam, { alignItems: 'flex-end' }]}>
+              <Text numberOfLines={1} style={[styles.featuredTeamName, { textAlign: 'right' }]}>{away.name}</Text>
+              <Text style={styles.featuredScore}>{game.awayGoals}</Text>
             </View>
           </View>
 
-          <View style={styles.sidePanel}>
-            <View style={styles.scoreRow}>
-              <View style={styles.teamBlock}>
-                <Text numberOfLines={1} style={styles.teamName}>{home.name}</Text>
-                <Text style={styles.score}>{game.homeGoals}</Text>
-              </View>
-              <View style={styles.clockBlock}>
-                <Text style={styles.clock}>{clock}</Text>
-                <Text style={styles.phase}>{matchPhaseLabel(game.phase).toUpperCase()}</Text>
-              </View>
-              <View style={[styles.teamBlock, { alignItems: 'flex-end' }]}>
-                <Text numberOfLines={1} style={[styles.teamName, { textAlign: 'right' }]}>{away.name}</Text>
-                <Text style={styles.score}>{game.awayGoals}</Text>
-              </View>
-            </View>
-
-            <View style={styles.liveRoundHeader}>
-              <Text style={styles.liveRoundTitle}>OUTROS JOGOS</Text>
-              <Text style={styles.liveRoundMinute}>{game.minute}′</Text>
-            </View>
-            <View style={styles.liveRoundList}>
-              {roundMatches.map((item) => (
-                <View key={item.fixture.id} style={[styles.liveRoundRow, item.isUser && styles.liveRoundRowUser]}>
-                  <Text numberOfLines={1} style={styles.liveRoundClub}>{item.home?.name ?? 'Casa'}</Text>
-                  <Text style={styles.liveRoundScore}>{item.homeGoals}-{item.awayGoals}</Text>
-                  <Text numberOfLines={1} style={[styles.liveRoundClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.eventHeader}>
-              <Text style={styles.eventHeaderText}>LANCES</Text>
-              <Text style={styles.eventHeaderMinute}>{game.minute}′</Text>
-            </View>
-            <View style={styles.eventList}>
-              {recentEvents.length ? recentEvents.map((event) => (
-                <View key={event.id} style={styles.eventRow}>
-                  <Text style={styles.eventMinute}>{event.minute}′</Text>
-                  <Text style={styles.eventSymbol}>{eventSymbol(event)}</Text>
-                  <Text numberOfLines={2} style={styles.eventText}>{event.text}</Text>
-                </View>
-              )) : <Text style={styles.noEvent}>Aguardando o apito inicial…</Text>}
-            </View>
-
-            <View style={styles.compactStats}>
-              <Text style={styles.statLine}>Finalizações  {game.homeStats.shots} - {game.awayStats.shots}</Text>
-              <Text style={styles.statLine}>Escanteios  {game.homeStats.corners} - {game.awayStats.corners}</Text>
-              <Text style={styles.statLine}>Faltas  {game.homeStats.fouls} - {game.awayStats.fouls}</Text>
-            </View>
+          <View style={styles.featuredStats}>
+            <Text style={styles.featuredStat}>Finalizações {game.homeStats.shots} - {game.awayStats.shots}</Text>
+            <Text style={styles.featuredStat}>Escanteios {game.homeStats.corners} - {game.awayStats.corners}</Text>
+            <Text style={styles.featuredStat}>Faltas {game.homeStats.fouls} - {game.awayStats.fouls}</Text>
           </View>
         </View>
 
+        <Panel style={styles.allMatchesPanel}>
+          <View style={styles.allMatchesHeader}>
+            <Text style={styles.allMatchesTitle}>TODOS OS JOGOS DA RODADA</Text>
+            <Text style={styles.allMatchesClock}>{clock}</Text>
+          </View>
+
+          {roundMatches.map((item) => (
+            <View key={item.fixture.id} style={[styles.allMatchRow, item.isUser && styles.allMatchRowUser]}>
+              <Text numberOfLines={1} style={styles.allMatchClub}>{item.home?.name ?? 'Casa'}</Text>
+              <Text style={styles.allMatchScore}>{item.homeGoals}</Text>
+              <Text style={styles.allMatchDash}>×</Text>
+              <Text style={styles.allMatchScore}>{item.awayGoals}</Text>
+              <Text numberOfLines={1} style={[styles.allMatchClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
+            </View>
+          ))}
+        </Panel>
+
+        <Panel style={styles.commentaryPanel}>
+          <View style={styles.commentaryHeader}>
+            <Text style={styles.commentaryTitle}>LANCES DA PARTIDA</Text>
+            <Text style={styles.commentaryClock}>{game.minute}′</Text>
+          </View>
+          {recentEvents.length ? recentEvents.map((event) => (
+            <View key={event.id} style={styles.commentaryRow}>
+              <Text style={styles.commentaryMinute}>{event.minute}′</Text>
+              <Text style={styles.commentarySymbol}>{eventSymbol(event)}</Text>
+              <Text style={styles.commentaryText}>{event.text}</Text>
+            </View>
+          )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
+        </Panel>
+
+        <View style={styles.liveControls}>
+          <Pressable onPress={() => setAutoRunning((v) => !v)} style={styles.controlButton}>
+            <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
+            <Text style={styles.controlButtonText}>{autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
+          </Pressable>
+
+          <View style={styles.speedGroup}>
+            {[1, 2, 3].map((value) => (
+              <Pressable
+                key={value}
+                onPress={() => setSpeed(value as 1 | 2 | 3)}
+                style={[styles.speedButton, speed === value && styles.speedButtonActive]}
+              >
+                <Text style={[styles.speedText, speed === value && styles.speedTextActive]}>{value}x</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable onPress={() => router.push('/tactics')} style={styles.controlDark}>
+            <Text style={styles.controlDarkText}>TÁTICA</Text>
+          </Pressable>
+
+          <Pressable onPress={() => setShowSubs((v) => !v)} style={styles.controlDark}>
+            <Text style={styles.controlDarkText}>SUB {game.substitutionsUsed}/5</Text>
+          </Pressable>
+        </View>
         {showSubs ? (
           <Panel style={styles.subPanel}>
             <SectionLabel title={outgoing ? 'Entra no lugar de ' + outgoing.name : 'Escolha quem sai'} />
@@ -409,6 +394,47 @@ const styles = StyleSheet.create({
   roundClub: { flex: 1, minWidth: 0, color: '#f3f7cc', fontSize: 11, fontWeight: '800' },
   roundScore: { width: 52, textAlign: 'center', color: '#ffffff', fontSize: 15, fontWeight: '900' },
   halftimeActions: { gap: 8 },
+
+  liveTopCard: { borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#163a25', overflow: 'hidden' },
+  liveTopBar: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: '#0d2618' },
+  liveCompetition: { flex: 1, color: '#dce8df', fontSize: 8, fontWeight: '900' },
+  liveProgress: { width: 74, height: 8, borderWidth: 1, borderColor: '#94b46d', backgroundColor: '#e5eadb' },
+  liveProgressFill: { height: '100%', backgroundColor: '#78a438' },
+  livePeriod: { color: '#dce8df', fontSize: 8, fontWeight: '800' },
+
+  featuredMatch: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: '#1d4a2d' },
+  featuredTeam: { flex: 1, minWidth: 0 },
+  featuredTeamName: { color: '#f4f6d7', fontSize: 12, fontWeight: '900' },
+  featuredScore: { color: '#ffffff', fontSize: 28, fontWeight: '900', marginTop: 4 },
+  featuredCenter: { width: 74, alignItems: 'center' },
+  featuredClock: { color: '#ffe66a', fontSize: 18, fontWeight: '900' },
+  featuredVs: { color: '#dce8df', fontSize: 11, fontWeight: '900', marginTop: 1 },
+  featuredStatus: { color: '#b9c8be', fontSize: 7, fontWeight: '800', marginTop: 3 },
+
+  featuredStats: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: '#14351f', paddingHorizontal: 8 },
+  featuredStat: { color: '#cfddcf', fontSize: 7, fontWeight: '800' },
+
+  allMatchesPanel: { padding: 0, overflow: 'hidden', backgroundColor: '#153426', borderColor: '#315f3f' },
+  allMatchesHeader: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, backgroundColor: '#0d2618' },
+  allMatchesTitle: { color: '#dce8df', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  allMatchesClock: { color: '#79ef91', fontSize: 10, fontWeight: '900' },
+  allMatchRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  allMatchRowUser: { backgroundColor: '#225034' },
+  allMatchClub: { flex: 1, minWidth: 0, color: '#eef5ef', fontSize: 9, fontWeight: '800' },
+  allMatchScore: { width: 20, textAlign: 'center', color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  allMatchDash: { color: '#8ea595', fontSize: 9, fontWeight: '900' },
+
+  commentaryPanel: { padding: 0, overflow: 'hidden', backgroundColor: '#0b2117', borderColor: '#315f3f' },
+  commentaryHeader: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, backgroundColor: '#14351f' },
+  commentaryTitle: { color: '#dce8df', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  commentaryClock: { color: '#79ef91', fontSize: 10, fontWeight: '900' },
+  commentaryRow: { minHeight: 32, flexDirection: 'row', alignItems: 'flex-start', gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  commentaryMinute: { width: 24, color: '#ffe66a', fontSize: 8, fontWeight: '900' },
+  commentarySymbol: { width: 18, color: '#ffffff', fontSize: 9, textAlign: 'center' },
+  commentaryText: { flex: 1, color: '#dce8df', fontSize: 8, lineHeight: 12 },
+  commentaryEmpty: { color: '#8fa696', fontSize: 9, padding: 12 },
+
+  liveControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
   subPanel: { gap: 4 },
   finalPanel: { alignItems: 'center', gap: 6 },
