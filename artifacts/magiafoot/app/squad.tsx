@@ -335,6 +335,21 @@ export default function SquadScreen() {
                   </Panel>
 
                   <Panel style={styles.detailPanel}>
+                    <Text style={styles.sectionTitle}>ATRIBUTOS TÉCNICOS</Text>
+                    <View style={styles.statsGrid}>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.technique ?? selected.strength}</Text><Text style={styles.statLabel}>TÉCNICA</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.passing ?? selected.strength}</Text><Text style={styles.statLabel}>PASSE</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.shooting ?? selected.strength}</Text><Text style={styles.statLabel}>FINAL.</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.defending ?? selected.strength}</Text><Text style={styles.statLabel}>MARCAÇÃO</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.pace ?? selected.strength}</Text><Text style={styles.statLabel}>VELOC.</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.physical ?? selected.strength}</Text><Text style={styles.statLabel}>FÍSICO</Text></View>
+                    </View>
+                    {selected.position === 'GOL' ? (
+                      <View style={styles.detailRow}><Text style={styles.detailKey}>Defesa de goleiro</Text><Text style={styles.detailValue}>{selected.skills?.goalkeeping ?? selected.strength}</Text></View>
+                    ) : null}
+                  </Panel>
+
+                  <Panel style={styles.detailPanel}>
                     <Text style={styles.sectionTitle}>TREINO INDIVIDUAL</Text>
                     <View style={styles.choiceWrap}>
                       {(Object.keys(TRAINING_LABELS) as PlayerTrainingFocus[]).map((focus) => (
@@ -343,7 +358,7 @@ export default function SquadScreen() {
                         </Pressable>
                       ))}
                     </View>
-                    <Text style={styles.helperText}>Foco individual prepara a evolução futura do atleta. Jovens e jogadores abaixo do potencial tendem a responder melhor.</Text>
+                    <Text style={styles.helperText}>O foco escolhido direciona a evolução real do atributo correspondente. Jogadores jovens e abaixo do potencial evoluem com mais facilidade.</Text>
                   </Panel>
 
                   <Panel style={styles.detailPanel}>
