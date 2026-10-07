@@ -208,6 +208,8 @@ export interface Fixture {
   roundIndex: number;
   homeClubId: string;
   awayClubId: string;
+  competition?: 'league' | 'cup';
+  scheduledDate?: string;
 }
 
 export interface LeagueResult extends Fixture {
@@ -307,6 +309,7 @@ export interface Career {
   sponsorships: SponsorshipState;
   playerTransferOffers: PlayerTransferOffer[];
   results: LeagueResult[];
+  leagueFixtures: Fixture[];
   seasonHistory: SeasonHistoryEntry[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
