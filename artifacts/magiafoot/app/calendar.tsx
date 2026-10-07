@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { LEAGUE_FIXTURES, LEAGUE_ROUNDS, formatSeasonRoundDate, getCurrentFixture, seasonRoundDate, seasonYear } from '@/game/engine';
+import { LEAGUE_ROUNDS, fixtureDate, formatFixtureDate, getCurrentFixture, seasonYear } from '@/game/engine';
 import type { Fixture, LeagueResult } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -33,9 +33,9 @@ export default function CalendarScreen() {
 
   const clubFixtures = useMemo(() => {
     if (!career) return [];
-    return LEAGUE_FIXTURES
+    return (career.leagueFixtures ?? [])
       .filter((fixture) => fixture.homeClubId === career.clubId || fixture.awayClubId === career.clubId)
-      .sort((a, b) => a.roundIndex - b.roundIndex);
+      .sort((a, b) => fixtureDate(a, career.season).getTime() - fixtureDate(b, career.season).getTime());
   }, [career?.clubId]);
 
   const current = career ? getCurrentFixture(career) : undefined;
@@ -43,8 +43,8 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     if (!career) return;
-    const round = Math.min(Math.max(career.roundIndex, 0), Math.max(0, LEAGUE_ROUNDS - 1));
-    const month = seasonRoundDate(career.season, round).getUTCMonth();
+    const activeFixture = current ?? clubFixtures.find((fixture) => fixture.roundIndex >= career.roundIndex) ?? clubFixtures[0];
+    const month = activeFixture ? fixtureDate(activeFixture, career.season).getUTCMonth() : 2;
     setVisibleMonth(month);
     if (current) setSelectedFixtureId(current.id);
   }, [career?.season, career?.roundIndex, current?.id]);
@@ -53,7 +53,7 @@ export default function CalendarScreen() {
     if (!career) return new Map<number, Fixture>();
     const map = new Map<number, Fixture>();
     for (const fixture of clubFixtures) {
-      const date = seasonRoundDate(career.season, fixture.roundIndex);
+      const date = fixtureDate(fixture, career.season);
       if (date.getUTCMonth() === visibleMonth) map.set(date.getUTCDate(), fixture);
     }
     return map;
@@ -205,7 +205,7 @@ export default function CalendarScreen() {
               <View>
                 <Text style={styles.detailKicker}>RODADA {selectedFixture.roundIndex + 1} · {selectedIsHome ? 'CASA' : 'FORA'}</Text>
                 <Text style={styles.detailTitle}>{selectedOpponent?.name ?? 'Adversário'}</Text>
-                <Text style={styles.detailDate}>{formatSeasonRoundDate(career.season, selectedFixture.roundIndex)}</Text>
+                <Text style={styles.detailDate}>{formatFixtureDate(selectedFixture, career.season)}</Text>
               </View>
               <View style={[styles.detailType,{ backgroundColor: selectedIsHome ? HOME_COLOR : AWAY_COLOR }]}>
                 <Text style={[styles.detailTypeText,{ color: selectedIsHome ? '#07150D' : '#FFFFFF' }]}>{selectedIsHome ? 'C' : 'F'}</Text>
@@ -238,7 +238,7 @@ export default function CalendarScreen() {
             <Text style={styles.progressLabel}>TEMPORADA {year}</Text>
             <Text style={styles.progressValue}>Rodada {Math.min(career.roundIndex + 1, LEAGUE_ROUNDS)} de {LEAGUE_ROUNDS}</Text>
           </View>
-          <Text style={styles.progressMeta}>20 clubes · turno e returno</Text>
+          <Text style={styles.progressMeta}>Liga: sábados e domingos · Copas: quartas e quintas</Text>
         </Panel>
       </Screen>
     </>
