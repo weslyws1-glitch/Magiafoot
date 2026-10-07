@@ -324,6 +324,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     playerTransferOffers: [],
     results: [],
+    leagueFixtures: makeLeagueSchedule(1),
     seasonHistory: [],
     liveMatch: null,
     lastResult: null,
@@ -411,7 +412,10 @@ export function setCaptain(career: Career, playerId: string): Career {
 }
 
 export function getCurrentFixture(career: Career): Fixture | undefined {
-  return LEAGUE_FIXTURES.find((fixture) => fixture.roundIndex === career.roundIndex
+  const schedule = Array.isArray(career.leagueFixtures) && career.leagueFixtures.length
+    ? career.leagueFixtures
+    : makeLeagueSchedule(career.season);
+  return schedule.find((fixture) => fixture.roundIndex === career.roundIndex
     && (fixture.homeClubId === career.clubId || fixture.awayClubId === career.clubId));
 }
 
@@ -1506,6 +1510,7 @@ function advanceToNextSeason(career: Career): Career {
     benchIds,
     captainId: nextCaptain,
     results: [],
+    leagueFixtures: makeLeagueSchedule(completedSeason + 1),
     seasonHistory: [...(career.seasonHistory ?? []), historyEntry],
     liveMatch: null,
     playerTransferOffers: [],
@@ -1541,7 +1546,7 @@ function advanceToNextSeason(career: Career): Career {
 export function finalizeMatch(career: Career): Career {
   const game = career.liveMatch;
   if (!game || game.phase !== 'finished') return career;
-  const roundFixtures = LEAGUE_FIXTURES.filter((fixture) => fixture.roundIndex === game.fixture.roundIndex);
+  const roundFixtures = (career.leagueFixtures?.length ? career.leagueFixtures : makeLeagueSchedule(career.season)).filter((fixture) => fixture.roundIndex === game.fixture.roundIndex);
   const newResults: LeagueResult[] = roundFixtures.map((fixture) => {
     const isUserMatch = fixture.id === game.fixture.id;
     const home = getClub(fixture.homeClubId);
