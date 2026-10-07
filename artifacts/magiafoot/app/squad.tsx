@@ -50,6 +50,19 @@ const PERSONALITY_LABELS: Record<string,string> = {
   festeiro: 'Festeiro',
 };
 
+const POSITION_COLORS: Record<Player['position'], string> = {
+  GOL: '#F59E0B',
+  LD: '#38BDF8',
+  LE: '#38BDF8',
+  ZAG: '#1D4ED8',
+  VOL: '#047857',
+  MC: '#22C55E',
+  MEI: '#86EFAC',
+  PE: '#FB7185',
+  PD: '#FB7185',
+  ATA: '#B91C1C',
+};
+
 const POSITION_BADGE_COLORS: Record<Position,{ background: string; text: string; border: string }> = {
   GOL: { background: '#F59E0B', text: '#101010', border: '#FDBA2D' },
   LD: { background: '#38BDF8', text: '#07131A', border: '#7DD3FC' },
