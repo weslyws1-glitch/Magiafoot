@@ -58,6 +58,16 @@ export interface PlayerTransferOffer {
   expiresRound: number;
 }
 
+export interface PlayerSkills {
+  technique: number;
+  passing: number;
+  shooting: number;
+  defending: number;
+  pace: number;
+  physical: number;
+  goalkeeping: number;
+}
+
 export interface AdministrativeProfessional {
   id: string;
   name: string;
@@ -136,6 +146,7 @@ export interface Player {
   wage: number;
   shirtNumber?: number;
   potential?: number;
+  skills?: PlayerSkills;
   secondaryPositions?: Position[];
   personality?: PlayerPersonality;
   squadRole?: PlayerSquadRole;
