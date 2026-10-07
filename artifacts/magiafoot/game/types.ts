@@ -216,6 +216,17 @@ export interface LeagueResult extends Fixture {
   attendance: number;
 }
 
+export interface SeasonHistoryEntry {
+  season: number;
+  year: number;
+  finalPosition: number;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  championClubId: string;
+}
+
 export interface MatchStats {
   shots: number;
   saves: number;
@@ -296,6 +307,7 @@ export interface Career {
   sponsorships: SponsorshipState;
   playerTransferOffers: PlayerTransferOffer[];
   results: LeagueResult[];
+  seasonHistory: SeasonHistoryEntry[];
   liveMatch: MatchSession | null;
   lastResult: LeagueResult | null;
   lastNews: string;
