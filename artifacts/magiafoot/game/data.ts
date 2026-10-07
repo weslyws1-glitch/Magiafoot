@@ -11,6 +11,12 @@ export const CLUBS: Club[] = [
   { id: 'candeia-fc', name: 'Candeia FC', city: 'Vila Candeia', initials: 'CF', rating: 69, color: '#836252', balance: 1_720_000, stadiumCapacity: 16_200, ticketPrice: 35 },
   { id: 'pedra-alta', name: 'Pedra Alta AC', city: 'Campos de Pedra', initials: 'PA', rating: 64, color: '#78736c', balance: 1_300_000, stadiumCapacity: 11_800, ticketPrice: 30 },
   { id: 'ventania-esporte', name: 'Ventania Esporte', city: 'Vale dos Ventos', initials: 'VE', rating: 67, color: '#667844', balance: 1_480_000, stadiumCapacity: 12_600, ticketPrice: 32 },
+  { id: 'imperial-rio', name: 'Imperial Rio', city: 'Rio Imperial', initials: 'IR', rating: 72, color: '#7a2f45', balance: 2250000, stadiumCapacity: 19600, ticketPrice: 41 },
+  { id: 'uniao-carioca', name: 'União Carioca', city: 'Santa Marina', initials: 'UC', rating: 70, color: '#315c8c', balance: 1980000, stadiumCapacity: 17800, ticketPrice: 39 },
+  { id: 'ferro-norte', name: 'Ferro Norte', city: 'Vila Ferro', initials: 'FN', rating: 66, color: '#5d5d63', balance: 1520000, stadiumCapacity: 13900, ticketPrice: 33 },
+  { id: 'atletico-cerrado', name: 'Atlético Cerrado', city: 'Campo Dourado', initials: 'AC', rating: 69, color: '#8a6532', balance: 1780000, stadiumCapacity: 16700, ticketPrice: 35 },
+  { id: 'real-pampas', name: 'Real dos Pampas', city: 'Estância Real', initials: 'RP', rating: 71, color: '#4b6d50', balance: 2050000, stadiumCapacity: 18900, ticketPrice: 39 },
+  { id: 'porto-verde', name: 'Porto Verde', city: 'Porto Verde', initials: 'PV', rating: 65, color: '#2f7056', balance: 1420000, stadiumCapacity: 12800, ticketPrice: 32 },
 ];
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
