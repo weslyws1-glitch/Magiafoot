@@ -17,6 +17,12 @@ export const CLUBS: Club[] = [
   { id: 'atletico-cerrado', name: 'Atlético Cerrado', city: 'Campo Dourado', initials: 'AC', rating: 69, color: '#8a6532', balance: 1780000, stadiumCapacity: 16700, ticketPrice: 35 },
   { id: 'real-pampas', name: 'Real dos Pampas', city: 'Estância Real', initials: 'RP', rating: 71, color: '#4b6d50', balance: 2050000, stadiumCapacity: 18900, ticketPrice: 39 },
   { id: 'porto-verde', name: 'Porto Verde', city: 'Porto Verde', initials: 'PV', rating: 65, color: '#2f7056', balance: 1420000, stadiumCapacity: 12800, ticketPrice: 32 },
+  { id: 'serra-branca', name: 'Serra Branca', city: 'Alto da Serra', initials: 'SB', rating: 68, color: '#d9d9d1', balance: 1690000, stadiumCapacity: 15100, ticketPrice: 34 },
+  { id: 'guara-central', name: 'Guará Central', city: 'Nova Central', initials: 'GC', rating: 67, color: '#a83f2f', balance: 1610000, stadiumCapacity: 14500, ticketPrice: 34 },
+  { id: 'vila-oeste', name: 'Vila Oeste', city: 'Oeste Novo', initials: 'VO', rating: 64, color: '#704f94', balance: 1260000, stadiumCapacity: 11900, ticketPrice: 30 },
+  { id: 'rio-dourado', name: 'Rio Dourado', city: 'Dourado das Águas', initials: 'RD', rating: 70, color: '#b58c2d', balance: 1920000, stadiumCapacity: 17200, ticketPrice: 37 },
+  { id: 'montanha-fc', name: 'Montanha FC', city: 'Monte Azul', initials: 'MF', rating: 66, color: '#3f5575', balance: 1470000, stadiumCapacity: 13300, ticketPrice: 32 },
+  { id: 'estacao-1912', name: 'Estação 1912', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
 ];
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
