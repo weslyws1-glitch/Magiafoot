@@ -52,6 +52,31 @@ function makeLeagueSchedule(): Fixture[] {
 export const LEAGUE_FIXTURES = makeLeagueSchedule();
 export const LEAGUE_ROUNDS = CLUBS.length * 2 - 2;
 
+export function seasonYear(season: number): number {
+  return 2026 + Math.max(0, season - 1);
+}
+
+export function seasonRoundDate(season: number, roundIndex: number): Date {
+  const year = seasonYear(season);
+  const start = new Date(Date.UTC(year, 2, 1));
+  const day = start.getUTCDay();
+  const firstSundayOffset = (7 - day) % 7;
+  const firstRound = new Date(Date.UTC(year, 2, 1 + firstSundayOffset));
+  const date = new Date(firstRound);
+  date.setUTCDate(firstRound.getUTCDate() + Math.max(0, roundIndex) * 7);
+  return date;
+}
+
+export function formatSeasonRoundDate(season: number, roundIndex: number): string {
+  return seasonRoundDate(season, roundIndex).toLocaleDateString('pt-BR', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 function assignSquadNumbers(players: Player[]): Player[] {
   const used = new Set<number>();
   return players.map((player, index) => {
@@ -195,6 +220,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     playerTransferOffers: [],
     results: [],
+    seasonHistory: [],
     liveMatch: null,
     lastResult: null,
     lastNews: 'A diretoria deseja uma temporada competitiva. O primeiro passo é entrar em campo.',
