@@ -75,7 +75,8 @@ export default function CalendarScreen() {
 
   const firstWeekday = new Date(Date.UTC(year, visibleMonth, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(year, visibleMonth + 1, 0)).getUTCDate();
-  const cells = Array.from({ length: 42 }, (_, index) => {
+  const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+  const cells = Array.from({ length: totalCells }, (_, index) => {
     const day = index - firstWeekday + 1;
     return day >= 1 && day <= daysInMonth ? day : null;
   });
