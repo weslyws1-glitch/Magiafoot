@@ -79,6 +79,41 @@ function assignSquadNumbers(players: Player[]): Player[] {
   });
 }
 
+function defaultPlayerSkills(player: Player) {
+  const seed = hash('skills-' + player.id);
+  const jitter = (shift: number) => ((seed >> shift) % 9) - 4;
+  const base = player.strength;
+  const clampSkill = (value: number) => clamp(Math.round(value), 20, 99);
+  const goalkeeper = player.position === 'GOL';
+
+  return {
+    technique: clampSkill(base + (goalkeeper ? -18 : jitter(1))),
+    passing: clampSkill(base + (goalkeeper ? -14 : jitter(4))),
+    shooting: clampSkill(base + (['ATA','PE','PD','MEI'].includes(player.position) ? 4 : ['ZAG','GOL'].includes(player.position) ? -14 : -3) + jitter(7)),
+    defending: clampSkill(base + (['ZAG','LD','LE','VOL'].includes(player.position) ? 5 : ['ATA','PE','PD','GOL'].includes(player.position) ? -15 : -4) + jitter(10)),
+    pace: clampSkill(base + (['PE','PD','LD','LE','ATA'].includes(player.position) ? 4 : goalkeeper ? -10 : 0) + jitter(13)),
+    physical: clampSkill(base + (['ZAG','VOL','ATA'].includes(player.position) ? 4 : 0) + jitter(16)),
+    goalkeeping: clampSkill(goalkeeper ? base + 6 + jitter(19) : 20 + Math.abs(jitter(19))),
+  };
+}
+
+function positionalSkillOverall(player: Player): number {
+  const s = player.skills ?? defaultPlayerSkills(player);
+  switch (player.position) {
+    case 'GOL': return s.goalkeeping * 0.68 + s.passing * 0.10 + s.physical * 0.12 + s.technique * 0.10;
+    case 'ZAG': return s.defending * 0.42 + s.physical * 0.22 + s.passing * 0.12 + s.technique * 0.12 + s.pace * 0.12;
+    case 'LD':
+    case 'LE': return s.defending * 0.28 + s.pace * 0.24 + s.passing * 0.18 + s.physical * 0.15 + s.technique * 0.15;
+    case 'VOL': return s.defending * 0.28 + s.passing * 0.24 + s.physical * 0.18 + s.technique * 0.18 + s.pace * 0.12;
+    case 'MC': return s.passing * 0.30 + s.technique * 0.25 + s.physical * 0.14 + s.defending * 0.13 + s.shooting * 0.10 + s.pace * 0.08;
+    case 'MEI': return s.technique * 0.29 + s.passing * 0.28 + s.shooting * 0.18 + s.pace * 0.12 + s.physical * 0.08 + s.defending * 0.05;
+    case 'PE':
+    case 'PD': return s.pace * 0.26 + s.technique * 0.25 + s.shooting * 0.19 + s.passing * 0.16 + s.physical * 0.09 + s.defending * 0.05;
+    case 'ATA': return s.shooting * 0.34 + s.physical * 0.20 + s.technique * 0.18 + s.pace * 0.15 + s.passing * 0.08 + s.defending * 0.05;
+    default: return player.strength;
+  }
+}
+
 function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 0): Player {
   const seed = hash(player.id + '-' + player.name);
   const personalities = ['profissional','lider','ambicioso','tranquilo','temperamental','festeiro'] as const;
@@ -95,6 +130,7 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
   return {
     ...player,
     potential: player.potential ?? clamp(player.strength + (player.age <= 21 ? 8 + (seed % 8) : player.age <= 25 ? 4 + (seed % 5) : 1 + (seed % 3)), player.strength, 95),
+    skills: player.skills ?? defaultPlayerSkills(player),
     secondaryPositions: player.secondaryPositions ?? (secondaryByPosition[player.position] ?? []).slice(0, 1 + (seed % 2)),
     personality: player.personality ?? personalities[seed % personalities.length],
     squadRole: player.squadRole ?? role,
@@ -190,7 +226,8 @@ export function effectiveStrength(player: Player, position: Position = player.po
   const fitnessFactor = 0.64 + clamp(player.fitness, 0, 100) * 0.0036;
   const moraleFactor = 0.88 + clamp(player.morale, 0, 100) * 0.0024;
   const statusFactor = player.status === 'available' ? 1 : 0;
-  return Math.round(player.strength * fitnessFactor * moraleFactor * positionFitMultiplier(player.position, position) * statusFactor);
+  const technicalOverall = positionalSkillOverall(player);
+  return Math.round(technicalOverall * fitnessFactor * moraleFactor * positionFitMultiplier(player.position, position) * statusFactor);
 }
 
 export function assignPlayerToSlot(career: Career, slotId: string, playerId: string): Career {
@@ -1337,7 +1374,22 @@ export function finalizeMatch(career: Career): Career {
     const developmentChance = canDevelop ? Math.min(0.32, 0.035 + trainingLevel * 0.014 + (player.age <= 21 ? 0.08 : player.age <= 25 ? 0.035 : 0)) : 0;
     const seedRoll = (hash(player.id + '-' + career.season + '-' + career.roundIndex) % 1000) / 1000;
     const strengthGain = seedRoll < developmentChance ? 1 : 0;
-    const nextStrength = clamp(player.strength + strengthGain, 1, player.potential ?? 95);
+    let nextSkills = { ...(player.skills ?? defaultPlayerSkills(player)) };
+    if (strengthGain > 0) {
+      const focus = player.trainingFocus ?? 'equilibrado';
+      const key =
+        focus === 'fisico' ? 'physical' :
+        focus === 'tecnica' ? 'technique' :
+        focus === 'finalizacao' ? 'shooting' :
+        focus === 'passe' ? 'passing' :
+        focus === 'marcacao' ? 'defending' :
+        (['ATA','PE','PD'].includes(player.position) ? 'shooting' :
+          ['ZAG','LD','LE','VOL'].includes(player.position) ? 'defending' :
+          player.position === 'GOL' ? 'goalkeeping' : 'technique');
+      nextSkills = { ...nextSkills, [key]: clamp(nextSkills[key as keyof typeof nextSkills] + 1, 20, 99) };
+    }
+    const skillOverall = positionalSkillOverall({ ...player, skills: nextSkills });
+    const nextStrength = clamp(Math.round(skillOverall), 1, player.potential ?? 95);
     const formValueFactor = appeared ? (rating - 6) * 0.025 : -0.005;
     const ageValueFactor = player.age <= 23 ? 0.008 : player.age >= 31 ? -0.012 : 0;
     const nextValue = Math.max(50000, Math.round(player.value * (1 + formValueFactor + ageValueFactor)));
@@ -1345,6 +1397,7 @@ export function finalizeMatch(career: Career): Career {
     return {
       ...player,
       strength: nextStrength,
+      skills: nextSkills,
       value: nextValue,
       morale: clamp(player.morale + moraleDelta + promiseDelta, 10, 100),
       playingTimeSatisfaction: clamp((player.playingTimeSatisfaction ?? 70) + playingDelta + promiseDelta, 0, 100),
