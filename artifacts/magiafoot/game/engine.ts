@@ -1728,6 +1728,83 @@ export function getCurrentLeaguePosition(career: Career): number {
   return calculateStandings(career.results).findIndex((row) => row.club.id === career.clubId) + 1;
 }
 
+function migrateLeagueScheduleForCareer(parsed: Partial<Career>): Fixture[] {
+  const season = parsed.season ?? 1;
+  const currentRound = parsed.roundIndex ?? 0;
+  const generated = makeLeagueSchedule(season);
+  const generatedById = new Map(generated.map((fixture) => [fixture.id, fixture]));
+  const saved = Array.isArray((parsed as Career).leagueFixtures) && (parsed as Career).leagueFixtures.length
+    ? (parsed as Career).leagueFixtures
+    : generated;
+
+  let schedule = saved.map((fixture) => {
+    const fallback = generatedById.get(fixture.id);
+    return {
+      ...fallback,
+      ...fixture,
+      competition: fixture.competition ?? 'league' as const,
+      scheduledDate: fixture.scheduledDate ?? fallback?.scheduledDate,
+    };
+  });
+
+  const resultById = new Map((parsed.results ?? []).map((result) => [result.id, result]));
+  schedule = schedule.map((fixture) => {
+    const result = resultById.get(fixture.id);
+    if (!result) return fixture;
+    return {
+      ...fixture,
+      homeClubId: result.homeClubId,
+      awayClubId: result.awayClubId,
+    };
+  });
+
+  const liveFixture = (parsed as Career).liveMatch?.fixture;
+  if (liveFixture) {
+    schedule = schedule.map((fixture) => fixture.id === liveFixture.id
+      ? {
+          ...fixture,
+          homeClubId: liveFixture.homeClubId,
+          awayClubId: liveFixture.awayClubId,
+        }
+      : fixture);
+  }
+
+  const clubId = parsed.clubId;
+  if (!clubId) return schedule;
+
+  const completedVenues = (parsed.results ?? [])
+    .filter((result) => result.homeClubId === clubId || result.awayClubId === clubId)
+    .sort((a, b) => a.roundIndex - b.roundIndex)
+    .map((result) => result.homeClubId === clubId ? 'H' as const : 'A' as const);
+
+  const venues: Array<'H' | 'A'> = [...completedVenues];
+  for (let roundIndex = currentRound; roundIndex < LEAGUE_ROUNDS; roundIndex += 1) {
+    const fixtureIndex = schedule.findIndex((fixture) =>
+      fixture.roundIndex === roundIndex
+      && (fixture.homeClubId === clubId || fixture.awayClubId === clubId));
+    if (fixtureIndex < 0) continue;
+
+    const fixture = schedule[fixtureIndex]!;
+    const venue: 'H' | 'A' = fixture.homeClubId === clubId ? 'H' : 'A';
+    const last = venues[venues.length - 1];
+    const previous = venues[venues.length - 2];
+    const wouldMakeThree = last === venue && previous === venue;
+
+    if (wouldMakeThree && fixture.id !== liveFixture?.id) {
+      schedule[fixtureIndex] = {
+        ...fixture,
+        homeClubId: fixture.awayClubId,
+        awayClubId: fixture.homeClubId,
+      };
+      venues.push(venue === 'H' ? 'A' : 'H');
+    } else {
+      venues.push(venue);
+    }
+  }
+
+  return schedule;
+}
+
 export function serializeCareer(career: Career): string {
   return JSON.stringify(career);
 }
@@ -1787,6 +1864,7 @@ export function parseCareer(saved: string | null): Career | null {
           renewalOffered: typeof contract.renewalOffered === 'boolean' ? contract.renewalOffered : false,
         }))
       : [];
+    const migratedLeagueFixtures = migrateLeagueScheduleForCareer(parsed);
     const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
@@ -1832,6 +1910,7 @@ export function parseCareer(saved: string | null): Career | null {
       },
       playerTransferOffers: Array.isArray((parsed as Career).playerTransferOffers) ? (parsed as Career).playerTransferOffers : [],
       seasonHistory: Array.isArray((parsed as Career).seasonHistory) ? (parsed as Career).seasonHistory : [],
+      leagueFixtures: migratedLeagueFixtures,
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
