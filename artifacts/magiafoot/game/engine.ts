@@ -181,6 +181,49 @@ export function cupMidweekDate(season: number, leagueRoundIndex: number, slotSee
   return date;
 }
 
+function balanceClubVenueSequence(
+  schedule: Fixture[],
+  clubId: string,
+  startRound = 0,
+  completedVenues: Array<'H' | 'A'> = [],
+  protectedFixtureId?: string,
+): Fixture[] {
+  const pattern: Array<'H' | 'A'> = ['H','A','A','H','A','H','H','A'];
+  const offset = hash('venue-' + clubId) % pattern.length;
+  const venues: Array<'H' | 'A'> = [...completedVenues];
+  const nextSchedule = schedule.map((fixture) => ({ ...fixture }));
+
+  for (let roundIndex = startRound; roundIndex < LEAGUE_ROUNDS; roundIndex += 1) {
+    const fixtureIndex = nextSchedule.findIndex((fixture) =>
+      fixture.roundIndex === roundIndex
+      && (fixture.homeClubId === clubId || fixture.awayClubId === clubId)
+    );
+    if (fixtureIndex < 0) continue;
+
+    const fixture = nextSchedule[fixtureIndex]!;
+    const currentVenue: 'H' | 'A' = fixture.homeClubId === clubId ? 'H' : 'A';
+    let desired = pattern[(roundIndex + offset) % pattern.length]!;
+    const last = venues[venues.length - 1];
+    const previous = venues[venues.length - 2];
+
+    if (last === desired && previous === desired) desired = desired === 'H' ? 'A' : 'H';
+    if (last === desired && roundIndex % 3 === 0) desired = desired === 'H' ? 'A' : 'H';
+
+    if (fixture.id !== protectedFixtureId && currentVenue !== desired) {
+      nextSchedule[fixtureIndex] = {
+        ...fixture,
+        homeClubId: fixture.awayClubId,
+        awayClubId: fixture.homeClubId,
+      };
+      venues.push(desired);
+    } else {
+      venues.push(currentVenue);
+    }
+  }
+
+  return nextSchedule;
+}
+
 function assignSquadNumbers(players: Player[]): Player[] {
   const used = new Set<number>();
   return players.map((player, index) => {
@@ -324,7 +367,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     playerTransferOffers: [],
     results: [],
-    leagueFixtures: makeLeagueSchedule(1),
+    leagueFixtures: balanceClubVenueSequence(makeLeagueSchedule(1), clubId),
     seasonHistory: [],
     liveMatch: null,
     lastResult: null,
@@ -1510,7 +1553,7 @@ function advanceToNextSeason(career: Career): Career {
     benchIds,
     captainId: nextCaptain,
     results: [],
-    leagueFixtures: makeLeagueSchedule(completedSeason + 1),
+    leagueFixtures: balanceClubVenueSequence(makeLeagueSchedule(completedSeason + 1), career.clubId),
     seasonHistory: [...(career.seasonHistory ?? []), historyEntry],
     liveMatch: null,
     playerTransferOffers: [],
@@ -1777,32 +1820,13 @@ function migrateLeagueScheduleForCareer(parsed: Partial<Career>): Fixture[] {
     .sort((a, b) => a.roundIndex - b.roundIndex)
     .map((result) => result.homeClubId === clubId ? 'H' as const : 'A' as const);
 
-  const venues: Array<'H' | 'A'> = [...completedVenues];
-  for (let roundIndex = currentRound; roundIndex < LEAGUE_ROUNDS; roundIndex += 1) {
-    const fixtureIndex = schedule.findIndex((fixture) =>
-      fixture.roundIndex === roundIndex
-      && (fixture.homeClubId === clubId || fixture.awayClubId === clubId));
-    if (fixtureIndex < 0) continue;
-
-    const fixture = schedule[fixtureIndex]!;
-    const venue: 'H' | 'A' = fixture.homeClubId === clubId ? 'H' : 'A';
-    const last = venues[venues.length - 1];
-    const previous = venues[venues.length - 2];
-    const wouldMakeThree = last === venue && previous === venue;
-
-    if (wouldMakeThree && fixture.id !== liveFixture?.id) {
-      schedule[fixtureIndex] = {
-        ...fixture,
-        homeClubId: fixture.awayClubId,
-        awayClubId: fixture.homeClubId,
-      };
-      venues.push(venue === 'H' ? 'A' : 'H');
-    } else {
-      venues.push(venue);
-    }
-  }
-
-  return schedule;
+  return balanceClubVenueSequence(
+    schedule,
+    clubId,
+    currentRound,
+    completedVenues,
+    liveFixture?.id,
+  );
 }
 
 export function serializeCareer(career: Career): string {
