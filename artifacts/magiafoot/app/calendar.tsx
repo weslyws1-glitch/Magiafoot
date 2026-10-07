@@ -36,7 +36,7 @@ export default function CalendarScreen() {
     return (career.leagueFixtures ?? [])
       .filter((fixture) => fixture.homeClubId === career.clubId || fixture.awayClubId === career.clubId)
       .sort((a, b) => fixtureDate(a, career.season).getTime() - fixtureDate(b, career.season).getTime());
-  }, [career?.clubId]);
+  }, [career?.clubId, career?.leagueFixtures, career?.season]);
 
   const current = career ? getCurrentFixture(career) : undefined;
   const year = career ? seasonYear(career.season) : 2026;
