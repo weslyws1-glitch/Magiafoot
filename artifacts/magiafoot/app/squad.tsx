@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { effectiveStrength, formatCurrency, getRosterGroups } from '@/game/engine';
-import type { Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus } from '@/game/types';
+import type { Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, Position } from '@/game/types';
 
 type TabKey = 'plantel' | 'contratos' | 'desempenho' | 'treino' | 'mercado';
 
@@ -50,6 +50,19 @@ const PERSONALITY_LABELS: Record<string,string> = {
   festeiro: 'Festeiro',
 };
 
+const POSITION_BADGE_COLORS: Record<Position,{ background: string; text: string; border: string }> = {
+  GOL: { background: '#F59E0B', text: '#101010', border: '#FDBA2D' },
+  LD: { background: '#38BDF8', text: '#07131A', border: '#7DD3FC' },
+  LE: { background: '#38BDF8', text: '#07131A', border: '#7DD3FC' },
+  ZAG: { background: '#1D4ED8', text: '#F8FAFC', border: '#3B82F6' },
+  VOL: { background: '#047857', text: '#F0FDF4', border: '#10B981' },
+  MC: { background: '#22C55E', text: '#052E16', border: '#4ADE80' },
+  MEI: { background: '#86EFAC', text: '#052E16', border: '#BBF7D0' },
+  PE: { background: '#FB7185', text: '#3F0712', border: '#FDA4AF' },
+  PD: { background: '#FB7185', text: '#3F0712', border: '#FDA4AF' },
+  ATA: { background: '#B91C1C', text: '#FFF7ED', border: '#EF4444' },
+};
+
 function averageRating(player: Player) {
   const stats = player.seasonStats;
   if (!stats || !stats.ratedMatches) return '—';
@@ -72,7 +85,9 @@ function PlayerRow({ player, careerRound, onPress }: { player: Player; careerRou
   const stats = player.seasonStats;
   return (
     <Pressable onPress={onPress} style={styles.playerRow}>
-      <View style={styles.positionBadge}><Text style={styles.positionText}>{player.position}</Text></View>
+      <View style={[styles.positionBadge,{ backgroundColor: POSITION_BADGE_COLORS[player.position].background, borderColor: POSITION_BADGE_COLORS[player.position].border }]}>
+        <Text style={[styles.positionText,{ color: POSITION_BADGE_COLORS[player.position].text }]}>{player.position}</Text>
+      </View>
       <View style={styles.playerMain}>
         <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
         <Text style={styles.playerSub} numberOfLines={1}>
@@ -228,7 +243,11 @@ export default function SquadScreen() {
               const quality = effectiveStrength(player);
               return (
                 <Pressable key={player.id} onPress={() => setSelectedId(player.id)} style={styles.tableRow}>
-                  <View style={styles.colPos}><Text style={styles.posCell}>{player.position}</Text></View>
+                  <View style={styles.colPos}>
+                    <View style={[styles.compactPositionBadge,{ backgroundColor: POSITION_BADGE_COLORS[player.position].background, borderColor: POSITION_BADGE_COLORS[player.position].border }]}>
+                      <Text style={[styles.posCell,{ color: POSITION_BADGE_COLORS[player.position].text }]}>{player.position}</Text>
+                    </View>
+                  </View>
                   <Text style={[styles.cell,styles.colNum]}>{player.shirtNumber ?? '—'}</Text>
                   <View style={styles.colName}>
                     <Text numberOfLines={1} style={styles.nameCell}>{player.name}</Text>
@@ -250,7 +269,9 @@ export default function SquadScreen() {
           <Panel style={styles.listPanel}>
             {visible.map((player) => (
               <Pressable key={player.id} onPress={() => setSelectedId(player.id)} style={styles.playerRow}>
-                <View style={styles.positionBadge}><Text style={styles.positionText}>{player.position}</Text></View>
+                <View style={[styles.positionBadge,{ backgroundColor: POSITION_BADGE_COLORS[player.position].background, borderColor: POSITION_BADGE_COLORS[player.position].border }]}>
+                  <Text style={[styles.positionText,{ color: POSITION_BADGE_COLORS[player.position].text }]}>{player.position}</Text>
+                </View>
                 <View style={styles.playerMain}>
                   <Text style={styles.playerName}>{player.name}</Text>
                   <Text style={styles.playerSub}>
@@ -279,7 +300,9 @@ export default function SquadScreen() {
             {selected ? (
               <>
                 <View style={styles.modalHeader}>
-                  <View style={styles.playerAvatar}><Text style={styles.playerAvatarText}>{selected.position}</Text></View>
+                  <View style={[styles.playerAvatar,{ backgroundColor: POSITION_BADGE_COLORS[selected.position].background, borderColor: POSITION_BADGE_COLORS[selected.position].border }]}>
+                    <Text style={[styles.playerAvatarText,{ color: POSITION_BADGE_COLORS[selected.position].text }]}>{selected.position}</Text>
+                  </View>
                   <View style={styles.modalIdentity}>
                     <Text style={styles.modalName}>{selected.name}</Text>
                     <Text style={styles.modalMeta}>{selected.age} anos · {ROLE_LABELS[selected.squadRole ?? 'rotacao']} · {PERSONALITY_LABELS[selected.personality ?? 'tranquilo']}{selected.status === 'loaned' ? ' · Emprestado' : ''}</Text>
@@ -455,13 +478,14 @@ const styles=StyleSheet.create({
   tableRow:{minHeight:54,paddingHorizontal:6,flexDirection:'row',alignItems:'center',borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:'#214231'},
   th:{color:'#79ef91',fontSize:6.5,fontWeight:'900',letterSpacing:0.4},
   cell:{color:'#dfe8e2',fontSize:8,fontWeight:'800',textAlign:'center'},
-  colPos:{width:40},
+  colPos:{width:40,alignItems:'flex-start',justifyContent:'center'},
+  compactPositionBadge:{width:34,height:28,borderRadius:6,alignItems:'center',justifyContent:'center',borderWidth:1},
   colNum:{width:28,textAlign:'center'},
   colName:{flex:1,minWidth:0,paddingRight:5},
   colCond:{width:60,alignItems:'center'},
   colQuality:{width:42,textAlign:'center'},
   colMorale:{width:42,textAlign:'center'},
-  posCell:{color:'#dfe8e2',fontSize:8,fontWeight:'900'},
+  posCell:{fontSize:8,fontWeight:'900'},
   nameCell:{color:'#f6f8f6',fontSize:8.5,fontWeight:'900'},
   nameSub:{color:'#718579',fontSize:5.8,marginTop:2},
   conditionTrack:{width:46,height:7,borderRadius:99,backgroundColor:'#1d2c23',overflow:'hidden',borderWidth:1,borderColor:'#31493a'},
@@ -471,7 +495,7 @@ const styles=StyleSheet.create({
   moraleCell:{color:'#f1d36c',fontSize:9,fontWeight:'900'},
   playerRow:{minHeight:64,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:9,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:'#214231'},
   positionBadge:{width:38,height:38,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:'#153426',borderWidth:1,borderColor:'#355846'},
-  positionText:{color:'#79ef91',fontSize:8,fontWeight:'900'},
+  positionText:{fontSize:8,fontWeight:'900'},
   playerMain:{flex:1,minWidth:0},
   playerName:{color:'#f6f8f6',fontSize:11,fontWeight:'900'},
   playerSub:{color:'#84998b',fontSize:7.3,marginTop:3},
@@ -483,7 +507,7 @@ const styles=StyleSheet.create({
   modalSheet:{height:'92%',backgroundColor:'#091910',borderTopLeftRadius:22,borderTopRightRadius:22,borderWidth:1,borderColor:'#345642'},
   modalHeader:{flexDirection:'row',alignItems:'center',gap:10,padding:14,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:'#294536'},
   playerAvatar:{width:48,height:48,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:'#153426',borderWidth:1,borderColor:'#397452'},
-  playerAvatarText:{color:'#79ef91',fontSize:11,fontWeight:'900'},
+  playerAvatarText:{fontSize:11,fontWeight:'900'},
   modalIdentity:{flex:1,minWidth:0},
   modalName:{color:'#f5f7f5',fontSize:18,fontWeight:'900'},
   modalMeta:{color:'#91a697',fontSize:8,marginTop:3},
