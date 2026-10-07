@@ -80,6 +80,9 @@ export default function CalendarScreen() {
     const day = index - firstWeekday + 1;
     return day >= 1 && day <= daysInMonth ? day : null;
   });
+  const weeks = Array.from({ length: totalCells / 7 }, (_, weekIndex) =>
+    cells.slice(weekIndex * 7, weekIndex * 7 + 7)
+  );
 
   const goPreviousMonth = () => setVisibleMonth((month) => Math.max(0, month - 1));
   const goNextMonth = () => setVisibleMonth((month) => Math.min(11, month + 1));
@@ -131,61 +134,65 @@ export default function CalendarScreen() {
           </View>
 
           <View style={styles.calendarGrid}>
-            {cells.map((day, index) => {
-              if (!day) return <View key={'empty-' + index} style={[styles.dayCell, styles.dayCellBlank]} />;
+            {weeks.map((week, weekIndex) => (
+              <View key={'week-' + weekIndex} style={styles.weekRow}>
+                {week.map((day, dayIndex) => {
+                  if (!day) return <View key={'empty-' + dayIndex} style={[styles.dayCell, styles.dayCellBlank]} />;
 
-              const fixture = monthFixtures.get(day);
-              const result = fixture ? resultMap.get(fixture.id) : undefined;
-              const isHome = fixture?.homeClubId === career.clubId;
-              const opponent = fixture ? getClub(isHome ? fixture.awayClubId : fixture.homeClubId) : undefined;
-              const isCurrent = fixture?.roundIndex === career.roundIndex;
-              const isSelected = fixture?.id === selectedFixtureId;
-              const outcome = result ? resultForUser(result, career.clubId) : undefined;
-              const backgroundColor = fixture ? (isHome ? HOME_COLOR : AWAY_COLOR) : EMPTY_COLOR;
-              const lightText = Boolean(fixture && !isHome);
+                  const fixture = monthFixtures.get(day);
+                  const result = fixture ? resultMap.get(fixture.id) : undefined;
+                  const isHome = fixture?.homeClubId === career.clubId;
+                  const opponent = fixture ? getClub(isHome ? fixture.awayClubId : fixture.homeClubId) : undefined;
+                  const isCurrent = fixture?.roundIndex === career.roundIndex;
+                  const isSelected = fixture?.id === selectedFixtureId;
+                  const outcome = result ? resultForUser(result, career.clubId) : undefined;
+                  const backgroundColor = fixture ? (isHome ? HOME_COLOR : AWAY_COLOR) : EMPTY_COLOR;
+                  const lightText = Boolean(fixture && !isHome);
 
-              return (
-                <Pressable
-                  key={day}
-                  onPress={() => fixture && setSelectedFixtureId(fixture.id)}
-                  disabled={!fixture}
-                  style={[
-                    styles.dayCell,
-                    { backgroundColor },
-                    fixture && styles.dayCellGame,
-                    isCurrent && styles.dayCellCurrent,
-                    isSelected && styles.dayCellSelected,
-                  ]}
-                >
-                  <Text style={[styles.dayNumber, fixture && { color: lightText ? '#FFFFFF' : '#07150D' }]}>{day}</Text>
+                  return (
+                    <Pressable
+                      key={day}
+                      onPress={() => fixture && setSelectedFixtureId(fixture.id)}
+                      disabled={!fixture}
+                      style={[
+                        styles.dayCell,
+                        { backgroundColor },
+                        fixture && styles.dayCellGame,
+                        isCurrent && styles.dayCellCurrent,
+                        isSelected && styles.dayCellSelected,
+                      ]}
+                    >
+                      <Text style={[styles.dayNumber, fixture && { color: lightText ? '#FFFFFF' : '#07150D' }]}>{day}</Text>
 
-                  {fixture ? (
-                    <>
-                      <View style={styles.fixtureCenter}>
-                        <Text style={[styles.opponentInitials, { color: lightText ? '#FFFFFF' : '#07150D' }]}>
-                          {opponent?.initials ?? 'ADV'}
-                        </Text>
-                        <Text style={[styles.homeAwayTag, { color: lightText ? '#DDE8FF' : '#0B3B1A' }]}>
-                          {isHome ? 'CASA' : 'FORA'}
-                        </Text>
-                      </View>
+                      {fixture ? (
+                        <>
+                          <View style={styles.fixtureCenter}>
+                            <Text style={[styles.opponentInitials, { color: lightText ? '#FFFFFF' : '#07150D' }]}>
+                              {opponent?.initials ?? 'ADV'}
+                            </Text>
+                            <Text style={[styles.homeAwayTag, { color: lightText ? '#DDE8FF' : '#0B3B1A' }]}>
+                              {isHome ? 'CASA' : 'FORA'}
+                            </Text>
+                          </View>
 
-                      {result ? (
-                        <View style={styles.scoreBox}>
-                          <Text style={[styles.cellScore, { color: lightText ? '#FFFFFF' : '#07150D' }]}>{result.homeGoals}×{result.awayGoals}</Text>
-                          <View style={[
-                            styles.outcomeDot,
-                            outcome === 'win' ? styles.outcomeWin : outcome === 'draw' ? styles.outcomeDraw : styles.outcomeLoss,
-                          ]} />
-                        </View>
-                      ) : isCurrent ? (
-                        <View style={styles.nextBadge}><Text style={styles.nextBadgeText}>PRÓXIMO</Text></View>
+                          {result ? (
+                            <View style={styles.scoreBox}>
+                              <Text style={[styles.cellScore, { color: lightText ? '#FFFFFF' : '#07150D' }]}>{result.homeGoals}×{result.awayGoals}</Text>
+                              <View style={[
+                                styles.outcomeDot,
+                                outcome === 'win' ? styles.outcomeWin : outcome === 'draw' ? styles.outcomeDraw : styles.outcomeLoss,
+                              ]} />
+                            </View>
+                          ) : isCurrent ? (
+                            <View style={styles.nextBadge}><Text style={styles.nextBadgeText}>PRÓXIMO</Text></View>
+                          ) : null}
+                        </>
                       ) : null}
-                    </>
-                  ) : null}
-                </Pressable>
-              );
-            })}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
 
           <View style={styles.legend}>
@@ -257,8 +264,9 @@ const styles = StyleSheet.create({
   yearTitle: { color: '#F5F7F5', fontSize: 10, fontWeight: '900', marginTop: 1 },
   weekHeader: { flexDirection: 'row', gap: 3 },
   weekHeaderText: { flex: 1, color: '#98AB9F', fontSize: 6.2, fontWeight: '900', textAlign: 'center' },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
-  dayCell: { width: '13.55%', aspectRatio: 0.86, borderRadius: 6, borderWidth: 1, borderColor: '#294536', padding: 4, position: 'relative', overflow: 'hidden' },
+  calendarGrid: { gap: 3 },
+  weekRow: { flexDirection: 'row', gap: 3 },
+  dayCell: { flex: 1, minWidth: 0, aspectRatio: 0.86, borderRadius: 6, borderWidth: 1, borderColor: '#294536', padding: 4, position: 'relative', overflow: 'hidden' },
   dayCellBlank: { opacity: 0.22, backgroundColor: '#08140D', borderColor: '#14271B' },
   dayCellGame: { borderColor: 'rgba(255,255,255,0.28)' },
   dayCellCurrent: { borderWidth: 2, borderColor: '#FFFFFF' },
