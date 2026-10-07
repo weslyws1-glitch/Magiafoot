@@ -1335,6 +1335,105 @@ function processSquadSocialDynamics(career: Career): Career {
   return nextCareer;
 }
 
+function advanceToNextSeason(career: Career): Career {
+  const standings = calculateStandings(career.results);
+  const userRow = standings.find((row) => row.club.id === career.clubId);
+  const champion = standings[0];
+  const completedSeason = career.season;
+  const completedYear = seasonYear(completedSeason);
+
+  const players = career.players.map((player) => {
+    const remainingContract = Math.max(0, (player.contractEndRound ?? LEAGUE_ROUNDS) - LEAGUE_ROUNDS);
+    const remainingLoan = typeof player.loanedOutUntilRound === 'number'
+      ? Math.max(0, player.loanedOutUntilRound - LEAGUE_ROUNDS)
+      : 0;
+    const loanContinues = player.status === 'loaned' && remainingLoan > 0;
+    return {
+      ...player,
+      age: player.age + 1,
+      fitness: clamp(Math.max(player.fitness, 88), 0, 100),
+      morale: clamp(player.morale + 2, 10, 100),
+      status: loanContinues ? 'loaned' as const : 'available' as const,
+      injuryUntilRound: null,
+      suspendedUntilRound: null,
+      loanedOutUntilRound: loanContinues ? remainingLoan : null,
+      loanClubName: loanContinues ? player.loanClubName ?? null : null,
+      contractEndRound: remainingContract,
+      promisedMinutesUntilRound: null,
+      lastSocialEventRound: (player.lastSocialEventRound ?? -99) - LEAGUE_ROUNDS,
+      seasonStats: { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedMatches: 0 },
+    };
+  });
+
+  const available = players.filter((player) => player.status === 'available');
+  const lineup = buildBestLineup(available, career.formationId);
+  const benchIds = buildBench(available, lineup);
+  const nextCaptain = lineup.some((slot) => slot.playerId === career.captainId)
+    ? career.captainId
+    : lineup[0]?.playerId ?? '';
+
+  const shiftStaff = (people: AdministrativeProfessional[]) => people
+    .filter((person) => person.contractEndRound > LEAGUE_ROUNDS)
+    .map((person) => ({
+      ...person,
+      hiredRound: Math.max(0, person.hiredRound - LEAGUE_ROUNDS),
+      contractEndRound: person.contractEndRound - LEAGUE_ROUNDS,
+    }));
+
+  const historyEntry = {
+    season: completedSeason,
+    year: completedYear,
+    finalPosition: userRow ? standings.findIndex((row) => row.club.id === career.clubId) + 1 : CLUBS.length,
+    points: userRow?.points ?? 0,
+    wins: userRow?.wins ?? 0,
+    draws: userRow?.draws ?? 0,
+    losses: userRow?.losses ?? 0,
+    championClubId: champion?.club.id ?? '',
+  };
+
+  const club = getClub(career.clubId);
+  let next: Career = {
+    ...career,
+    season: completedSeason + 1,
+    roundIndex: 0,
+    players,
+    market: club ? makeCareerMarket(club).map((player) => initializePlayerCareerProfile(player, completedSeason + 1, 0)) : career.market,
+    lineup,
+    benchIds,
+    captainId: nextCaptain,
+    results: [],
+    seasonHistory: [...(career.seasonHistory ?? []), historyEntry],
+    liveMatch: null,
+    playerTransferOffers: [],
+    administrationStaff: {
+      board: shiftStaff(career.administrationStaff?.board ?? []),
+      finance: shiftStaff(career.administrationStaff?.finance ?? []),
+      legal: shiftStaff(career.administrationStaff?.legal ?? []),
+    },
+    sponsorships: {
+      ...career.sponsorships,
+      proposals: [],
+      lastMarketRound: -1,
+    },
+    legalWorkloadEvents: Math.max(0, Math.floor((career.legalWorkloadEvents ?? 0) * 0.35)),
+    lastNews: 'A temporada ' + completedYear + ' terminou. A temporada ' + (completedYear + 1) + ' começou com um novo calendário de 38 rodadas.',
+  };
+
+  next = addCareerNews(
+    next,
+    'Nova temporada iniciada',
+    'Temporada ' + (completedYear + 1) + ': calendário renovado, elenco reapresentado e 38 rodadas pela frente.',
+    'club',
+  );
+  next = addCareerNews(
+    next,
+    'Fim da temporada ' + completedYear,
+    'O clube terminou em ' + historyEntry.finalPosition + 'º lugar com ' + historyEntry.points + ' pontos. Campeão: ' + (champion?.club.name ?? '—') + '.',
+    'match',
+  );
+  return next;
+}
+
 export function finalizeMatch(career: Career): Career {
   const game = career.liveMatch;
   if (!game || game.phase !== 'finished') return career;
@@ -1474,7 +1573,9 @@ export function finalizeMatch(career: Career): Career {
     lastResult: leagueResult,
     lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
   };
-  return generatePlayerTransferOffers(processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon)));
+  const settled = processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
+  if (settled.roundIndex >= LEAGUE_ROUNDS) return advanceToNextSeason(settled);
+  return generatePlayerTransferOffers(settled);
 }
 
 export function calculateStandings(results: LeagueResult[]): StandingRow[] {
@@ -1621,6 +1722,7 @@ export function parseCareer(saved: string | null): Career | null {
         history: Array.isArray(rawSponsorships.history) ? rawSponsorships.history : [],
       },
       playerTransferOffers: Array.isArray((parsed as Career).playerTransferOffers) ? (parsed as Career).playerTransferOffers : [],
+      seasonHistory: Array.isArray((parsed as Career).seasonHistory) ? (parsed as Career).seasonHistory : [],
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
