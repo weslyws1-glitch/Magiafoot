@@ -19,52 +19,149 @@ const gameRandom = (game: MatchSession) => {
   return game.randomSeed / 4_294_967_296;
 };
 
-function makeLeagueSchedule(): Fixture[] {
-  const clubs = CLUBS.map((club) => club.id);
-  const ring = [...clubs];
-  const fixtures: Fixture[] = [];
-  const firstHalfRounds = clubs.length - 1;
+function firstLeagueSaturday(season: number): Date {
+  const year = seasonYear(season);
+  const start = new Date(Date.UTC(year, 2, 1));
+  const offset = (6 - start.getUTCDay() + 7) % 7;
+  return new Date(Date.UTC(year, 2, 1 + offset));
+}
+
+export function seasonRoundDate(season: number, roundIndex: number): Date {
+  const firstSaturday = firstLeagueSaturday(season);
+  const date = new Date(firstSaturday);
+  date.setUTCDate(firstSaturday.getUTCDate() + Math.max(0, roundIndex) * 7);
+  return date;
+}
+
+function leagueFixtureDate(season: number, roundIndex: number, pairIndex: number): Date {
+  const saturday = seasonRoundDate(season, roundIndex);
+  const date = new Date(saturday);
+  const playSunday = (roundIndex + pairIndex + season) % 2 === 1;
+  if (playSunday) date.setUTCDate(date.getUTCDate() + 1);
+  return date;
+}
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function recentVenueStreak(history: Array<'H' | 'A'>, next: 'H' | 'A'): number {
+  let streak = 1;
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index] !== next) break;
+    streak += 1;
+  }
+  return streak;
+}
+
+export function makeLeagueSchedule(season = 1): Fixture[] {
+  const baseClubs = CLUBS.map((club) => club.id);
+  const shift = baseClubs.length ? ((season - 1) * 3) % baseClubs.length : 0;
+  const rotated = [...baseClubs.slice(shift), ...baseClubs.slice(0, shift)];
+  const ring = season % 2 === 0 ? [...rotated].reverse() : [...rotated];
+  const roundPairings: Array<Array<[string, string]>> = [];
+  const firstHalfRounds = Math.max(0, ring.length - 1);
+
   for (let roundIndex = 0; roundIndex < firstHalfRounds; roundIndex += 1) {
-    for (let pair = 0; pair < clubs.length / 2; pair += 1) {
-      const left = ring[pair];
-      const right = ring[clubs.length - 1 - pair];
-      if (!left || !right) continue;
-      const flip = (roundIndex + pair) % 2 === 1;
-      fixtures.push({
-        id: `liga-${roundIndex + 1}-${pair + 1}`,
-        roundIndex,
-        homeClubId: flip ? right : left,
-        awayClubId: flip ? left : right,
-      });
-      fixtures.push({
-        id: `liga-${roundIndex + firstHalfRounds + 1}-${pair + 1}`,
-        roundIndex: roundIndex + firstHalfRounds,
-        homeClubId: flip ? left : right,
-        awayClubId: flip ? right : left,
-      });
+    const pairs: Array<[string, string]> = [];
+    for (let pairIndex = 0; pairIndex < ring.length / 2; pairIndex += 1) {
+      const left = ring[pairIndex];
+      const right = ring[ring.length - 1 - pairIndex];
+      if (left && right) pairs.push([left, right]);
     }
+    roundPairings.push(pairs);
     const last = ring.pop();
     if (last) ring.splice(1, 0, last);
   }
-  return fixtures;
+
+  const venueHistory = new Map<string, Array<'H' | 'A'>>();
+  for (const club of baseClubs) venueHistory.set(club, []);
+
+  const firstHalf: Fixture[][] = roundPairings.map((pairs, roundIndex) => {
+    const optionCount = 1 << pairs.length;
+    let bestMask = 0;
+    let bestPenalty = Number.POSITIVE_INFINITY;
+
+    for (let mask = 0; mask < optionCount; mask += 1) {
+      let penalty = 0;
+      for (let pairIndex = 0; pairIndex < pairs.length; pairIndex += 1) {
+        const pair = pairs[pairIndex]!;
+        const flip = ((mask >> pairIndex) & 1) === 1;
+        const homeClubId = flip ? pair[1] : pair[0];
+        const awayClubId = flip ? pair[0] : pair[1];
+
+        for (const [clubId, venue] of [[homeClubId, 'H'], [awayClubId, 'A']] as const) {
+          const history = venueHistory.get(clubId) ?? [];
+          const streak = recentVenueStreak(history, venue);
+          if (streak > 2) penalty += 1000 * (streak - 2);
+          if (history[history.length - 1] === venue) penalty += 2;
+
+          const homeCount = history.filter((item) => item === 'H').length + (venue === 'H' ? 1 : 0);
+          const awayCount = history.length + 1 - homeCount;
+          penalty += Math.pow(homeCount - awayCount, 2) * 0.35;
+        }
+      }
+
+      const tieBreaker = (hash('schedule-' + season + '-' + roundIndex + '-' + mask) % 1000) / 1_000_000;
+      penalty += tieBreaker;
+      if (penalty < bestPenalty) {
+        bestPenalty = penalty;
+        bestMask = mask;
+      }
+    }
+
+    return pairs.map((pair, pairIndex) => {
+      const flip = ((bestMask >> pairIndex) & 1) === 1;
+      const homeClubId = flip ? pair[1] : pair[0];
+      const awayClubId = flip ? pair[0] : pair[1];
+      venueHistory.get(homeClubId)?.push('H');
+      venueHistory.get(awayClubId)?.push('A');
+      return {
+        id: 'liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
+        roundIndex,
+        homeClubId,
+        awayClubId,
+        competition: 'league' as const,
+        scheduledDate: isoDate(leagueFixtureDate(season, roundIndex, pairIndex)),
+      };
+    });
+  });
+
+  const secondHalf = [...firstHalf].reverse().map((roundFixtures, secondIndex) => {
+    const roundIndex = firstHalfRounds + secondIndex;
+    return roundFixtures.map((fixture, pairIndex) => ({
+      id: 'liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
+      roundIndex,
+      homeClubId: fixture.awayClubId,
+      awayClubId: fixture.homeClubId,
+      competition: 'league' as const,
+      scheduledDate: isoDate(leagueFixtureDate(season, roundIndex, pairIndex)),
+    }));
+  });
+
+  return [...firstHalf, ...secondHalf].flat();
 }
 
-export const LEAGUE_FIXTURES = makeLeagueSchedule();
 export const LEAGUE_ROUNDS = CLUBS.length * 2 - 2;
+export const LEAGUE_FIXTURES = makeLeagueSchedule(1);
 
 export function seasonYear(season: number): number {
   return 2026 + Math.max(0, season - 1);
 }
 
-export function seasonRoundDate(season: number, roundIndex: number): Date {
-  const year = seasonYear(season);
-  const start = new Date(Date.UTC(year, 2, 1));
-  const day = start.getUTCDay();
-  const firstSundayOffset = (7 - day) % 7;
-  const firstRound = new Date(Date.UTC(year, 2, 1 + firstSundayOffset));
-  const date = new Date(firstRound);
-  date.setUTCDate(firstRound.getUTCDate() + Math.max(0, roundIndex) * 7);
-  return date;
+export function fixtureDate(fixture: Fixture, season: number): Date {
+  if (fixture.scheduledDate) return new Date(fixture.scheduledDate + 'T12:00:00Z');
+  return seasonRoundDate(season, fixture.roundIndex);
+}
+
+export function formatFixtureDate(fixture: Fixture, season: number): string {
+  return fixtureDate(fixture, season).toLocaleDateString('pt-BR', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export function formatSeasonRoundDate(season: number, roundIndex: number): string {
@@ -75,6 +172,13 @@ export function formatSeasonRoundDate(season: number, roundIndex: number): strin
     month: 'short',
     year: 'numeric',
   });
+}
+
+export function cupMidweekDate(season: number, leagueRoundIndex: number, slotSeed = 0): Date {
+  const weekend = seasonRoundDate(season, leagueRoundIndex);
+  const date = new Date(weekend);
+  date.setUTCDate(weekend.getUTCDate() - (slotSeed % 2 === 0 ? 3 : 2));
+  return date;
 }
 
 function assignSquadNumbers(players: Player[]): Player[] {
