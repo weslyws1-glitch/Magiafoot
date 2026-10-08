@@ -94,6 +94,13 @@ function satisfactionText(value: number) {
   return 'Muito insatisfeito';
 }
 
+function availabilityText(player: Player) {
+  if (player.status === 'injured') return `${player.injuryName ?? 'Lesionado'} · ${player.injuryDaysRemaining ?? 0} dias`;
+  if (player.status === 'suspended') return `Suspenso · ${player.suspensionReason ?? 'próxima partida'}`;
+  if (player.status === 'loaned') return 'Emprestado';
+  return 'Disponível';
+}
+
 function PlayerRow({ player, careerRound, onPress }: { player: Player; careerRound: number; onPress: () => void }) {
   const stats = player.seasonStats;
   return (
@@ -104,7 +111,7 @@ function PlayerRow({ player, careerRound, onPress }: { player: Player; careerRou
       <View style={styles.playerMain}>
         <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
         <Text style={styles.playerSub} numberOfLines={1}>
-          {ROLE_LABELS[player.squadRole ?? 'rotacao']} · {player.age} anos · {player.status === 'available' ? 'Disponível' : player.status === 'injured' ? 'Lesionado' : 'Suspenso'}
+          {ROLE_LABELS[player.squadRole ?? 'rotacao']} · {player.age} anos · {availabilityText(player)}
         </Text>
       </View>
       <View style={styles.rowStat}><Text style={styles.rowStatValue}>{effectiveStrength(player)}</Text><Text style={styles.rowStatLabel}>FOR</Text></View>
@@ -264,7 +271,9 @@ export default function SquadScreen() {
                   <Text style={[styles.cell,styles.colNum]}>{player.shirtNumber ?? '—'}</Text>
                   <View style={styles.colName}>
                     <Text numberOfLines={1} style={styles.nameCell}>{player.name}</Text>
-                    <Text numberOfLines={1} style={styles.nameSub}>{ROLE_LABELS[player.squadRole ?? 'rotacao']}</Text>
+                    <Text numberOfLines={1} style={[styles.nameSub, player.status !== 'available' && styles.nameSubUnavailable]}>
+                      {player.status === 'available' ? ROLE_LABELS[player.squadRole ?? 'rotacao'] : availabilityText(player)}
+                    </Text>
                   </View>
                   <View style={styles.colCond}>
                     <View style={styles.conditionTrack}>
@@ -331,6 +340,20 @@ export default function SquadScreen() {
                     <View style={styles.profileMetric}><Text style={styles.profileValue}>{selected.morale}</Text><Text style={styles.profileLabel}>MORAL</Text></View>
                   </View>
 
+                  <Panel style={[styles.detailPanel, selected.status !== 'available' && styles.availabilityPanel]}>
+                    <Text style={styles.sectionTitle}>DISPONIBILIDADE</Text>
+                    <View style={styles.detailRow}><Text style={styles.detailKey}>Situação</Text><Text style={[styles.detailValue, selected.status !== 'available' && styles.availabilityValue]}>{availabilityText(selected)}</Text></View>
+                    {selected.status === 'injured' ? (
+                      <>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Lesão</Text><Text style={styles.detailValue}>{selected.injuryName ?? 'Em avaliação'}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Previsão</Text><Text style={styles.detailValue}>{selected.injuryDaysRemaining ?? 0} dias indisponível</Text></View>
+                      </>
+                    ) : null}
+                    {selected.status === 'suspended' ? (
+                      <View style={styles.detailRow}><Text style={styles.detailKey}>Motivo</Text><Text style={styles.detailValue}>{selected.suspensionReason ?? 'Suspensão automática'}</Text></View>
+                    ) : null}
+                  </Panel>
+
                   <Panel style={styles.detailPanel}>
                     <Text style={styles.sectionTitle}>CONTRATO</Text>
                     <View style={styles.detailRow}><Text style={styles.detailKey}>Salário semanal</Text><Text style={styles.detailValue}>{formatCurrency(selected.wage)}</Text></View>
@@ -376,12 +399,27 @@ export default function SquadScreen() {
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.technique ?? selected.strength}</Text><Text style={styles.statLabel}>TÉCNICA</Text></View>
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.passing ?? selected.strength}</Text><Text style={styles.statLabel}>PASSE</Text></View>
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.shooting ?? selected.strength}</Text><Text style={styles.statLabel}>FINAL.</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.dribbling ?? selected.strength}</Text><Text style={styles.statLabel}>DRIBLE</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.crossing ?? selected.strength}</Text><Text style={styles.statLabel}>CRUZ.</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.heading ?? selected.strength}</Text><Text style={styles.statLabel}>CABEÇ.</Text></View>
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.defending ?? selected.strength}</Text><Text style={styles.statLabel}>MARCAÇÃO</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.tackling ?? selected.strength}</Text><Text style={styles.statLabel}>DESARME</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.positioning ?? selected.strength}</Text><Text style={styles.statLabel}>POSIC.</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.vision ?? selected.strength}</Text><Text style={styles.statLabel}>VISÃO</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.setPieces ?? selected.strength}</Text><Text style={styles.statLabel}>B. PARADA</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.penalties ?? selected.strength}</Text><Text style={styles.statLabel}>PÊNALTI</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.composure ?? selected.strength}</Text><Text style={styles.statLabel}>FRIEZA</Text></View>
+                      <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.decisions ?? selected.strength}</Text><Text style={styles.statLabel}>DECISÃO</Text></View>
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.pace ?? selected.strength}</Text><Text style={styles.statLabel}>VELOC.</Text></View>
                       <View style={styles.statBox}><Text style={styles.statNumber}>{selected.skills?.physical ?? selected.strength}</Text><Text style={styles.statLabel}>FÍSICO</Text></View>
                     </View>
                     {selected.position === 'GOL' ? (
-                      <View style={styles.detailRow}><Text style={styles.detailKey}>Defesa de goleiro</Text><Text style={styles.detailValue}>{selected.skills?.goalkeeping ?? selected.strength}</Text></View>
+                      <>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Defesa de goleiro</Text><Text style={styles.detailValue}>{selected.skills?.goalkeeping ?? selected.strength}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Reflexo</Text><Text style={styles.detailValue}>{selected.skills?.goalkeepingReflexes ?? selected.strength}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Saída do gol</Text><Text style={styles.detailValue}>{selected.skills?.goalkeepingRushing ?? selected.strength}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailKey}>Segurança</Text><Text style={styles.detailValue}>{selected.skills?.goalkeepingHandling ?? selected.strength}</Text></View>
+                      </>
                     ) : null}
                   </Panel>
 
@@ -531,6 +569,8 @@ const styles=StyleSheet.create({
   profileValue:{color:'#f5f7f5',fontSize:16,fontWeight:'900'},
   profileLabel:{color:'#7f9486',fontSize:6,fontWeight:'900',marginTop:2},
   detailPanel:{gap:9,backgroundColor:'#10291d',borderColor:'#2c503d'},
+  availabilityPanel:{backgroundColor:'#2b1b18',borderColor:'#8e4d43'},
+  availabilityValue:{color:'#ff9a8e'},
   sectionTitle:{color:'#79ef91',fontSize:7,fontWeight:'900',letterSpacing:0.8},
   detailRow:{flexDirection:'row',justifyContent:'space-between',gap:10,paddingVertical:4,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:'#254232'},
   detailKey:{color:'#8fa394',fontSize:8,flex:1},
