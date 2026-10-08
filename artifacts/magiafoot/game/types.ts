@@ -275,6 +275,10 @@ export interface MatchSession {
   userLineup: FormationSlot[];
   userBenchIds: string[];
   substitutionsUsed: number;
+  substitutedOutIds: string[];
+  startedPlayerIds: string[];
+  appearedPlayerIds: string[];
+  pausedForTactics: boolean;
   events: MatchEvent[];
   randomSeed: number;
 }
