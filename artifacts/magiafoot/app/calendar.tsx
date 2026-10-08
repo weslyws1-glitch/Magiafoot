@@ -12,8 +12,8 @@ import { useColors } from '@/hooks/useColors';
 const MONTHS = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 const WEEKDAYS = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 
-const HOME_COLOR = '#42E879';
-const AWAY_COLOR = '#2563EB';
+const HOME_COLOR = '#A6B66A';
+const AWAY_COLOR = '#B9825B';
 const EMPTY_COLOR = '#10251A';
 
 function resultForUser(result: LeagueResult, clubId: string): 'win' | 'draw' | 'loss' {
@@ -141,7 +141,7 @@ export default function CalendarScreen() {
                   const isSelected = fixture?.id === selectedFixtureId;
                   const outcome = result ? resultForUser(result, career.clubId) : undefined;
                   const backgroundColor = fixture ? (isHome ? HOME_COLOR : AWAY_COLOR) : EMPTY_COLOR;
-                  const lightText = Boolean(fixture && !isHome);
+                  const lightText = false;
 
                   return (
                     <Pressable
@@ -164,7 +164,7 @@ export default function CalendarScreen() {
                             <Text style={[styles.opponentInitials, { color: lightText ? '#FFFFFF' : '#07150D' }]}>
                               {opponent?.initials ?? 'ADV'}
                             </Text>
-                            <Text style={[styles.homeAwayTag, { color: lightText ? '#DDE8FF' : '#0B3B1A' }]}>
+                            <Text style={[styles.homeAwayTag, { color: '#2B1A10' }]}>
                               {isHome ? 'CASA' : 'FORA'}
                             </Text>
                           </View>
