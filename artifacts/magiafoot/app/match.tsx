@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -478,7 +478,7 @@ export default function MatchScreen() {
           </Pressable>
         </View>
 
-        {game.phase === 'pregame' && unavailableStarters.length === 0 ? (
+        {game.phase === 'pregame' && unavailableStarters.length === 0 && unavailableBench.length === 0 ? (
           <GameButton label="APITO INICIAL" icon="play" onPress={() => advanceCurrentMatch(1)} />
         ) : null}
 
