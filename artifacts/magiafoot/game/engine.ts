@@ -646,7 +646,9 @@ function maybeInjurePlayer(career: Career, game: MatchSession, clubId: string): 
   const players = career.players.map((player) => player.id === candidate.id
     ? { ...player, status: 'injured' as const, injuryUntilRound: game.fixture.roundIndex + 1, fitness: Math.max(10, player.fitness - 12) }
     : player);
-  const replacementId = game.userBenchIds.find((id) => players.some((player) => player.id === id && player.status === 'available'));
+  const replacementId = game.substitutionsUsed < 5
+    ? game.userBenchIds.find((id) => players.some((player) => player.id === id && player.status === 'available'))
+    : undefined;
   const patchedSlot = replacementId
     ? { ...slot, playerId: replacementId, sentOff: false, offReason: undefined }
     : { ...slot, sentOff: true, offReason: 'injury' as const };
