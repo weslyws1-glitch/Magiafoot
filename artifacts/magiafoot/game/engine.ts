@@ -561,11 +561,15 @@ function recoverBetweenRounds(players: Player[], currentRound: number, physioLev
       && typeof player.loanedOutUntilRound === 'number'
       && currentRound > player.loanedOutUntilRound;
     const recovery = 18 + physioLevel * 2 + Math.floor(gymLevel / 2);
+    const injuryDaysRemaining = player.status === 'injured' && !expiredInjury
+      ? Math.max(1, (player.injuryDaysRemaining ?? 7) - 7)
+      : 0;
     return {
       ...player,
       fitness: clamp(player.fitness + recovery, 15, 100),
-      ...(expiredInjury ? { status: 'available' as const, injuryUntilRound: null } : {}),
-      ...(expiredSuspension ? { status: 'available' as const, suspendedUntilRound: null } : {}),
+      injuryDaysRemaining,
+      ...(expiredInjury ? { status: 'available' as const, injuryUntilRound: null, injuryName: null, injuryDaysRemaining: 0 } : {}),
+      ...(expiredSuspension ? { status: 'available' as const, suspendedUntilRound: null, suspensionReason: null } : {}),
       ...(expiredLoan ? { status: 'available' as const, loanedOutUntilRound: null, loanClubName: null } : {}),
     };
   });
@@ -579,16 +583,8 @@ export function startMatch(career: Career): Career {
   if (!club) return career;
 
   const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex, career.trainingCenterUpgrades?.physio ?? 1, career.trainingCenterUpgrades?.gym ?? 1);
-  const eligibleIds = new Set(recoveredPlayers.filter((player) => player.status === 'available').map((player) => player.id));
-  let lineup = career.lineup.map((slot) => ({ ...slot }));
-  if (lineup.some((slot) => !eligibleIds.has(slot.playerId))) {
-    lineup = buildBestLineup(recoveredPlayers, career.formationId);
-  }
-  const benchIds = career.benchIds.filter((id) => eligibleIds.has(id) && !lineup.some((slot) => slot.playerId === id));
-  for (const id of buildBench(recoveredPlayers, lineup)) {
-    if (benchIds.length >= 7) break;
-    if (!benchIds.includes(id)) benchIds.push(id);
-  }
+  const lineup = career.lineup.map((slot) => ({ ...slot }));
+  const benchIds = career.benchIds.filter((id) => !lineup.some((slot) => slot.playerId === id)).slice(0, 7);
   const game: MatchSession = {
     fixture,
     userClubId: career.clubId,
@@ -608,6 +604,7 @@ export function startMatch(career: Career): Career {
     appearedPlayerIds: lineup.map((slot) => slot.playerId),
     yellowCardCounts: {},
     pausedForTactics: false,
+    requiredSubstitutionPlayerId: null,
     pausedForVar: false,
     pendingVar: null,
     firstHalfAddedTime: 0,
@@ -2024,6 +2021,7 @@ export function parseCareer(saved: string | null): Career | null {
       lastSubstitutionMinute: typeof rawLiveMatch.lastSubstitutionMinute === 'number' ? rawLiveMatch.lastSubstitutionMinute : null,
       yellowCardCounts: rawLiveMatch.yellowCardCounts ?? {},
       pausedForTactics: false,
+      requiredSubstitutionPlayerId: rawLiveMatch.requiredSubstitutionPlayerId ?? null,
       pausedForVar: false,
       pendingVar: null,
       firstHalfAddedTime: typeof rawLiveMatch.firstHalfAddedTime === 'number' ? rawLiveMatch.firstHalfAddedTime : 0,
