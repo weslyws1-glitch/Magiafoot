@@ -66,6 +66,19 @@ export interface PlayerSkills {
   pace: number;
   physical: number;
   goalkeeping: number;
+  dribbling: number;
+  crossing: number;
+  heading: number;
+  positioning: number;
+  vision: number;
+  setPieces: number;
+  penalties: number;
+  tackling: number;
+  composure: number;
+  decisions: number;
+  goalkeepingReflexes: number;
+  goalkeepingRushing: number;
+  goalkeepingHandling: number;
 }
 
 export interface AdministrativeProfessional {
@@ -142,6 +155,9 @@ export interface Player {
   status: PlayerStatus;
   injuryUntilRound: number | null;
   suspendedUntilRound: number | null;
+  injuryDaysRemaining?: number;
+  injuryName?: string | null;
+  suspensionReason?: string | null;
   value: number;
   wage: number;
   shirtNumber?: number;
@@ -231,6 +247,8 @@ export interface SeasonHistoryEntry {
 
 export interface MatchStats {
   shots: number;
+  shotsOnTarget: number;
+  bigChances: number;
   saves: number;
   fouls: number;
   offsides: number;
@@ -238,6 +256,17 @@ export interface MatchStats {
   yellowCards: number;
   redCards: number;
   injuries: number;
+  penalties: number;
+  handballs: number;
+  advantages: number;
+  varReviews: number;
+  throwIns: number;
+  goalKicks: number;
+  freeKicks: number;
+  passes: number;
+  completedPasses: number;
+  possessionTicks: number;
+  xg: number;
 }
 
 export interface MatchEvent {
@@ -248,19 +277,59 @@ export interface MatchEvent {
     | 'goal'
     | 'shot'
     | 'save'
+    | 'post'
     | 'foul'
+    | 'advantage'
+    | 'free_kick'
+    | 'penalty'
+    | 'handball'
     | 'offside'
     | 'corner'
+    | 'throw_in'
+    | 'goal_kick'
+    | 'keeper_8s'
     | 'yellow'
+    | 'second_yellow'
     | 'red'
     | 'medical'
+    | 'injury_forced_sub'
     | 'substitution'
+    | 'var_start'
+    | 'var_end'
+    | 'var_overturn'
+    | 'stoppage_time'
     | 'halftime'
     | 'second_half'
     | 'fulltime';
   clubId?: string;
   playerId?: string;
   text: string;
+}
+
+export interface PendingVarReview {
+  id: string;
+  reason: 'goal' | 'penalty' | 'red_card' | 'second_yellow' | 'corner';
+  clubId?: string;
+  playerId?: string;
+  decision: 'confirmed' | 'overturned';
+  headline: string;
+  detail: string;
+  reverseGoalForClubId?: string;
+  awardPenaltyToClubId?: string;
+}
+
+export interface MatchReferee {
+  name: string;
+  strictness: number;
+  advantage: number;
+  varSensitivity: number;
+}
+
+export interface SetPieceTakers {
+  penalties: string | null;
+  freeKicks: string | null;
+  leftCorners: string | null;
+  rightCorners: string | null;
 }
 
 export interface MatchSession {
@@ -275,10 +344,18 @@ export interface MatchSession {
   userLineup: FormationSlot[];
   userBenchIds: string[];
   substitutionsUsed: number;
+  substitutionWindowsUsed: number;
+  lastSubstitutionMinute: number | null;
   substitutedOutIds: string[];
   startedPlayerIds: string[];
   appearedPlayerIds: string[];
+  yellowCardCounts: Record<string, number>;
   pausedForTactics: boolean;
+  pausedForVar: boolean;
+  pendingVar: PendingVarReview | null;
+  firstHalfAddedTime: number;
+  secondHalfAddedTime: number;
+  referee: MatchReferee;
   events: MatchEvent[];
   randomSeed: number;
 }
@@ -297,6 +374,7 @@ export interface Career {
   benchIds: string[];
   captainId: string;
   tactics: Tactics;
+  setPieceTakers: SetPieceTakers;
   boardTrust: number;
   fanTrust: number;
   legalWorkloadEvents: number;
