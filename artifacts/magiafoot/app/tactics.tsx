@@ -133,7 +133,10 @@ export default function TacticsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.forcedLabel}>TROCA OBRIGATÓRIA POR LESÃO</Text>
               <Text style={styles.forcedName}>{career.players.find((player) => player.id === requiredPlayerId)?.name ?? 'Jogador lesionado'}</Text>
-              <Text style={styles.forcedMeta}>{statusText(career.players.find((player) => player.id === requiredPlayerId)!)}</Text>
+              <Text style={styles.forcedMeta}>{(() => {
+                const forced = career.players.find((player) => player.id === requiredPlayerId);
+                return forced ? statusText(forced) : 'Jogador indisponível';
+              })()}</Text>
             </View>
           </Panel>
         ) : null}
