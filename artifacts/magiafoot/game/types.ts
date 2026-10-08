@@ -351,6 +351,7 @@ export interface MatchSession {
   appearedPlayerIds: string[];
   yellowCardCounts: Record<string, number>;
   pausedForTactics: boolean;
+  requiredSubstitutionPlayerId: string | null;
   pausedForVar: boolean;
   pendingVar: PendingVarReview | null;
   firstHalfAddedTime: number;
