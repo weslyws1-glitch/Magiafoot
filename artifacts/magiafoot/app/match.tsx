@@ -505,27 +505,44 @@ export default function MatchScreen() {
               )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
             </View>
           ) : (
-            <View style={styles.tabContent}>
-              <View style={styles.intelligenceHeader}>
-                <Text style={styles.commentaryTitle}>NÚMEROS AO VIVO</Text>
-                <Text style={styles.intelligenceScore}>{home.initials} × {away.initials}</Text>
+            <View style={[styles.tabContent, styles.statsTabContent]}>
+              <View style={styles.statsHeader}>
+                <View>
+                  <Text style={styles.commentaryTitle}>NÚMEROS AO VIVO</Text>
+                  <Text style={styles.statsSubtitle}>Comparativo da partida</Text>
+                </View>
+                <View style={styles.statsTeams}>
+                  <Text style={styles.statsTeamName}>{home.initials}</Text>
+                  <Text style={styles.statsVersus}>×</Text>
+                  <Text style={styles.statsTeamName}>{away.initials}</Text>
+                </View>
               </View>
-              <View style={styles.metricGrid}>
-                <Metric label="Posse %" left={homePossession} right={awayPossession} />
-                <Metric label="xG" left={Number(game.homeStats.xg.toFixed(2))} right={Number(game.awayStats.xg.toFixed(2))} />
-                <Metric label="Finalizações" left={game.homeStats.shots} right={game.awayStats.shots} />
-                <Metric label="No alvo" left={game.homeStats.shotsOnTarget} right={game.awayStats.shotsOnTarget} />
-                <Metric label="Grandes chances" left={game.homeStats.bigChances} right={game.awayStats.bigChances} />
-                <Metric label="Escanteios" left={game.homeStats.corners} right={game.awayStats.corners} />
-                <Metric label="Faltas" left={game.homeStats.fouls} right={game.awayStats.fouls} />
-                <Metric label="Impedimentos" left={game.homeStats.offsides} right={game.awayStats.offsides} />
-                <Metric label="Passes certos %" left={homePassAccuracy} right={awayPassAccuracy} />
-                <Metric label="VAR" left={game.homeStats.varReviews} right={game.awayStats.varReviews} />
+
+              <View style={styles.statsCompactGrid}>
+                <StatTile label="POSSE" left={homePossession + '%'} right={awayPossession + '%'} />
+                <StatTile label="xG" left={game.homeStats.xg.toFixed(2)} right={game.awayStats.xg.toFixed(2)} />
+                <StatTile label="FINALIZAÇÕES" left={game.homeStats.shots} right={game.awayStats.shots} />
+                <StatTile label="NO ALVO" left={game.homeStats.shotsOnTarget} right={game.awayStats.shotsOnTarget} />
+                <StatTile label="GRANDES CHANCES" left={game.homeStats.bigChances} right={game.awayStats.bigChances} />
+                <StatTile label="ESCANTEIOS" left={game.homeStats.corners} right={game.awayStats.corners} />
+                <StatTile label="FALTAS" left={game.homeStats.fouls} right={game.awayStats.fouls} />
+                <StatTile label="IMPEDIMENTOS" left={game.homeStats.offsides} right={game.awayStats.offsides} />
+                <StatTile label="PASSES CERTOS" left={homePassAccuracy + '%'} right={awayPassAccuracy + '%'} />
+                <StatTile label="VAR" left={game.homeStats.varReviews} right={game.awayStats.varReviews} />
               </View>
-              <View style={styles.cardsRow}>
-                <Text style={styles.cardsText}>🟨 {game.homeStats.yellowCards}  🟥 {game.homeStats.redCards}</Text>
-                <Text style={styles.xgText}>xG {game.homeStats.xg.toFixed(2)} — {game.awayStats.xg.toFixed(2)}</Text>
-                <Text style={styles.cardsText}>🟨 {game.awayStats.yellowCards}  🟥 {game.awayStats.redCards}</Text>
+
+              <View style={styles.disciplineStrip}>
+                <View style={styles.disciplineTeam}>
+                  <Text style={styles.disciplineClub}>{home.initials}</Text>
+                  <Text style={styles.disciplineCards}>🟨 {game.homeStats.yellowCards}   🟥 {game.homeStats.redCards}</Text>
+                </View>
+                <View style={styles.disciplineCenter}>
+                  <Text style={styles.disciplineLabel}>DISCIPLINA</Text>
+                </View>
+                <View style={[styles.disciplineTeam,{ alignItems:'flex-end' }]}>
+                  <Text style={styles.disciplineClub}>{away.initials}</Text>
+                  <Text style={styles.disciplineCards}>🟨 {game.awayStats.yellowCards}   🟥 {game.awayStats.redCards}</Text>
+                </View>
               </View>
             </View>
           )}
@@ -587,6 +604,19 @@ export default function MatchScreen() {
         ) : null}
       </Screen>
     </>
+  );
+}
+
+function StatTile({ label, left, right }: { label: string; left: number | string; right: number | string }) {
+  return (
+    <View style={styles.statTile}>
+      <Text style={styles.statTileLabel}>{label}</Text>
+      <View style={styles.statTileValues}>
+        <Text style={styles.statTileValue}>{left}</Text>
+        <View style={styles.statTileDivider} />
+        <Text style={[styles.statTileValue,{ textAlign:'right' }]}>{right}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -705,7 +735,25 @@ const styles = StyleSheet.create({
   infoTabActive: { backgroundColor: '#79ef91', borderColor: '#79ef91' },
   infoTabText: { color: '#9fb2a5', fontSize: 7, fontWeight: '900', letterSpacing: 0.4 },
   infoTabTextActive: { color: '#07150d' },
-  tabContent: { maxHeight: 300 },
+  tabContent: { overflow: 'hidden' },
+  statsTabContent: { paddingBottom: 8 },
+  statsHeader: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#254332' },
+  statsSubtitle: { color: '#74897c', fontSize: 6.5, marginTop: 2 },
+  statsTeams: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, backgroundColor: '#10291d' },
+  statsTeamName: { color: '#ffffff', fontSize: 8, fontWeight: '900' },
+  statsVersus: { color: '#79ef91', fontSize: 7, fontWeight: '900' },
+  statsCompactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 8 },
+  statTile: { width: '49%', minHeight: 55, borderRadius: 9, borderWidth: 1, borderColor: '#284837', backgroundColor: '#10291d', paddingHorizontal: 8, paddingVertical: 7, justifyContent: 'space-between' },
+  statTileLabel: { color: '#8ea295', fontSize: 6, fontWeight: '900', letterSpacing: 0.45, textAlign: 'center' },
+  statTileValues: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  statTileValue: { flex: 1, color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  statTileDivider: { width: 1, height: 18, backgroundColor: '#31513d', marginHorizontal: 7 },
+  disciplineStrip: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8, paddingHorizontal: 9, borderRadius: 9, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#0d2618' },
+  disciplineTeam: { flex: 1, minWidth: 0 },
+  disciplineClub: { color: '#a9b9ae', fontSize: 6.5, fontWeight: '900' },
+  disciplineCards: { color: '#ffffff', fontSize: 8.5, fontWeight: '900', marginTop: 2 },
+  disciplineCenter: { paddingHorizontal: 4 },
+  disciplineLabel: { color: '#79ef91', fontSize: 5.8, fontWeight: '900', letterSpacing: 0.6 },
   refereePanel: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#171e18', borderColor: '#3d493f' },
   refereeIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#2a3027', alignItems: 'center', justifyContent: 'center' },
   refereeLabel: { color: '#a39869', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.7 },
