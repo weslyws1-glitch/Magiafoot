@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { career, isReady } = useCareer();
+  const { career, isReady, startCurrentMatch } = useCareer();
 
   const dashboard = useMemo(() => {
     if (!career) return null;
@@ -95,6 +95,11 @@ export default function HomeScreen() {
   }
 
   const currentRound = Math.min(career.roundIndex + 1, dashboard.standings.length * 2 - 2);
+  const openMatch = () => {
+    if (!dashboard.fixture) return;
+    if (!career.liveMatch) startCurrentMatch();
+    router.push('/match');
+  };
   const isHome = dashboard.fixture?.homeClubId === career.clubId;
   const opponent = dashboard.fixture
     ? getClub(isHome ? dashboard.fixture.awayClubId : dashboard.fixture.homeClubId)
@@ -194,9 +199,9 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <Pressable onPress={() => router.push('/match')} style={styles.playButton}>
+            <Pressable onPress={openMatch} style={styles.playButton}>
               <Feather name="play" size={20} color="#07150d" />
-              <Text style={styles.playButtonText}>{career.liveMatch ? 'CONTINUAR PARTIDA' : 'JOGAR PARTIDA'}</Text>
+              <Text style={styles.playButtonText}>{career.liveMatch ? 'CONTINUAR PARTIDA' : 'INICIAR PARTIDA'}</Text>
             </Pressable>
           </>
         ) : (
