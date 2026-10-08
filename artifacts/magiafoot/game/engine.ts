@@ -7,8 +7,10 @@ export const POSITION_LABELS: Record<Position, string> = {
 };
 
 export const EMPTY_STATS: MatchStats = {
-  shots: 0, saves: 0, fouls: 0, offsides: 0, corners: 0,
-  yellowCards: 0, redCards: 0, injuries: 0,
+  shots: 0, shotsOnTarget: 0, bigChances: 0, saves: 0, fouls: 0, offsides: 0, corners: 0,
+  yellowCards: 0, redCards: 0, injuries: 0, penalties: 0, handballs: 0, advantages: 0,
+  varReviews: 0, throwIns: 0, goalKicks: 0, freeKicks: 0, passes: 0, completedPasses: 0,
+  possessionTicks: 0, xg: 0,
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -258,6 +260,7 @@ function defaultPlayerSkills(player: Player) {
   const clampSkill = (value: number) => clamp(Math.round(value), 20, 99);
   const goalkeeper = player.position === 'GOL';
 
+  const goalkeeping = clampSkill(goalkeeper ? base + 6 + jitter(19) : 20 + Math.abs(jitter(19)));
   return {
     technique: clampSkill(base + (goalkeeper ? -18 : jitter(1))),
     passing: clampSkill(base + (goalkeeper ? -14 : jitter(4))),
@@ -265,7 +268,20 @@ function defaultPlayerSkills(player: Player) {
     defending: clampSkill(base + (['ZAG','LD','LE','VOL'].includes(player.position) ? 5 : ['ATA','PE','PD','GOL'].includes(player.position) ? -15 : -4) + jitter(10)),
     pace: clampSkill(base + (['PE','PD','LD','LE','ATA'].includes(player.position) ? 4 : goalkeeper ? -10 : 0) + jitter(13)),
     physical: clampSkill(base + (['ZAG','VOL','ATA'].includes(player.position) ? 4 : 0) + jitter(16)),
-    goalkeeping: clampSkill(goalkeeper ? base + 6 + jitter(19) : 20 + Math.abs(jitter(19))),
+    goalkeeping,
+    dribbling: clampSkill(base + (['PE','PD','MEI','ATA'].includes(player.position) ? 4 : goalkeeper ? -18 : -3) + jitter(2)),
+    crossing: clampSkill(base + (['PE','PD','LD','LE'].includes(player.position) ? 5 : goalkeeper ? -18 : -5) + jitter(5)),
+    heading: clampSkill(base + (['ATA','ZAG'].includes(player.position) ? 5 : goalkeeper ? -15 : -2) + jitter(8)),
+    positioning: clampSkill(base + (['ZAG','VOL','ATA','GOL'].includes(player.position) ? 4 : 0) + jitter(11)),
+    vision: clampSkill(base + (['MEI','MC','VOL'].includes(player.position) ? 5 : goalkeeper ? -12 : -2) + jitter(14)),
+    setPieces: clampSkill(base + (['MEI','MC','PE','PD'].includes(player.position) ? 3 : goalkeeper ? -15 : -6) + jitter(17)),
+    penalties: clampSkill(base + (['ATA','MEI','PD','PE'].includes(player.position) ? 4 : goalkeeper ? -12 : -4) + jitter(20)),
+    tackling: clampSkill(base + (['ZAG','VOL','LD','LE'].includes(player.position) ? 5 : ['ATA','PE','PD'].includes(player.position) ? -10 : -2) + jitter(3)),
+    composure: clampSkill(base + (['ATA','MEI','GOL'].includes(player.position) ? 3 : 0) + jitter(6)),
+    decisions: clampSkill(base + (['MC','MEI','VOL','GOL'].includes(player.position) ? 3 : 0) + jitter(9)),
+    goalkeepingReflexes: clampSkill(goalkeeper ? goalkeeping + jitter(12) : 20),
+    goalkeepingRushing: clampSkill(goalkeeper ? goalkeeping + jitter(15) : 20),
+    goalkeepingHandling: clampSkill(goalkeeper ? goalkeeping + jitter(18) : 20),
   };
 }
 
@@ -302,7 +318,7 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
   return {
     ...player,
     potential: player.potential ?? clamp(player.strength + (player.age <= 21 ? 8 + (seed % 8) : player.age <= 25 ? 4 + (seed % 5) : 1 + (seed % 3)), player.strength, 95),
-    skills: player.skills ?? defaultPlayerSkills(player),
+    skills: { ...defaultPlayerSkills(player), ...(player.skills ?? {}) },
     secondaryPositions: player.secondaryPositions ?? (secondaryByPosition[player.position] ?? []).slice(0, 1 + (seed % 2)),
     personality: player.personality ?? personalities[seed % personalities.length],
     squadRole: player.squadRole ?? role,
@@ -323,6 +339,9 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
     lastSocialEventRound: player.lastSocialEventRound ?? -99,
     loanedOutUntilRound: player.loanedOutUntilRound ?? null,
     loanClubName: player.loanClubName ?? null,
+    injuryDaysRemaining: player.injuryDaysRemaining ?? 0,
+    injuryName: player.injuryName ?? null,
+    suspensionReason: player.suspensionReason ?? null,
   };
 }
 
@@ -351,6 +370,12 @@ export function createCareer(coachName: string, clubId: string): Career {
     benchIds,
     captainId: captain?.id ?? lineup[0]?.playerId ?? '',
     tactics: { mentality: 'equilibrada', pressure: 'normal', tempo: 'normal' },
+    setPieceTakers: {
+      penalties: lineup.find((slot) => slot.position === 'ATA')?.playerId ?? lineup[0]?.playerId ?? null,
+      freeKicks: lineup.find((slot) => slot.position === 'MEI')?.playerId ?? lineup[0]?.playerId ?? null,
+      leftCorners: lineup.find((slot) => slot.position === 'PE')?.playerId ?? lineup.find((slot) => slot.position === 'MEI')?.playerId ?? null,
+      rightCorners: lineup.find((slot) => slot.position === 'PD')?.playerId ?? lineup.find((slot) => slot.position === 'MEI')?.playerId ?? null,
+    },
     boardTrust: 66,
     fanTrust: 60,
     legalWorkloadEvents: 0,
@@ -2013,6 +2038,7 @@ export function parseCareer(saved: string | null): Career | null {
       },
       legalWorkloadEvents: typeof (parsed as Career).legalWorkloadEvents === 'number' ? (parsed as Career).legalWorkloadEvents : 0,
       fanTrust: typeof (parsed as Career).fanTrust === 'number' ? (parsed as Career).fanTrust : 60,
+      setPieceTakers: (parsed as Career).setPieceTakers ?? { penalties: null, freeKicks: null, leftCorners: null, rightCorners: null },
       sponsorships: {
         ...fallbackSponsorships,
         ...rawSponsorships,
