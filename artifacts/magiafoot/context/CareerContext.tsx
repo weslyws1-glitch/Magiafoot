@@ -343,7 +343,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     declinePlayerOffer,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
