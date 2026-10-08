@@ -50,7 +50,11 @@ export default function TacticsScreen() {
   const lineup = career.liveMatch?.userLineup ?? career.lineup;
   const starterIds = new Set(lineup.map((slot) => slot.playerId));
   const benchIds = career.liveMatch?.userBenchIds ?? career.benchIds;
-  const bench = sortPlayers(career.players.filter((p) => benchIds.includes(p.id) && !starterIds.has(p.id) && p.status === 'available'));
+  const bench = sortPlayers(career.players.filter((p) =>
+    benchIds.includes(p.id)
+    && !starterIds.has(p.id)
+    && (live ? p.status === 'available' : true)
+  ));
   const substitutedOut = live
     ? sortPlayers(career.players.filter((p) => (career.liveMatch?.substitutedOutIds ?? []).includes(p.id)))
     : [];
@@ -222,7 +226,7 @@ export default function TacticsScreen() {
                 <Text style={styles.benchPos}>{player.position}</Text>
                 <Text numberOfLines={1} style={styles.benchName}>{player.name.split(' ')[0]}</Text>
                 <Text style={styles.benchRating}>FOR {effectiveStrength(player)}</Text>
-                <Text style={styles.benchCondition}>CND {Math.round(player.fitness)}</Text>
+                <Text style={styles.benchCondition}>{player.status === 'available' ? 'CND ' + Math.round(player.fitness) : statusText(player).toUpperCase()}</Text>
               </Pressable>
             );
           })}
