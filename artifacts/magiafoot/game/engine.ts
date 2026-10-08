@@ -405,28 +405,50 @@ export function effectiveStrength(player: Player, position: Position = player.po
 }
 
 export function assignPlayerToSlot(career: Career, slotId: string, playerId: string): Career {
+  if (career.liveMatch && career.liveMatch.phase !== 'pregame') return career;
   const targetIndex = career.lineup.findIndex((slot) => slot.id === slotId);
   const targetPlayer = career.players.find((player) => player.id === playerId);
   if (targetIndex < 0 || !targetPlayer || targetPlayer.status !== 'available') return career;
+
   const lineup = career.lineup.map((slot) => ({ ...slot }));
   const currentSlotIndex = lineup.findIndex((slot) => slot.playerId === playerId);
   const outgoingId = lineup[targetIndex]?.playerId;
-  if (!outgoingId) return career;
+  if (!outgoingId || outgoingId === playerId) return career;
 
-  if (currentSlotIndex >= 0 && currentSlotIndex !== targetIndex) {
-    const other = lineup[currentSlotIndex];
-    const target = lineup[targetIndex];
-    if (other && target) {
-      lineup[currentSlotIndex] = { ...other, playerId: outgoingId };
-      lineup[targetIndex] = { ...target, playerId };
-    }
-    return { ...career, lineup, captainId: career.captainId };
+  if (currentSlotIndex >= 0) {
+    const currentSlot = lineup[currentSlotIndex];
+    const targetSlot = lineup[targetIndex];
+    if (!currentSlot || !targetSlot) return career;
+    lineup[currentSlotIndex] = { ...currentSlot, playerId: outgoingId };
+    lineup[targetIndex] = { ...targetSlot, playerId };
+    return { ...career, lineup, captainId: career.captainId === outgoingId ? playerId : career.captainId };
   }
 
+  const benchIndex = career.benchIds.indexOf(playerId);
   lineup[targetIndex] = { ...lineup[targetIndex]!, playerId };
-  const benchIds = buildBench(career.players, lineup);
+
+  const benchIds = [...career.benchIds];
+  if (benchIndex >= 0) {
+    benchIds[benchIndex] = outgoingId;
+  }
+
   const newCaptain = career.captainId === outgoingId ? playerId : career.captainId;
   return { ...career, lineup, benchIds, captainId: newCaptain };
+}
+
+export function replaceBenchPlayer(career: Career, outgoingBenchId: string, incomingId: string): Career {
+  if (career.liveMatch && career.liveMatch.phase !== 'pregame') return career;
+  const benchIndex = career.benchIds.indexOf(outgoingBenchId);
+  if (benchIndex < 0) return career;
+
+  const incoming = career.players.find((player) => player.id === incomingId);
+  if (!incoming || incoming.status !== 'available') return career;
+  if (career.lineup.some((slot) => slot.playerId === incomingId)) return career;
+  if (career.benchIds.includes(incomingId)) return career;
+
+  const benchIds = [...career.benchIds];
+  benchIds[benchIndex] = incomingId;
+  return { ...career, benchIds };
 }
 
 export function changeFormation(career: Career, formationId: FormationId): Career {
@@ -532,6 +554,10 @@ export function startMatch(career: Career): Career {
     userLineup: lineup.map((slot) => ({ ...slot })),
     userBenchIds: benchIds,
     substitutionsUsed: 0,
+    substitutedOutIds: [],
+    startedPlayerIds: lineup.map((slot) => slot.playerId),
+    appearedPlayerIds: lineup.map((slot) => slot.playerId),
+    pausedForTactics: false,
     events: [],
     randomSeed: (hash(`${career.clubId}-${career.roundIndex}-${career.season}`) + 19) >>> 0,
   };
@@ -605,14 +631,16 @@ function maybeInjurePlayer(career: Career, game: MatchSession, clubId: string): 
   game.userLineup = game.userLineup.map((item) => item.id === slot.id ? patchedSlot : item);
   addEvent(game, 'medical', `${candidate.name} sente a perna. O atendimento médico entra em campo.`, clubId, candidate.id);
   if (replacementId) {
-    game.userBenchIds = game.userBenchIds.filter((id) => id !== replacementId).concat(candidate.id);
+    game.userBenchIds = game.userBenchIds.filter((id) => id !== replacementId);
     game.substitutionsUsed = Math.min(5, game.substitutionsUsed + 1);
+    game.substitutedOutIds = [...new Set([...(game.substitutedOutIds ?? []), candidate.id])];
+    game.appearedPlayerIds = [...new Set([...(game.appearedPlayerIds ?? game.userLineup.map((item) => item.playerId)), replacementId])];
     const replacement = players.find((player) => player.id === replacementId);
-    addEvent(game, 'substitution', `${replacement?.name ?? 'Um reserva'} entra no lugar de ${candidate.name}. O jogo segue.`, clubId, replacementId);
+    addEvent(game, 'substitution', `${replacement?.name ?? 'Um reserva'} entra no lugar de ${candidate.name}. ${candidate.name} não pode retornar. O jogo segue.`, clubId, replacementId);
   } else {
     addEvent(game, 'substitution', `${candidate.name} deixa o campo. ${getClub(clubId)?.name} continua com um a menos.`, clubId, candidate.id);
   }
-  return { ...career, players, lineup: game.userLineup, benchIds: game.userBenchIds };
+  return { ...career, players, liveMatch: { ...game } };
 }
 
 function simulateChance(career: Career, game: MatchSession, clubId: string): Career {
@@ -713,13 +741,16 @@ function simulateMinute(career: Career, game: MatchSession) {
 
 export function advanceMatch(career: Career, minutes = 5): Career {
   const existing = career.liveMatch;
-  if (!existing || existing.phase === 'finished') return career;
+  if (!existing || existing.phase === 'finished' || existing.pausedForTactics) return career;
   const game: MatchSession = {
     ...existing,
     homeStats: { ...existing.homeStats },
     awayStats: { ...existing.awayStats },
     userLineup: existing.userLineup.map((slot) => ({ ...slot })),
     userBenchIds: [...existing.userBenchIds],
+    substitutedOutIds: [...(existing.substitutedOutIds ?? [])],
+    startedPlayerIds: [...(existing.startedPlayerIds ?? existing.userLineup.map((slot) => slot.playerId))],
+    appearedPlayerIds: [...(existing.appearedPlayerIds ?? existing.userLineup.map((slot) => slot.playerId))],
     events: [...existing.events],
   };
   let next: Career = { ...career, liveMatch: game };
@@ -741,27 +772,51 @@ export function advanceMatch(career: Career, minutes = 5): Career {
   return { ...next, liveMatch: game };
 }
 
+export function setMatchTacticsPaused(career: Career, paused: boolean): Career {
+  const game = career.liveMatch;
+  if (!game || game.phase === 'finished') return career;
+  return {
+    ...career,
+    liveMatch: {
+      ...game,
+      pausedForTactics: paused,
+    },
+  };
+}
+
 export function substitutePlayer(career: Career, outgoingId: string, incomingId: string): Career {
   const game = career.liveMatch;
   if (!game || game.phase === 'finished' || game.substitutionsUsed >= 5) return career;
   if (!game.userBenchIds.includes(incomingId)) return career;
+  if ((game.substitutedOutIds ?? []).includes(incomingId)) return career;
+
   const index = game.userLineup.findIndex((slot) => slot.playerId === outgoingId && !slot.sentOff);
   if (index < 0) return career;
+
   const incoming = career.players.find((player) => player.id === incomingId);
   if (!incoming || incoming.status !== 'available') return career;
+
+  const appearedPlayerIds = new Set(game.appearedPlayerIds ?? game.userLineup.map((slot) => slot.playerId));
+  appearedPlayerIds.add(incomingId);
+
   const gameCopy: MatchSession = {
     ...game,
-    userLineup: game.userLineup.map((slot, slotIndex) => slotIndex === index ? { ...slot, playerId: incomingId, sentOff: false, offReason: undefined } : { ...slot }),
-    userBenchIds: game.userBenchIds.filter((id) => id !== incomingId).concat(outgoingId),
+    userLineup: game.userLineup.map((slot, slotIndex) => slotIndex === index
+      ? { ...slot, playerId: incomingId, sentOff: false, offReason: undefined }
+      : { ...slot }),
+    userBenchIds: game.userBenchIds.filter((id) => id !== incomingId),
     substitutionsUsed: game.substitutionsUsed + 1,
+    substitutedOutIds: [...new Set([...(game.substitutedOutIds ?? []), outgoingId])],
+    startedPlayerIds: [...(game.startedPlayerIds ?? game.userLineup.map((slot) => slot.playerId))],
+    appearedPlayerIds: [...appearedPlayerIds],
     events: [...game.events],
   };
+
   const outgoing = career.players.find((player) => player.id === outgoingId);
-  addEvent(gameCopy, 'substitution', `${incoming.name} entra no lugar de ${outgoing?.name ?? 'um companheiro'}. Substituições: ${gameCopy.substitutionsUsed}/5.`, career.clubId, incomingId);
+  addEvent(gameCopy, 'substitution', `${incoming.name} entra no lugar de ${outgoing?.name ?? 'um companheiro'}. ${outgoing?.name ?? 'O jogador substituído'} não pode retornar. Substituições: ${gameCopy.substitutionsUsed}/5.`, career.clubId, incomingId);
+
   return {
     ...career,
-    lineup: gameCopy.userLineup.map((slot) => ({ ...slot })),
-    benchIds: [...gameCopy.userBenchIds],
     liveMatch: gameCopy,
   };
 }
@@ -1627,12 +1682,13 @@ export function finalizeMatch(career: Career): Career {
   const gateIncome = club ? attendance * (career.ticketPrice ?? club.ticketPrice) : 0;
   const wageBill = career.players.reduce((sum, player) => sum + player.wage, 0);
   const finalLineupIds = new Set(game.userLineup.map((slot) => slot.playerId));
+  const startedIds = new Set(game.startedPlayerIds ?? game.userLineup.map((slot) => slot.playerId));
   const eventPlayerIds = new Set(game.events.filter((item) => item.playerId && item.clubId === career.clubId).map((item) => item.playerId as string));
-  const appearedIds = new Set([...finalLineupIds, ...eventPlayerIds]);
+  const appearedIds = new Set([...(game.appearedPlayerIds ?? []), ...finalLineupIds, ...eventPlayerIds]);
   const updatedPlayers = career.players.map((player) => {
     const redEvent = game.events.find((item) => item.type === 'red' && item.playerId === player.id && item.clubId === career.clubId);
     const appeared = appearedIds.has(player.id);
-    const started = finalLineupIds.has(player.id);
+    const started = startedIds.has(player.id);
     const goals = game.events.filter((item) => item.type === 'goal' && item.playerId === player.id && item.clubId === career.clubId).length;
     const yellows = game.events.filter((item) => item.type === 'yellow' && item.playerId === player.id && item.clubId === career.clubId).length;
     const reds = redEvent ? 1 : 0;
@@ -1889,6 +1945,14 @@ export function parseCareer(saved: string | null): Career | null {
         }))
       : [];
     const migratedLeagueFixtures = migrateLeagueScheduleForCareer(parsed);
+    const rawLiveMatch = (parsed as Career).liveMatch;
+    const migratedLiveMatch: Career['liveMatch'] = rawLiveMatch ? {
+      ...rawLiveMatch,
+      substitutedOutIds: Array.isArray(rawLiveMatch.substitutedOutIds) ? rawLiveMatch.substitutedOutIds : [],
+      startedPlayerIds: Array.isArray(rawLiveMatch.startedPlayerIds) ? rawLiveMatch.startedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
+      appearedPlayerIds: Array.isArray(rawLiveMatch.appearedPlayerIds) ? rawLiveMatch.appearedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
+      pausedForTactics: false,
+    } : null;
     const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
       stands: Math.max(1, Math.min(5, (parsed.stadiumLevel ?? 0) + 1)),
@@ -1935,6 +1999,7 @@ export function parseCareer(saved: string | null): Career | null {
       playerTransferOffers: Array.isArray((parsed as Career).playerTransferOffers) ? (parsed as Career).playerTransferOffers : [],
       seasonHistory: Array.isArray((parsed as Career).seasonHistory) ? (parsed as Career).seasonHistory : [],
       leagueFixtures: migratedLeagueFixtures,
+      liveMatch: migratedLiveMatch,
       newsFeed: Array.isArray((parsed as Career).newsFeed) ? (parsed as Career).newsFeed : fallbackNewsFeed,
     };
   } catch {
