@@ -601,13 +601,22 @@ export function startMatch(career: Career): Career {
     userLineup: lineup.map((slot) => ({ ...slot })),
     userBenchIds: benchIds,
     substitutionsUsed: 0,
+    substitutionWindowsUsed: 0,
+    lastSubstitutionMinute: null,
     substitutedOutIds: [],
     startedPlayerIds: lineup.map((slot) => slot.playerId),
     appearedPlayerIds: lineup.map((slot) => slot.playerId),
+    yellowCardCounts: {},
     pausedForTactics: false,
+    pausedForVar: false,
+    pendingVar: null,
+    firstHalfAddedTime: 0,
+    secondHalfAddedTime: 0,
+    referee: { name: '', strictness: 50, advantage: 50, varSensitivity: 50 },
     events: [],
     randomSeed: (hash(`${career.clubId}-${career.roundIndex}-${career.season}`) + 19) >>> 0,
   };
+  game.referee = makeMatchReferee(game);
   const fieldCapacity = trainingFieldCapacity(career.trainingCenterUpgrades?.field ?? 1);
   const overcrowding = Math.max(0, recoveredPlayers.length - fieldCapacity);
   const adjustedPlayers = overcrowding > 0
@@ -642,6 +651,17 @@ function attackModifier(career: Career, game: MatchSession, clubId: string): num
   const tempo = career.tactics.tempo === 'alta' ? 0.035 : career.tactics.tempo === 'baixa' ? -0.025 : 0;
   const pressure = career.tactics.pressure === 'alta' ? 0.018 : career.tactics.pressure === 'baixa' ? -0.008 : 0;
   return mentality + tempo + pressure;
+}
+
+function makeMatchReferee(game: MatchSession) {
+  const names = ['Rafael Monteiro','Bruno Azevedo','Caio Nogueira','Diego Valença','Henrique Paes','Lucas Ferraz'];
+  const seed = hash(game.fixture.id + '-ref-' + game.randomSeed);
+  return {
+    name: names[seed % names.length]!,
+    strictness: 42 + (seed % 36),
+    advantage: 35 + ((seed >> 5) % 46),
+    varSensitivity: 45 + ((seed >> 9) % 41),
+  };
 }
 
 function getOtherClub(game: MatchSession, clubId: string): string {
@@ -2000,7 +2020,15 @@ export function parseCareer(saved: string | null): Career | null {
       substitutedOutIds: Array.isArray(rawLiveMatch.substitutedOutIds) ? rawLiveMatch.substitutedOutIds : [],
       startedPlayerIds: Array.isArray(rawLiveMatch.startedPlayerIds) ? rawLiveMatch.startedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
       appearedPlayerIds: Array.isArray(rawLiveMatch.appearedPlayerIds) ? rawLiveMatch.appearedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
+      substitutionWindowsUsed: typeof rawLiveMatch.substitutionWindowsUsed === 'number' ? rawLiveMatch.substitutionWindowsUsed : 0,
+      lastSubstitutionMinute: typeof rawLiveMatch.lastSubstitutionMinute === 'number' ? rawLiveMatch.lastSubstitutionMinute : null,
+      yellowCardCounts: rawLiveMatch.yellowCardCounts ?? {},
       pausedForTactics: false,
+      pausedForVar: false,
+      pendingVar: null,
+      firstHalfAddedTime: typeof rawLiveMatch.firstHalfAddedTime === 'number' ? rawLiveMatch.firstHalfAddedTime : 0,
+      secondHalfAddedTime: typeof rawLiveMatch.secondHalfAddedTime === 'number' ? rawLiveMatch.secondHalfAddedTime : 0,
+      referee: rawLiveMatch.referee ?? { name: 'Árbitro da partida', strictness: 55, advantage: 50, varSensitivity: 55 },
     } : null;
     const fallbackNewsFeed: Career['newsFeed'] = [];
     const fallbackUpgrades: Career['stadiumUpgrades'] = {
