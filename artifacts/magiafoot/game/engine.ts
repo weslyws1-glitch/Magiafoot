@@ -433,7 +433,16 @@ export function assignPlayerToSlot(career: Career, slotId: string, playerId: str
   }
 
   const newCaptain = career.captainId === outgoingId ? playerId : career.captainId;
-  return { ...career, lineup, benchIds, captainId: newCaptain };
+  const liveMatch = career.liveMatch?.phase === 'pregame'
+    ? {
+        ...career.liveMatch,
+        userLineup: lineup.map((slot) => ({ ...slot })),
+        userBenchIds: [...benchIds],
+        startedPlayerIds: lineup.map((slot) => slot.playerId),
+        appearedPlayerIds: lineup.map((slot) => slot.playerId),
+      }
+    : career.liveMatch;
+  return { ...career, lineup, benchIds, captainId: newCaptain, liveMatch };
 }
 
 export function replaceBenchPlayer(career: Career, outgoingBenchId: string, incomingId: string): Career {
@@ -448,7 +457,10 @@ export function replaceBenchPlayer(career: Career, outgoingBenchId: string, inco
 
   const benchIds = [...career.benchIds];
   benchIds[benchIndex] = incomingId;
-  return { ...career, benchIds };
+  const liveMatch = career.liveMatch?.phase === 'pregame'
+    ? { ...career.liveMatch, userBenchIds: [...benchIds] }
+    : career.liveMatch;
+  return { ...career, benchIds, liveMatch };
 }
 
 export function changeFormation(career: Career, formationId: FormationId): Career {
@@ -459,12 +471,22 @@ export function changeFormation(career: Career, formationId: FormationId): Caree
   const captainId = lineup.some((slot) => slot.playerId === career.captainId)
     ? career.captainId
     : lineup[0]?.playerId ?? '';
+  const liveMatch = career.liveMatch?.phase === 'pregame'
+    ? {
+        ...career.liveMatch,
+        userLineup: lineup.map((slot) => ({ ...slot })),
+        userBenchIds: [...benchIds],
+        startedPlayerIds: lineup.map((slot) => slot.playerId),
+        appearedPlayerIds: lineup.map((slot) => slot.playerId),
+      }
+    : career.liveMatch;
   return {
     ...career,
     formationId: formation.id,
     lineup,
     benchIds,
     captainId,
+    liveMatch,
   };
 }
 
