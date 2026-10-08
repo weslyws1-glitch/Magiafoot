@@ -665,48 +665,412 @@ function getOtherClub(game: MatchSession, clubId: string): string {
   return clubId === game.fixture.homeClubId ? game.fixture.awayClubId : game.fixture.homeClubId;
 }
 
+function addStoppage(game: MatchSession, minutes: number) {
+  const amount = clamp(Math.round(minutes), 0, 8);
+  if (amount <= 0) return;
+  if (game.phase === 'first_half') game.firstHalfAddedTime = clamp(game.firstHalfAddedTime + amount, 0, 9);
+  if (game.phase === 'second_half') game.secondHalfAddedTime = clamp(game.secondHalfAddedTime + amount, 0, 12);
+}
+
+function activeUserPlayerById(career: Career, game: MatchSession, playerId: string | null | undefined): Player | undefined {
+  if (!playerId) return undefined;
+  const onField = game.userLineup.some((slot) => slot.playerId === playerId && !slot.sentOff);
+  if (!onField) return undefined;
+  return career.players.find((player) => player.id === playerId && player.status === 'available');
+}
+
+function bestSetPieceTaker(career: Career, game: MatchSession, kind: 'penalties' | 'freeKicks' | 'leftCorners' | 'rightCorners'): Player | undefined {
+  const preferredId = career.setPieceTakers?.[kind] ?? null;
+  const preferred = activeUserPlayerById(career, game, preferredId);
+  if (preferred) return preferred;
+
+  const candidates = currentGamePlayers(career, game).map((item) => item.player);
+  const skillKey = kind === 'penalties' ? 'penalties' : kind === 'freeKicks' ? 'setPieces' : 'crossing';
+  return candidates.sort((a, b) => {
+    const aSkill = a.skills?.[skillKey] ?? a.strength;
+    const bSkill = b.skills?.[skillKey] ?? b.strength;
+    return bSkill - aSkill;
+  })[0];
+}
+
+function userGoalkeeper(career: Career, game: MatchSession): Player | undefined {
+  const slot = game.userLineup.find((item) => item.position === 'GOL' && !item.sentOff);
+  return slot ? career.players.find((player) => player.id === slot.playerId) : undefined;
+}
+
+function sendOffUserPlayer(career: Career, game: MatchSession, playerId: string, reason: string): Career {
+  const player = career.players.find((item) => item.id === playerId);
+  if (!player) return career;
+
+  game.userLineup = game.userLineup.map((slot) => slot.playerId === playerId
+    ? { ...slot, sentOff: true, offReason: 'red' as const }
+    : slot);
+
+  return {
+    ...career,
+    players: career.players.map((item) => item.id === playerId
+      ? {
+          ...item,
+          status: 'suspended' as const,
+          suspendedUntilRound: game.fixture.roundIndex + 1,
+          suspensionReason: reason,
+        }
+      : item),
+  };
+}
+
+function queueVar(
+  game: MatchSession,
+  review: NonNullable<MatchSession['pendingVar']>,
+) {
+  game.pendingVar = review;
+  game.pausedForVar = true;
+  if (review.clubId) statLine(game, review.clubId).varReviews += 1;
+  addStoppage(game, 2);
+  addEvent(game, 'var_start', `VAR: ${review.headline}. O jogo está paralisado para revisão.`, review.clubId, review.playerId);
+}
+
+function scoreGoal(game: MatchSession, clubId: string) {
+  if (clubId === game.fixture.homeClubId) game.homeGoals += 1;
+  else game.awayGoals += 1;
+}
+
+function removeGoal(game: MatchSession, clubId: string) {
+  if (clubId === game.fixture.homeClubId) game.homeGoals = Math.max(0, game.homeGoals - 1);
+  else game.awayGoals = Math.max(0, game.awayGoals - 1);
+}
+
+function takePenalty(career: Career, game: MatchSession, clubId: string): Career {
+  const stats = statLine(game, clubId);
+  stats.penalties += 1;
+  stats.shots += 1;
+  stats.bigChances += 1;
+  stats.xg += 0.76;
+
+  const isUser = clubId === career.clubId;
+  const taker = isUser ? bestSetPieceTaker(career, game, 'penalties') : undefined;
+  const takerQuality = isUser
+    ? ((taker?.skills?.penalties ?? taker?.strength ?? 66) * 0.65 + (taker?.skills?.composure ?? taker?.strength ?? 66) * 0.35)
+    : (getClub(clubId)?.rating ?? 64) + 5;
+  const keeper = clubId === career.clubId ? undefined : userGoalkeeper(career, game);
+  const keeperQuality = keeper
+    ? ((keeper.skills?.goalkeepingReflexes ?? keeper.strength) * 0.65 + (keeper.skills?.goalkeepingHandling ?? keeper.strength) * 0.35)
+    : (getClub(getOtherClub(game, clubId))?.rating ?? 64);
+  const goalChance = clamp(0.74 + (takerQuality - keeperQuality) * 0.004, 0.56, 0.91);
+  const takerName = taker?.name ?? 'O cobrador';
+
+  addEvent(game, 'penalty', `${game.minute}′ PÊNALTI! ${takerName} prepara a cobrança.`, clubId, taker?.id);
+
+  const doubleTouch = gameRandom(game) < 0.012;
+  let scored = gameRandom(game) < goalChance;
+  if (doubleTouch) {
+    addEvent(game, 'penalty', `${game.minute}′ O cobrador toca acidentalmente duas vezes na bola. Se entrar, a cobrança será repetida.`, clubId, taker?.id);
+    if (scored) scored = gameRandom(game) < goalChance;
+  }
+
+  if (scored) {
+    stats.shotsOnTarget += 1;
+    scoreGoal(game, clubId);
+    addEvent(game, 'goal', `${game.minute}′ GOL DE PÊNALTI! ${takerName} desloca o goleiro e marca.`, clubId, taker?.id);
+  } else if (gameRandom(game) < 0.72) {
+    stats.shotsOnTarget += 1;
+    statLine(game, getOtherClub(game, clubId)).saves += 1;
+    addEvent(game, 'save', `${game.minute}′ DEFENDEU! O goleiro acerta o canto e salva o pênalti.`, clubId, taker?.id);
+  } else {
+    addEvent(game, 'post', `${game.minute}′ NA TRAVE! A cobrança explode na madeira.`, clubId, taker?.id);
+  }
+  return career;
+}
+
+export function resolveVarReview(career: Career): Career {
+  const existing = career.liveMatch;
+  if (!existing || !existing.pendingVar) return career;
+
+  const game: MatchSession = {
+    ...existing,
+    homeStats: { ...existing.homeStats },
+    awayStats: { ...existing.awayStats },
+    userLineup: existing.userLineup.map((slot) => ({ ...slot })),
+    userBenchIds: [...existing.userBenchIds],
+    yellowCardCounts: { ...(existing.yellowCardCounts ?? {}) },
+    substitutedOutIds: [...(existing.substitutedOutIds ?? [])],
+    appearedPlayerIds: [...(existing.appearedPlayerIds ?? [])],
+    events: [...existing.events],
+  };
+  const review = game.pendingVar;
+  let next: Career = { ...career, liveMatch: game };
+
+  if (review.decision === 'overturned') {
+    if (review.reverseGoalForClubId) removeGoal(game, review.reverseGoalForClubId);
+    addEvent(game, 'var_overturn', `DECISÃO ALTERADA! ${review.detail}`, review.clubId, review.playerId);
+  } else {
+    if ((review.reason === 'red_card' || review.reason === 'second_yellow') && review.clubId === career.clubId && review.playerId) {
+      next = sendOffUserPlayer(next, game, review.playerId, review.reason === 'second_yellow' ? 'Expulso por segundo cartão amarelo' : 'Expulsão direta');
+      statLine(game, career.clubId).redCards += 1;
+      addEvent(game, review.reason === 'second_yellow' ? 'second_yellow' : 'red',
+        review.reason === 'second_yellow'
+          ? `${game.minute}′ Segundo amarelo confirmado pelo VAR. Expulso!`
+          : `${game.minute}′ Cartão vermelho confirmado pelo VAR.`,
+        career.clubId, review.playerId);
+    }
+    addEvent(game, 'var_end', `VAR confirma a decisão: ${review.detail}`, review.clubId, review.playerId);
+    if (review.reason === 'penalty' && review.awardPenaltyToClubId) {
+      next = takePenalty(next, game, review.awardPenaltyToClubId);
+    }
+  }
+
+  game.pendingVar = null;
+  game.pausedForVar = false;
+  return { ...next, liveMatch: game };
+}
+
 function maybeInjurePlayer(career: Career, game: MatchSession, clubId: string): Career {
-  const stat = statLine(game, clubId);
+  const stats = statLine(game, clubId);
   const isUser = clubId === career.clubId;
   const candidate = isUser ? activeClubPlayer(career, game) : undefined;
   const medicalLevel = career.trainingCenterUpgrades?.medical ?? 1;
   const gymLevel = career.trainingCenterUpgrades?.gym ?? 1;
-  const medicalProtection = Math.max(0.35, 1 - (medicalLevel - 1) * 0.055);
-  const gymProtection = Math.max(0.72, 1 - (gymLevel - 1) * 0.02);
+  const medicalProtection = Math.max(0.42, 1 - (medicalLevel - 1) * 0.052);
+  const gymProtection = Math.max(0.74, 1 - (gymLevel - 1) * 0.018);
   const risk = isUser
-    ? (candidate && candidate.fitness < 45 ? 0.00125 : 0.00032) * medicalProtection * gymProtection
-    : 0.00018;
+    ? (candidate && candidate.fitness < 45 ? 0.0017 : 0.00048) * medicalProtection * gymProtection
+    : 0.00028;
   if (gameRandom(game) >= risk) return career;
-  stat.injuries += 1;
+
+  stats.injuries += 1;
+  addStoppage(game, 2 + Math.floor(gameRandom(game) * 2));
+
   if (!isUser || !candidate) {
-    addEvent(game, 'medical', `${game.minute}′ Atendimento médico em campo. A partida continua.`, clubId);
+    addEvent(game, 'medical', `${game.minute}′ Atendimento médico. O jogador adversário recebe cuidados e a partida é retomada.`, clubId);
     return career;
   }
 
-  const slot = game.userLineup.find((item) => item.playerId === candidate.id && !item.sentOff);
-  if (!slot) return career;
+  const severityRoll = gameRandom(game);
+  const injury =
+    severityRoll < 0.38 ? { name: 'Contusão leve', min: 4, max: 8, fitness: 8 } :
+    severityRoll < 0.68 ? { name: 'Entorse', min: 8, max: 18, fitness: 14 } :
+    severityRoll < 0.90 ? { name: 'Lesão muscular', min: 18, max: 35, fitness: 20 } :
+    { name: 'Lesão ligamentar', min: 35, max: 70, fitness: 28 };
+  const rawDays = injury.min + Math.floor(gameRandom(game) * (injury.max - injury.min + 1));
+  const days = Math.max(3, Math.round(rawDays * medicalProtection));
+  const roundsOut = Math.max(1, Math.ceil(days / 7));
+
   const players = career.players.map((player) => player.id === candidate.id
-    ? { ...player, status: 'injured' as const, injuryUntilRound: game.fixture.roundIndex + 1, fitness: Math.max(10, player.fitness - 12) }
+    ? {
+        ...player,
+        status: 'injured' as const,
+        injuryUntilRound: game.fixture.roundIndex + roundsOut,
+        injuryDaysRemaining: days,
+        injuryName: injury.name,
+        fitness: Math.max(5, player.fitness - injury.fitness),
+      }
     : player);
-  const replacementId = game.substitutionsUsed < 5
-    ? game.userBenchIds.find((id) => players.some((player) => player.id === id && player.status === 'available'))
-    : undefined;
-  const patchedSlot = replacementId
-    ? { ...slot, playerId: replacementId, sentOff: false, offReason: undefined }
-    : { ...slot, sentOff: true, offReason: 'injury' as const };
-  game.userLineup = game.userLineup.map((item) => item.id === slot.id ? patchedSlot : item);
-  addEvent(game, 'medical', `${candidate.name} sente a perna. O atendimento médico entra em campo.`, clubId, candidate.id);
-  if (replacementId) {
-    game.userBenchIds = game.userBenchIds.filter((id) => id !== replacementId);
-    game.substitutionsUsed = Math.min(5, game.substitutionsUsed + 1);
-    game.substitutedOutIds = [...new Set([...(game.substitutedOutIds ?? []), candidate.id])];
-    game.appearedPlayerIds = [...new Set([...(game.appearedPlayerIds ?? game.userLineup.map((item) => item.playerId)), replacementId])];
-    const replacement = players.find((player) => player.id === replacementId);
-    addEvent(game, 'substitution', `${replacement?.name ?? 'Um reserva'} entra no lugar de ${candidate.name}. ${candidate.name} não pode retornar. O jogo segue.`, clubId, replacementId);
+
+  addEvent(game, 'medical', `${game.minute}′ ${candidate.name} cai no gramado. O departamento médico entra imediatamente.`, clubId, candidate.id);
+  addEvent(game, 'injury_forced_sub', `${candidate.name} sofreu ${injury.name.toLowerCase()} e ficará aproximadamente ${days} dias fora. A troca é obrigatória.`, clubId, candidate.id);
+
+  const canOpenWindow = game.phase === 'halftime'
+    || game.lastSubstitutionMinute === game.minute
+    || game.substitutionWindowsUsed < 3;
+  const canSubstitute = game.substitutionsUsed < 5
+    && canOpenWindow
+    && game.userBenchIds.some((id) => players.some((player) => player.id === id && player.status === 'available'));
+
+  if (canSubstitute) {
+    game.requiredSubstitutionPlayerId = candidate.id;
+    game.pausedForTactics = true;
   } else {
-    addEvent(game, 'substitution', `${candidate.name} deixa o campo. ${getClub(clubId)?.name} continua com um a menos.`, clubId, candidate.id);
+    game.userLineup = game.userLineup.map((slot) => slot.playerId === candidate.id
+      ? { ...slot, sentOff: true, offReason: 'injury' as const }
+      : slot);
+    game.substitutedOutIds = [...new Set([...(game.substitutedOutIds ?? []), candidate.id])];
+    addEvent(game, 'injury_forced_sub', `Sem substituição disponível. ${getClub(clubId)?.name} seguirá com um jogador a menos.`, clubId, candidate.id);
   }
+
   return { ...career, players, liveMatch: { ...game } };
+}
+
+function maybeGoalVar(game: MatchSession, clubId: string, playerId?: string) {
+  if (game.pausedForVar || gameRandom(game) > 0.14) return;
+  const overturned = gameRandom(game) < 0.27;
+  queueVar(game, {
+    id: `var-goal-${game.minute}-${game.events.length}`,
+    reason: 'goal',
+    clubId,
+    playerId,
+    decision: overturned ? 'overturned' : 'confirmed',
+    headline: gameRandom(game) < 0.55 ? 'checagem de possível impedimento' : 'checagem da origem do gol',
+    detail: overturned ? 'gol anulado após a revisão' : 'gol legal, sem infração no lance',
+    reverseGoalForClubId: clubId,
+  });
+}
+
+function maybePenaltySituation(career: Career, game: MatchSession, attackingClubId: string): Career {
+  if (game.pausedForVar) return career;
+  const defenderId = getOtherClub(game, attackingClubId);
+  const attackStats = statLine(game, attackingClubId);
+  const defenseStats = statLine(game, defenderId);
+  const isHandball = gameRandom(game) < 0.42;
+  if (isHandball) {
+    defenseStats.handballs += 1;
+    addEvent(game, 'handball', `${game.minute}′ A bola toca no braço dentro da área. O árbitro aponta para a marca!`, defenderId);
+  } else {
+    defenseStats.fouls += 1;
+    addEvent(game, 'foul', `${game.minute}′ Contato dentro da área. Pênalti marcado!`, defenderId);
+  }
+
+  const useVar = gameRandom(game) < (0.48 + game.referee.varSensitivity / 220);
+  if (useVar) {
+    const overturned = gameRandom(game) < 0.22;
+    queueVar(game, {
+      id: `var-pen-${game.minute}-${game.events.length}`,
+      reason: 'penalty',
+      clubId: attackingClubId,
+      decision: overturned ? 'overturned' : 'confirmed',
+      headline: 'possível pênalti',
+      detail: overturned ? 'o contato não foi suficiente e o pênalti foi cancelado' : 'pênalti confirmado após a revisão',
+      awardPenaltyToClubId: attackingClubId,
+    });
+    return career;
+  }
+
+  attackStats.penalties += 0;
+  return takePenalty(career, game, attackingClubId);
+}
+
+function bookUserPlayer(career: Career, game: MatchSession, offender: Player): Career {
+  const stats = statLine(game, career.clubId);
+  const current = game.yellowCardCounts?.[offender.id] ?? 0;
+  const nextCount = current + 1;
+  game.yellowCardCounts = { ...(game.yellowCardCounts ?? {}), [offender.id]: nextCount };
+  stats.yellowCards += 1;
+
+  if (nextCount < 2) {
+    addEvent(game, 'yellow', `${game.minute}′ Cartão amarelo para ${offender.name}.`, career.clubId, offender.id);
+    return career;
+  }
+
+  const shouldReview = gameRandom(game) < (0.18 + game.referee.varSensitivity / 500);
+  if (shouldReview) {
+    queueVar(game, {
+      id: `var-2yellow-${game.minute}-${offender.id}`,
+      reason: 'second_yellow',
+      clubId: career.clubId,
+      playerId: offender.id,
+      decision: gameRandom(game) < 0.16 ? 'overturned' : 'confirmed',
+      headline: 'revisão do segundo cartão amarelo',
+      detail: 'segundo amarelo e expulsão',
+    });
+    return career;
+  }
+
+  stats.redCards += 1;
+  addEvent(game, 'second_yellow', `${game.minute}′ SEGUNDO AMARELO! ${offender.name} está expulso e cumprirá suspensão na próxima partida.`, career.clubId, offender.id);
+  return sendOffUserPlayer(career, game, offender.id, 'Expulso por segundo cartão amarelo');
+}
+
+function maybeDiscipline(career: Career, game: MatchSession, clubId: string): Career {
+  const stats = statLine(game, clubId);
+  const foulChance = 0.050 + game.referee.strictness * 0.00036;
+  if (gameRandom(game) >= foulChance) return career;
+
+  stats.fouls += 1;
+  const userOffender = clubId === career.clubId ? activeClubPlayer(career, game) : undefined;
+  const severity = gameRandom(game);
+  const advantage = severity < 0.67 && gameRandom(game) < game.referee.advantage / 120;
+
+  if (advantage) {
+    stats.advantages += 1;
+    addEvent(game, 'advantage', `${game.minute}′ Houve falta, mas o árbitro dá vantagem e manda seguir.`, clubId, userOffender?.id);
+    return career;
+  }
+
+  stats.freeKicks += 1;
+  addEvent(game, 'foul', `${game.minute}′ Falta marcada para ${getClub(getOtherClub(game, clubId))?.name}. ${game.referee.name} interrompe o jogo.`, clubId, userOffender?.id);
+
+  if (severity > 0.965) {
+    if (clubId === career.clubId && userOffender) {
+      const useVar = gameRandom(game) < 0.65;
+      if (useVar) {
+        queueVar(game, {
+          id: `var-red-${game.minute}-${userOffender.id}`,
+          reason: 'red_card',
+          clubId,
+          playerId: userOffender.id,
+          decision: gameRandom(game) < 0.13 ? 'overturned' : 'confirmed',
+          headline: 'possível cartão vermelho direto',
+          detail: 'entrada grave analisada pelo VAR',
+        });
+        return career;
+      }
+      stats.redCards += 1;
+      addEvent(game, 'red', `${game.minute}′ VERMELHO DIRETO! ${userOffender.name} é expulso.`, clubId, userOffender.id);
+      return sendOffUserPlayer(career, game, userOffender.id, 'Expulsão direta');
+    }
+    stats.redCards += 1;
+    addEvent(game, 'red', `${game.minute}′ Cartão vermelho direto para ${getClub(clubId)?.name}.`, clubId);
+    return career;
+  }
+
+  const cardChance = clamp(0.12 + game.referee.strictness * 0.004 + (severity > 0.82 ? 0.34 : 0), 0.10, 0.72);
+  if (gameRandom(game) < cardChance) {
+    if (clubId === career.clubId && userOffender) return bookUserPlayer(career, game, userOffender);
+    stats.yellowCards += 1;
+    addEvent(game, 'yellow', `${game.minute}′ Cartão amarelo para ${getClub(clubId)?.name}.`, clubId);
+  }
+
+  return career;
+}
+
+function maybeSetPiece(career: Career, game: MatchSession, clubId: string): Career {
+  const stats = statLine(game, clubId);
+  const roll = gameRandom(game);
+
+  if (roll < 0.018) {
+    stats.offsides += 1;
+    addEvent(game, 'offside', `${game.minute}′ Impedimento! A jogada é interrompida pela arbitragem.`, clubId);
+    return career;
+  }
+
+  if (roll < 0.036) {
+    stats.throwIns += 1;
+    addEvent(game, 'throw_in', `${game.minute}′ Lateral para ${getClub(clubId)?.name} no campo de ataque.`, clubId);
+    return career;
+  }
+
+  if (roll < 0.050) {
+    stats.goalKicks += 1;
+    addEvent(game, 'goal_kick', `${game.minute}′ Tiro de meta. O goleiro organiza a saída curta.`, clubId);
+    return career;
+  }
+
+  if (roll < 0.063) {
+    stats.corners += 1;
+    addEvent(game, 'corner', `${game.minute}′ Escanteio para ${getClub(clubId)?.name}. Bola fechada na área.`, clubId);
+    if (gameRandom(game) < 0.13) {
+      stats.shots += 1;
+      stats.xg += 0.10;
+      const scorer = clubId === career.clubId ? bestSetPieceTaker(career, game, 'leftCorners') : undefined;
+      if (gameRandom(game) < 0.12) {
+        stats.shotsOnTarget += 1;
+        scoreGoal(game, clubId);
+        addEvent(game, 'goal', `${game.minute}′ GOL DE BOLA PARADA! A cobrança encontra a cabeça do atacante!`, clubId, scorer?.id);
+        maybeGoalVar(game, clubId, scorer?.id);
+      } else {
+        addEvent(game, 'shot', `${game.minute}′ Cabeçada após o escanteio passa perto do gol.`, clubId, scorer?.id);
+      }
+    }
+  }
+
+  return career;
+}
+
+function maybeKeeperEightSeconds(game: MatchSession, clubId: string) {
+  if (gameRandom(game) >= 0.0026) return;
+  const opponentId = getOtherClub(game, clubId);
+  statLine(game, opponentId).corners += 1;
+  addEvent(game, 'keeper_8s', `${game.minute}′ O goleiro segura a bola por mais de 8 segundos. O árbitro faz a contagem e marca escanteio para o adversário.`, clubId);
+  addStoppage(game, 1);
 }
 
 function simulateChance(career: Career, game: MatchSession, clubId: string): Career {
@@ -714,65 +1078,75 @@ function simulateChance(career: Career, game: MatchSession, clubId: string): Car
   const attackPower = teamPower(career, game, clubId) * attackModifier(career, game, clubId);
   const defensePower = teamPower(career, game, otherClubId);
   const difference = clamp(attackPower - defensePower, -20, 20);
-  const shotChance = clamp(0.095 + difference * 0.002 + (clubId === career.clubId && career.tactics.tempo === 'alta' ? 0.025 : 0), 0.055, 0.18);
   const stats = statLine(game, clubId);
-  const player = clubId === career.clubId ? activeClubPlayer(career, game) : undefined;
-  if (gameRandom(game) < shotChance) {
-    stats.shots += 1;
-    const finisher = player?.name ?? 'O atacante';
-    const goalChance = clamp(0.083 + difference * 0.0012, 0.045, 0.15);
-    if (gameRandom(game) < goalChance) {
-      if (clubId === game.fixture.homeClubId) game.homeGoals += 1;
-      else game.awayGoals += 1;
-      addEvent(game, 'goal', `${game.minute}′ GOL! ${getClub(clubId)?.name}. ${finisher} balança a rede!`, clubId, player?.id);
-      if (player) {
-        const players = career.players.map((item) => item.id === player.id ? { ...item, morale: clamp(item.morale + 3, 0, 100) } : item);
-        career = { ...career, players };
-      }
-    } else if (gameRandom(game) < 0.58) {
-      statLine(game, otherClubId).saves += 1;
-      addEvent(game, 'save', `${game.minute}′ ${finisher} finaliza. O goleiro espalma para longe!`, clubId, player?.id);
-      if (gameRandom(game) < 0.48) {
-        statLine(game, clubId).corners += 1;
-        addEvent(game, 'corner', `${game.minute}′ Escanteio para ${getClub(clubId)?.name}.`, clubId);
-      }
-    } else {
-      addEvent(game, 'shot', `${game.minute}′ ${finisher} arrisca. A bola passa perto do gol.`, clubId, player?.id);
-    }
+
+  if (gameRandom(game) < 0.0075) {
+    career = maybePenaltySituation(career, game, clubId);
+    if (game.pausedForVar) return career;
   }
 
-  if (gameRandom(game) < 0.077) {
-    stats.fouls += 1;
-    const fouled = clubId === career.clubId ? player : undefined;
-    addEvent(game, 'foul', `${game.minute}′ Falta de ${getClub(clubId)?.name}. O árbitro marca.`, clubId, fouled?.id);
-    if (gameRandom(game) < 0.105) {
-      stats.yellowCards += 1;
-      const offender = fouled ?? activeClubPlayer(career, game);
-      addEvent(game, 'yellow', `${game.minute}′ Cartão amarelo para ${offender?.name ?? 'um jogador'}.`, clubId, offender?.id);
-      if (gameRandom(game) < 0.018) {
-        stats.redCards += 1;
-        if (offender && clubId === career.clubId) {
-          game.userLineup = game.userLineup.map((slot) => slot.playerId === offender.id
-            ? { ...slot, sentOff: true, offReason: 'red' }
-            : slot);
-        }
-        addEvent(game, 'red', `${game.minute}′ Cartão vermelho! ${offender?.name ?? 'Um jogador'} é expulso.`, clubId, offender?.id);
-      }
+  const shotChance = clamp(0.078 + difference * 0.0018 + (clubId === career.clubId && career.tactics.tempo === 'alta' ? 0.022 : 0), 0.04, 0.16);
+  if (gameRandom(game) >= shotChance) return career;
+
+  stats.shots += 1;
+  const player = clubId === career.clubId ? activeClubPlayer(career, game) : undefined;
+  const finisher = player?.name ?? 'O atacante';
+  const shooting = player?.skills?.shooting ?? player?.strength ?? (getClub(clubId)?.rating ?? 64);
+  const composure = player?.skills?.composure ?? player?.strength ?? (getClub(clubId)?.rating ?? 64);
+  const bigChance = gameRandom(game) < clamp(0.18 + difference * 0.006, 0.08, 0.38);
+  const shotXg = bigChance ? 0.30 + gameRandom(game) * 0.24 : 0.035 + gameRandom(game) * 0.13;
+  stats.xg += shotXg;
+  if (bigChance) stats.bigChances += 1;
+
+  const targetChance = clamp(0.38 + (shooting + composure - 130) * 0.004, 0.24, 0.72);
+  const onTarget = gameRandom(game) < targetChance;
+  if (!onTarget) {
+    if (gameRandom(game) < 0.12) addEvent(game, 'post', `${game.minute}′ NA TRAVE! ${finisher} quase abre o placar.`, clubId, player?.id);
+    else addEvent(game, 'shot', `${game.minute}′ ${finisher} finaliza, mas a bola sai por pouco.`, clubId, player?.id);
+    return career;
+  }
+
+  stats.shotsOnTarget += 1;
+  const goalChance = clamp(shotXg * 0.74 + (difference + shooting - 65) * 0.0022, 0.045, bigChance ? 0.58 : 0.28);
+  if (gameRandom(game) < goalChance) {
+    scoreGoal(game, clubId);
+    addEvent(game, 'goal', `${game.minute}′ GOOOL! ${finisher} finaliza com categoria para ${getClub(clubId)?.name}!`, clubId, player?.id);
+    if (player) {
+      career = {
+        ...career,
+        players: career.players.map((item) => item.id === player.id ? { ...item, morale: clamp(item.morale + 3, 0, 100) } : item),
+      };
     }
+    maybeGoalVar(game, clubId, player?.id);
+    return career;
   }
-  if (gameRandom(game) < 0.026) {
-    stats.offsides += 1;
-    addEvent(game, 'offside', `${game.minute}′ Impedimento assinalado.`, clubId);
-  }
-  if (gameRandom(game) < 0.037 && stats.corners < stats.shots + 2) {
+
+  statLine(game, otherClubId).saves += 1;
+  addEvent(game, 'save', `${game.minute}′ DEFESA! ${finisher} acerta o alvo, mas o goleiro salva.`, clubId, player?.id);
+  if (gameRandom(game) < 0.36) {
     stats.corners += 1;
-    addEvent(game, 'corner', `${game.minute}′ Escanteio para ${getClub(clubId)?.name}.`, clubId);
+    addEvent(game, 'corner', `${game.minute}′ O goleiro espalma para escanteio.`, clubId);
   }
   return career;
 }
 
+function simulatePossessionMinute(career: Career, game: MatchSession) {
+  const homePower = teamPower(career, game, game.fixture.homeClubId) * attackModifier(career, game, game.fixture.homeClubId);
+  const awayPower = teamPower(career, game, game.fixture.awayClubId) * attackModifier(career, game, game.fixture.awayClubId);
+  const homeShare = clamp(0.50 + (homePower - awayPower) * 0.009, 0.30, 0.70);
+  const clubId = gameRandom(game) < homeShare ? game.fixture.homeClubId : game.fixture.awayClubId;
+  const stats = statLine(game, clubId);
+  stats.possessionTicks += 1;
+  const passes = 5 + Math.floor(gameRandom(game) * 10);
+  const clubRating = clubId === career.clubId ? teamPower(career, game, clubId) : (getClub(clubId)?.rating ?? 64);
+  const accuracy = clamp(0.67 + (clubRating - 60) * 0.004, 0.62, 0.90);
+  stats.passes += passes;
+  stats.completedPasses += Math.round(passes * accuracy);
+}
+
 function simulateMinute(career: Career, game: MatchSession) {
   game.minute += 1;
+
   if (game.userLineup.some((slot) => !slot.sentOff)) {
     const drain = 0.075
       + (career.tactics.tempo === 'alta' ? 0.10 : career.tactics.tempo === 'normal' ? 0.055 : 0.015)
@@ -786,53 +1160,102 @@ function simulateMinute(career: Career, game: MatchSession) {
     };
   }
 
+  simulatePossessionMinute(career, game);
+
   const userClubId = career.clubId;
   const opponentId = getOtherClub(game, userClubId);
+
   career = maybeInjurePlayer(career, game, userClubId);
+  if (game.requiredSubstitutionPlayerId) return career;
   career = maybeInjurePlayer(career, game, opponentId);
+
+  career = maybeDiscipline(career, game, game.fixture.homeClubId);
+  if (game.pausedForVar) return career;
+  career = maybeDiscipline(career, game, game.fixture.awayClubId);
+  if (game.pausedForVar) return career;
+
+  career = maybeSetPiece(career, game, game.fixture.homeClubId);
+  if (game.pausedForVar) return career;
+  career = maybeSetPiece(career, game, game.fixture.awayClubId);
+  if (game.pausedForVar) return career;
+
   career = simulateChance(career, game, game.fixture.homeClubId);
+  if (game.pausedForVar) return career;
   career = simulateChance(career, game, game.fixture.awayClubId);
-  if (game.events.length === 0 || gameRandom(game) < 0.09) {
-    addEvent(game, 'shot', `${game.minute}′ As equipes disputam cada espaço do campo.`, undefined);
+  if (game.pausedForVar) return career;
+
+  maybeKeeperEightSeconds(game, game.fixture.homeClubId);
+  maybeKeeperEightSeconds(game, game.fixture.awayClubId);
+
+  if (game.minute === 45 && game.phase === 'first_half' && game.firstHalfAddedTime === 0) {
+    game.firstHalfAddedTime = clamp(1 + Math.floor(gameRandom(game) * 4) + Math.min(3, Math.floor(game.events.filter((event) => event.type === 'medical' || event.type === 'var_start').length / 2)), 1, 7);
+    addEvent(game, 'stoppage_time', `O quarto árbitro indica +${game.firstHalfAddedTime} de acréscimos no primeiro tempo.`);
   }
-  if (game.minute === 45) {
+  if (game.phase === 'first_half' && game.minute >= 45 + game.firstHalfAddedTime) {
     game.phase = 'halftime';
-    addEvent(game, 'halftime', `Intervalo! ${game.homeGoals} × ${game.awayGoals}. Respire, ajuste o time e volte para o segundo tempo.`);
-  } else if (game.minute === 90) {
-    game.phase = 'finished';
-    addEvent(game, 'fulltime', `Apito final! ${getClub(game.fixture.homeClubId)?.name} ${game.homeGoals} × ${game.awayGoals} ${getClub(game.fixture.awayClubId)?.name}.`);
+    addEvent(game, 'halftime', `Intervalo! ${game.homeGoals} × ${game.awayGoals}. Hora dos ajustes.`);
+    return career;
   }
+
+  if (game.minute === 90 && game.phase === 'second_half' && game.secondHalfAddedTime === 0) {
+    game.secondHalfAddedTime = clamp(2 + Math.floor(gameRandom(game) * 5) + Math.min(4, Math.floor(game.events.filter((event) => event.type === 'medical' || event.type === 'var_start' || event.type === 'substitution').length / 3)), 2, 10);
+    addEvent(game, 'stoppage_time', `Teremos +${game.secondHalfAddedTime} de acréscimos.`);
+  }
+  if (game.phase === 'second_half' && game.minute >= 90 + game.secondHalfAddedTime) {
+    game.phase = 'finished';
+    addEvent(game, 'fulltime', `FIM DE JOGO! ${getClub(game.fixture.homeClubId)?.name} ${game.homeGoals} × ${game.awayGoals} ${getClub(game.fixture.awayClubId)?.name}.`);
+  }
+
   return career;
 }
 
 export function advanceMatch(career: Career, minutes = 5): Career {
   const existing = career.liveMatch;
-  if (!existing || existing.phase === 'finished' || existing.pausedForTactics) return career;
+  if (!existing || existing.phase === 'finished' || existing.pausedForTactics || existing.pausedForVar || existing.requiredSubstitutionPlayerId) return career;
+
   const game: MatchSession = {
     ...existing,
     homeStats: { ...existing.homeStats },
     awayStats: { ...existing.awayStats },
     userLineup: existing.userLineup.map((slot) => ({ ...slot })),
     userBenchIds: [...existing.userBenchIds],
+    yellowCardCounts: { ...(existing.yellowCardCounts ?? {}) },
     substitutedOutIds: [...(existing.substitutedOutIds ?? [])],
     startedPlayerIds: [...(existing.startedPlayerIds ?? existing.userLineup.map((slot) => slot.playerId))],
     appearedPlayerIds: [...(existing.appearedPlayerIds ?? existing.userLineup.map((slot) => slot.playerId))],
     events: [...existing.events],
   };
   let next: Career = { ...career, liveMatch: game };
+
   if (game.phase === 'pregame') {
+    const unavailable = game.userLineup
+      .map((slot) => career.players.find((player) => player.id === slot.playerId))
+      .filter((player) => !player || player.status !== 'available');
+    if (unavailable.length) return next;
     game.phase = 'first_half';
-    addEvent(game, 'kickoff', 'Bola rolando! Começa a partida.', career.clubId);
+    addEvent(game, 'kickoff', `Bola rolando! ${game.referee.name} autoriza o início da partida.`, career.clubId);
     return next;
   }
+
   if (game.phase === 'halftime') {
     game.phase = 'second_half';
     addEvent(game, 'second_half', 'As equipes voltam. Começa o segundo tempo!', career.clubId);
     return next;
   }
+
   const safeMinutes = clamp(Math.floor(minutes), 1, 5);
-  const endMinute = Math.min(game.phase === 'first_half' ? 45 : 90, game.minute + safeMinutes);
-  while (game.minute < endMinute && game.phase !== 'finished') {
+  const cap = game.phase === 'first_half'
+    ? 45 + Math.max(0, game.firstHalfAddedTime)
+    : 90 + Math.max(0, game.secondHalfAddedTime);
+  const endMinute = Math.min(cap || (game.phase === 'first_half' ? 45 : 90), game.minute + safeMinutes);
+
+  while (
+    game.minute < endMinute
+    && game.phase !== 'finished'
+    && !game.pausedForVar
+    && !game.requiredSubstitutionPlayerId
+    && !game.pausedForTactics
+  ) {
     next = simulateMinute(next, game);
   }
   return { ...next, liveMatch: game };
@@ -841,6 +1264,7 @@ export function advanceMatch(career: Career, minutes = 5): Career {
 export function setMatchTacticsPaused(career: Career, paused: boolean): Career {
   const game = career.liveMatch;
   if (!game || game.phase === 'finished') return career;
+  if (!paused && game.requiredSubstitutionPlayerId) return career;
   return {
     ...career,
     liveMatch: {
@@ -855,6 +1279,11 @@ export function substitutePlayer(career: Career, outgoingId: string, incomingId:
   if (!game || game.phase === 'finished' || game.substitutionsUsed >= 5) return career;
   if (!game.userBenchIds.includes(incomingId)) return career;
   if ((game.substitutedOutIds ?? []).includes(incomingId)) return career;
+
+  const isHalfTime = game.phase === 'halftime';
+  const sameWindow = game.lastSubstitutionMinute === game.minute;
+  const windowsNeeded = isHalfTime || sameWindow ? 0 : 1;
+  if (game.substitutionWindowsUsed + windowsNeeded > 3) return career;
 
   const index = game.userLineup.findIndex((slot) => slot.playerId === outgoingId && !slot.sentOff);
   if (index < 0) return career;
@@ -872,14 +1301,20 @@ export function substitutePlayer(career: Career, outgoingId: string, incomingId:
       : { ...slot }),
     userBenchIds: game.userBenchIds.filter((id) => id !== incomingId),
     substitutionsUsed: game.substitutionsUsed + 1,
+    substitutionWindowsUsed: game.substitutionWindowsUsed + windowsNeeded,
+    lastSubstitutionMinute: isHalfTime ? game.lastSubstitutionMinute : game.minute,
     substitutedOutIds: [...new Set([...(game.substitutedOutIds ?? []), outgoingId])],
     startedPlayerIds: [...(game.startedPlayerIds ?? game.userLineup.map((slot) => slot.playerId))],
     appearedPlayerIds: [...appearedPlayerIds],
+    requiredSubstitutionPlayerId: game.requiredSubstitutionPlayerId === outgoingId ? null : game.requiredSubstitutionPlayerId,
     events: [...game.events],
   };
 
   const outgoing = career.players.find((player) => player.id === outgoingId);
-  addEvent(gameCopy, 'substitution', `${incoming.name} entra no lugar de ${outgoing?.name ?? 'um companheiro'}. ${outgoing?.name ?? 'O jogador substituído'} não pode retornar. Substituições: ${gameCopy.substitutionsUsed}/5.`, career.clubId, incomingId);
+  addEvent(gameCopy, 'substitution',
+    `${incoming.name} entra no lugar de ${outgoing?.name ?? 'um companheiro'}. ${outgoing?.name ?? 'O jogador substituído'} não pode retornar. Substituições: ${gameCopy.substitutionsUsed}/5 · janelas: ${gameCopy.substitutionWindowsUsed}/3.`,
+    career.clubId, incomingId);
+  if (!isHalfTime) addStoppage(gameCopy, 1);
 
   return {
     ...career,
