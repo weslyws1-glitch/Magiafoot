@@ -32,6 +32,8 @@ import {
   setHeadquartersInvestment,
   startMatch,
   substitutePlayer,
+  setMatchTacticsPaused,
+  replaceBenchPlayer,
   updateTactics,
   upgradeStadium,
   upgradeStadiumFacility,
@@ -50,6 +52,9 @@ interface CareerContextValue {
   startCurrentMatch: () => void;
   advanceCurrentMatch: (minutes?: number) => void;
   makeSubstitution: (outgoingId: string, incomingId: string) => boolean;
+  swapBenchPlayer: (outgoingBenchId: string, incomingId: string) => boolean;
+  pauseMatchForTactics: () => void;
+  resumeMatchFromTactics: () => void;
   setFormation: (formationId: FormationId) => void;
   movePlayer: (slotId: string, playerId: string) => void;
   chooseCaptain: (playerId: string) => void;
@@ -137,6 +142,22 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setCareer(next);
     return true;
   }, [career]);
+
+  const swapBenchPlayer = useCallback((outgoingBenchId: string, incomingId: string) => {
+    if (!career) return false;
+    const next = replaceBenchPlayer(career, outgoingBenchId, incomingId);
+    if (next === career) return false;
+    setCareer(next);
+    return true;
+  }, [career]);
+
+  const pauseMatchForTactics = useCallback(() => {
+    update((current) => setMatchTacticsPaused(current, true));
+  }, [update]);
+
+  const resumeMatchFromTactics = useCallback(() => {
+    update((current) => setMatchTacticsPaused(current, false));
+  }, [update]);
   const setFormation = useCallback((formationId: FormationId) => update((current) => changeFormation(current, formationId)), [update]);
   const movePlayer = useCallback((slotId: string, playerId: string) => update((current) => assignPlayerToSlot(current, slotId, playerId)), [update]);
   const chooseCaptain = useCallback((playerId: string) => update((current) => setCaptain(current, playerId)), [update]);
@@ -288,6 +309,9 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     startCurrentMatch,
     advanceCurrentMatch,
     makeSubstitution,
+    swapBenchPlayer,
+    pauseMatchForTactics,
+    resumeMatchFromTactics,
     setFormation,
     movePlayer,
     chooseCaptain,
