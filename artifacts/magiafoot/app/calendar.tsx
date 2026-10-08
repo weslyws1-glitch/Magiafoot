@@ -27,7 +27,7 @@ function resultForUser(result: LeagueResult, clubId: string): 'win' | 'draw' | '
 export default function CalendarScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { career, startCurrentMatch } = useCareer();
+  const { career } = useCareer();
   const [visibleMonth, setVisibleMonth] = useState(2);
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
 
@@ -86,12 +86,6 @@ export default function CalendarScreen() {
 
   const goPreviousMonth = () => setVisibleMonth((month) => Math.max(0, month - 1));
   const goNextMonth = () => setVisibleMonth((month) => Math.min(11, month + 1));
-
-  const play = () => {
-    if (!current) return;
-    if (!career.liveMatch) startCurrentMatch();
-    router.push('/match');
-  };
 
   const selectedResult = selectedFixture ? resultMap.get(selectedFixture.id) : undefined;
   const selectedIsHome = selectedFixture?.homeClubId === career.clubId;
@@ -225,12 +219,13 @@ export default function CalendarScreen() {
                 <Text style={styles.finalLabel}>RESULTADO FINAL</Text>
                 <Text style={styles.finalScore}>{getClub(selectedFixture.homeClubId)?.initials} {selectedResult.homeGoals} × {selectedResult.awayGoals} {getClub(selectedFixture.awayClubId)?.initials}</Text>
               </View>
-            ) : selectedIsCurrent ? (
-              <GameButton label={career.liveMatch ? 'CONTINUAR PARTIDA' : 'JOGAR PARTIDA'} icon="play" onPress={play} />
             ) : (
               <View style={styles.scheduledBox}>
-                <Feather name="calendar" size={16} color="#79EF91" />
-                <Text style={styles.scheduledText}>Partida agendada para esta data.</Text>
+                <Feather name={selectedIsCurrent ? 'clock' : 'calendar'} size={16} color="#79EF91" />
+                <View>
+                  <Text style={styles.scheduledTitle}>{selectedIsCurrent ? 'PRÓXIMA PARTIDA' : 'PARTIDA AGENDADA'}</Text>
+                  <Text style={styles.scheduledText}>O início da partida agora fica na página principal.</Text>
+                </View>
               </View>
             )}
           </Panel>
@@ -302,7 +297,8 @@ const styles = StyleSheet.create({
   finalLabel: { color: '#829789', fontSize: 6.5, fontWeight: '900' },
   finalScore: { color: '#F5F7F5', fontSize: 15, fontWeight: '900', marginTop: 3 },
   scheduledBox: { minHeight: 42, borderRadius: 9, backgroundColor: '#0B2117', borderWidth: 1, borderColor: '#2C503D', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  scheduledText: { color: '#A7B8AD', fontSize: 8, fontWeight: '800' },
+  scheduledTitle: { color: '#79EF91', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.5 },
+  scheduledText: { color: '#A7B8AD', fontSize: 8, fontWeight: '800', marginTop: 2 },
   emptyDetail: { minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#10291D', borderColor: '#2C503D' },
   emptyDetailText: { color: '#879C8E', fontSize: 8, textAlign: 'center' },
   seasonProgress: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: '#10291D', borderColor: '#2C503D' },
