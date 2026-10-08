@@ -34,6 +34,8 @@ import {
   substitutePlayer,
   setMatchTacticsPaused,
   replaceBenchPlayer,
+  resolveVarReview,
+  setSetPieceTaker,
   updateTactics,
   upgradeStadium,
   upgradeStadiumFacility,
@@ -55,6 +57,8 @@ interface CareerContextValue {
   swapBenchPlayer: (outgoingBenchId: string, incomingId: string) => boolean;
   pauseMatchForTactics: () => void;
   resumeMatchFromTactics: () => void;
+  resolveVAR: () => void;
+  chooseSetPieceTaker: (role: 'penalties' | 'freeKicks' | 'leftCorners' | 'rightCorners', playerId: string) => void;
   setFormation: (formationId: FormationId) => void;
   movePlayer: (slotId: string, playerId: string) => void;
   chooseCaptain: (playerId: string) => void;
@@ -157,6 +161,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
 
   const resumeMatchFromTactics = useCallback(() => {
     update((current) => setMatchTacticsPaused(current, false));
+  }, [update]);
+
+  const resolveVAR = useCallback(() => {
+    update(resolveVarReview);
+  }, [update]);
+
+  const chooseSetPieceTaker = useCallback((role: 'penalties' | 'freeKicks' | 'leftCorners' | 'rightCorners', playerId: string) => {
+    update((current) => setSetPieceTaker(current, role, playerId));
   }, [update]);
   const setFormation = useCallback((formationId: FormationId) => update((current) => changeFormation(current, formationId)), [update]);
   const movePlayer = useCallback((slotId: string, playerId: string) => update((current) => assignPlayerToSlot(current, slotId, playerId)), [update]);
@@ -312,6 +324,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     swapBenchPlayer,
     pauseMatchForTactics,
     resumeMatchFromTactics,
+    resolveVAR,
+    chooseSetPieceTaker,
     setFormation,
     movePlayer,
     chooseCaptain,
@@ -343,7 +357,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     declinePlayerOffer,
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
-    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, movePlayer, setFormation,
+    expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
   ]);
 
