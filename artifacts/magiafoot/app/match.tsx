@@ -96,6 +96,63 @@ function cpuLiveScore(fixtureId: string, season: number, minute: number, homeRat
   return { homeGoals, awayGoals };
 }
 
+function tacticalShare(left: number, right: number, fallback = 50) {
+  const total = Math.max(0, left) + Math.max(0, right);
+  if (total <= 0.0001) return fallback;
+  return Math.max(8, Math.min(92, Math.round((left / total) * 100)));
+}
+
+function broadcastReading(
+  homeName: string,
+  awayName: string,
+  homePossession: number,
+  awayPossession: number,
+  homeXg: number,
+  awayXg: number,
+  homeShotsOnTarget: number,
+  awayShotsOnTarget: number,
+) {
+  const possessionDiff = homePossession - awayPossession;
+  const xgDiff = homeXg - awayXg;
+  const targetDiff = homeShotsOnTarget - awayShotsOnTarget;
+
+  if (Math.abs(xgDiff) >= 0.55) {
+    const leader = xgDiff > 0 ? homeName : awayName;
+    const trailer = xgDiff > 0 ? awayName : homeName;
+    return `${leader} criou as chances mais perigosas. ${trailer} precisa proteger melhor a área e reduzir os espaços entre as linhas.`;
+  }
+  if (Math.abs(possessionDiff) >= 16 && Math.abs(xgDiff) < 0.30) {
+    const leader = possessionDiff > 0 ? homeName : awayName;
+    return `${leader} controla mais a bola, mas ainda transforma pouco essa posse em chances claras. É uma posse mais territorial do que agressiva.`;
+  }
+  if (Math.abs(targetDiff) >= 3) {
+    const leader = targetDiff > 0 ? homeName : awayName;
+    return `${leader} chega com mais frequência ao gol e obriga o adversário a defender mais baixo. O volume ofensivo está fazendo diferença.`;
+  }
+  return 'Jogo equilibrado: nenhuma equipe conseguiu impor domínio claro. A próxima sequência de pressão pode mudar o roteiro da partida.';
+}
+
+function TacticalBar({
+  label, leftLabel, rightLabel, leftShare,
+}: {
+  label: string; leftLabel: string; rightLabel: string; leftShare: number;
+}) {
+  const safe = Math.max(6, Math.min(94, leftShare));
+  return (
+    <View style={styles.tacticalMetric}>
+      <View style={styles.tacticalMetricHeader}>
+        <Text style={styles.tacticalSideValue}>{leftLabel}</Text>
+        <Text style={styles.tacticalMetricLabel}>{label}</Text>
+        <Text style={[styles.tacticalSideValue,{ textAlign:'right' }]}>{rightLabel}</Text>
+      </View>
+      <View style={styles.dualBar}>
+        <View style={[styles.dualBarLeft,{ width:(safe + '%') as any }]} />
+        <View style={[styles.dualBarRight,{ width:((100-safe) + '%') as any }]} />
+      </View>
+    </View>
+  );
+}
+
 function EventDiagram({ event }: { event?: MatchEvent }) {
   const showOffside = event?.type === 'offside' || (event?.type === 'var_start' && event.text.toLowerCase().includes('impedimento'));
   const showPenalty = event?.type === 'penalty' || (event?.type === 'var_start' && event.text.toLowerCase().includes('pênalti'));
@@ -135,6 +192,8 @@ export default function MatchScreen() {
   } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
+  const [infoTab, setInfoTab] = useState<'timeline' | 'stats'>('timeline');
+  const [showRoundLive, setShowRoundLive] = useState(false);
   const game = career?.liveMatch ?? null;
 
   useEffect(() => {
@@ -192,6 +251,14 @@ export default function MatchScreen() {
   const [homePossession, awayPossession] = possession(game.homeStats, game.awayStats);
   const homePassAccuracy = game.homeStats.passes ? Math.round(game.homeStats.completedPasses / game.homeStats.passes * 100) : 0;
   const awayPassAccuracy = game.awayStats.passes ? Math.round(game.awayStats.completedPasses / game.awayStats.passes * 100) : 0;
+  const xgShare = tacticalShare(game.homeStats.xg, game.awayStats.xg);
+  const targetShare = tacticalShare(game.homeStats.shotsOnTarget + game.homeStats.bigChances * 0.7, game.awayStats.shotsOnTarget + game.awayStats.bigChances * 0.7);
+  const pressureShare = Math.max(12, Math.min(88, 50 + (game.homeStats.shotsOnTarget - game.awayStats.shotsOnTarget) * 7 + (game.homeStats.corners - game.awayStats.corners) * 2));
+  const broadcastText = broadcastReading(
+    home.name, away.name, homePossession, awayPossession,
+    game.homeStats.xg, game.awayStats.xg,
+    game.homeStats.shotsOnTarget, game.awayStats.shotsOnTarget,
+  );
 
   const injuredRequired = game.requiredSubstitutionPlayerId
     ? career.players.find((player) => player.id === game.requiredSubstitutionPlayerId)
@@ -252,11 +319,17 @@ export default function MatchScreen() {
           <Panel style={styles.halftimeHero}>
             <Text style={styles.halftimeKicker}>INTERVALO</Text>
             <Text style={styles.halftimeScore}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
-            <Text style={styles.halftimeText}>Posse {homePossession}% × {awayPossession}% · xG {game.homeStats.xg.toFixed(2)} × {game.awayStats.xg.toFixed(2)}</Text>
+            <Text style={styles.halftimeText}>Resumo do primeiro tempo e leitura tática da transmissão</Text>
           </Panel>
 
           <Panel style={styles.matchIntelligence}>
             <Text style={styles.panelKicker}>LEITURA DO 1º TEMPO</Text>
+            <Text style={styles.broadcastLead}>{broadcastText}</Text>
+            <View style={styles.tacticalBars}>
+              <TacticalBar label="POSSE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
+              <TacticalBar label="PERIGO (xG)" leftLabel={game.homeStats.xg.toFixed(2)} rightLabel={game.awayStats.xg.toFixed(2)} leftShare={xgShare} />
+              <TacticalBar label="PRESSÃO" leftLabel={home.initials} rightLabel={away.initials} leftShare={pressureShare} />
+            </View>
             <View style={styles.metricGrid}>
               <Metric label="Finalizações" left={game.homeStats.shots} right={game.awayStats.shots} />
               <Metric label="No alvo" left={game.homeStats.shotsOnTarget} right={game.awayStats.shotsOnTarget} />
@@ -287,8 +360,6 @@ export default function MatchScreen() {
       </>
     );
   }
-
-  const pressure = Math.max(12, Math.min(88, 50 + (game.homeStats.shotsOnTarget - game.awayStats.shotsOnTarget) * 7 + (game.homeStats.corners - game.awayStats.corners) * 2));
 
   return (
     <>
@@ -323,12 +394,31 @@ export default function MatchScreen() {
             </View>
           </View>
 
-          <View style={styles.featuredStats}>
-            <Text style={styles.featuredStat}>Posse {homePossession}% - {awayPossession}%</Text>
-            <Text style={styles.featuredStat}>xG {game.homeStats.xg.toFixed(2)} - {game.awayStats.xg.toFixed(2)}</Text>
-            <Text style={styles.featuredStat}>No alvo {game.homeStats.shotsOnTarget} - {game.awayStats.shotsOnTarget}</Text>
+          <View style={styles.featuredActions}>
+            <Pressable onPress={() => setShowRoundLive((value) => !value)} style={[styles.roundLiveButton, showRoundLive && styles.roundLiveButtonActive]}>
+              <View style={styles.liveDot} />
+              <Text style={[styles.roundLiveButtonText, showRoundLive && styles.roundLiveButtonTextActive]}>RODADA AO VIVO</Text>
+              <Feather name={showRoundLive ? 'chevron-up' : 'chevron-down'} size={13} color={showRoundLive ? '#07150d' : '#79ef91'} />
+            </Pressable>
           </View>
         </View>
+
+        {showRoundLive ? (
+          <Panel style={styles.roundLivePanel}>
+            <View style={styles.roundLiveHeader}>
+              <Text style={styles.roundLiveTitle}>PLACARES EM TEMPO REAL</Text>
+              <Text style={styles.roundLiveClock}>{clock}</Text>
+            </View>
+            {roundMatches.map((item) => (
+              <View key={item.fixture.id} style={[styles.roundLiveRow, item.isUser && styles.roundLiveRowUser]}>
+                <Text numberOfLines={1} style={styles.roundLiveClub}>{item.home?.name ?? 'Casa'}</Text>
+                <Text style={styles.roundLiveScore}>{item.homeGoals} - {item.awayGoals}</Text>
+                <Text numberOfLines={1} style={[styles.roundLiveClub,{ textAlign:'right' }]}>{item.away?.name ?? 'Fora'}</Text>
+              </View>
+            ))}
+            <Text style={styles.roundLiveNote}>A partida continua normalmente enquanto esta aba está aberta.</Text>
+          </Panel>
+        ) : null}
 
         {game.pausedForVar && game.pendingVar ? (
           <Panel style={styles.varPanel}>
@@ -377,36 +467,68 @@ export default function MatchScreen() {
             <Text style={styles.momentMinute}>{clock}</Text>
           </View>
           <EventDiagram event={latestEvent} />
-          <View style={styles.pressureRow}>
-            <Text style={styles.pressureTeam}>{home.initials}</Text>
-            <View style={styles.pressureTrack}>
-              <View style={[styles.pressureHome, { width: (pressure + '%') as any }]} />
-            </View>
-            <Text style={styles.pressureTeam}>{away.initials}</Text>
+          <View style={styles.broadcastReadingBox}>
+            <Text style={styles.broadcastReadingLabel}>LEITURA DA TRANSMISSÃO</Text>
+            <Text style={styles.broadcastReadingText}>{broadcastText}</Text>
           </View>
-          <Text style={styles.pressureLabel}>PRESSÃO TERRITORIAL</Text>
+          <View style={styles.tacticalBars}>
+            <TacticalBar label="CONTROLE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
+            <TacticalBar label="PERIGO" leftLabel={game.homeStats.xg.toFixed(2)} rightLabel={game.awayStats.xg.toFixed(2)} leftShare={xgShare} />
+            <TacticalBar label="PRESSÃO" leftLabel={home.initials} rightLabel={away.initials} leftShare={pressureShare} />
+          </View>
         </Panel>
 
-        <Panel style={styles.matchIntelligence}>
-          <View style={styles.intelligenceHeader}>
-            <Text style={styles.panelKicker}>ESTATÍSTICAS AO VIVO</Text>
-            <Text style={styles.intelligenceScore}>{home.initials} × {away.initials}</Text>
+        <Panel style={styles.liveInfoPanel}>
+          <View style={styles.infoTabs}>
+            <Pressable onPress={() => setInfoTab('timeline')} style={[styles.infoTab, infoTab === 'timeline' && styles.infoTabActive]}>
+              <Feather name="list" size={12} color={infoTab === 'timeline' ? '#07150d' : '#9fb2a5'} />
+              <Text style={[styles.infoTabText, infoTab === 'timeline' && styles.infoTabTextActive]}>LINHA DO TEMPO</Text>
+            </Pressable>
+            <Pressable onPress={() => setInfoTab('stats')} style={[styles.infoTab, infoTab === 'stats' && styles.infoTabActive]}>
+              <Feather name="bar-chart-2" size={12} color={infoTab === 'stats' ? '#07150d' : '#9fb2a5'} />
+              <Text style={[styles.infoTabText, infoTab === 'stats' && styles.infoTabTextActive]}>ESTATÍSTICAS</Text>
+            </Pressable>
           </View>
-          <View style={styles.metricGrid}>
-            <Metric label="Finalizações" left={game.homeStats.shots} right={game.awayStats.shots} />
-            <Metric label="No alvo" left={game.homeStats.shotsOnTarget} right={game.awayStats.shotsOnTarget} />
-            <Metric label="Grandes chances" left={game.homeStats.bigChances} right={game.awayStats.bigChances} />
-            <Metric label="Escanteios" left={game.homeStats.corners} right={game.awayStats.corners} />
-            <Metric label="Faltas" left={game.homeStats.fouls} right={game.awayStats.fouls} />
-            <Metric label="Impedimentos" left={game.homeStats.offsides} right={game.awayStats.offsides} />
-            <Metric label="Passes certos %" left={homePassAccuracy} right={awayPassAccuracy} />
-            <Metric label="VAR" left={game.homeStats.varReviews} right={game.awayStats.varReviews} />
-          </View>
-          <View style={styles.cardsRow}>
-            <Text style={styles.cardsText}>🟨 {game.homeStats.yellowCards}  🟥 {game.homeStats.redCards}</Text>
-            <Text style={styles.xgText}>xG {game.homeStats.xg.toFixed(2)} — {game.awayStats.xg.toFixed(2)}</Text>
-            <Text style={styles.cardsText}>🟨 {game.awayStats.yellowCards}  🟥 {game.awayStats.redCards}</Text>
-          </View>
+
+          {infoTab === 'timeline' ? (
+            <View style={styles.tabContent}>
+              <View style={styles.commentaryHeader}>
+                <Text style={styles.commentaryTitle}>LANCES DA PARTIDA</Text>
+                <Text style={styles.commentaryClock}>{clock}</Text>
+              </View>
+              {recentEvents.length ? recentEvents.map((event) => (
+                <View key={event.id} style={[styles.commentaryRow, event.type.startsWith('var_') && styles.varEventRow]}>
+                  <Text style={styles.commentaryMinute}>{event.minute > 90 ? '90+' + (event.minute - 90) : event.minute > 45 && game.phase === 'first_half' ? '45+' + (event.minute - 45) : event.minute}′</Text>
+                  <Text style={styles.commentarySymbol}>{eventSymbol(event)}</Text>
+                  <Text style={styles.commentaryText}>{event.text}</Text>
+                </View>
+              )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
+            </View>
+          ) : (
+            <View style={styles.tabContent}>
+              <View style={styles.intelligenceHeader}>
+                <Text style={styles.commentaryTitle}>NÚMEROS AO VIVO</Text>
+                <Text style={styles.intelligenceScore}>{home.initials} × {away.initials}</Text>
+              </View>
+              <View style={styles.metricGrid}>
+                <Metric label="Posse %" left={homePossession} right={awayPossession} />
+                <Metric label="xG" left={Number(game.homeStats.xg.toFixed(2))} right={Number(game.awayStats.xg.toFixed(2))} />
+                <Metric label="Finalizações" left={game.homeStats.shots} right={game.awayStats.shots} />
+                <Metric label="No alvo" left={game.homeStats.shotsOnTarget} right={game.awayStats.shotsOnTarget} />
+                <Metric label="Grandes chances" left={game.homeStats.bigChances} right={game.awayStats.bigChances} />
+                <Metric label="Escanteios" left={game.homeStats.corners} right={game.awayStats.corners} />
+                <Metric label="Faltas" left={game.homeStats.fouls} right={game.awayStats.fouls} />
+                <Metric label="Impedimentos" left={game.homeStats.offsides} right={game.awayStats.offsides} />
+                <Metric label="Passes certos %" left={homePassAccuracy} right={awayPassAccuracy} />
+                <Metric label="VAR" left={game.homeStats.varReviews} right={game.awayStats.varReviews} />
+              </View>
+              <View style={styles.cardsRow}>
+                <Text style={styles.cardsText}>🟨 {game.homeStats.yellowCards}  🟥 {game.homeStats.redCards}</Text>
+                <Text style={styles.xgText}>xG {game.homeStats.xg.toFixed(2)} — {game.awayStats.xg.toFixed(2)}</Text>
+                <Text style={styles.cardsText}>🟨 {game.awayStats.yellowCards}  🟥 {game.awayStats.redCards}</Text>
+              </View>
+            </View>
+          )}
         </Panel>
 
         <Panel style={styles.refereePanel}>
@@ -418,36 +540,6 @@ export default function MatchScreen() {
               Critério {game.referee.strictness >= 66 ? 'rigoroso' : game.referee.strictness <= 50 ? 'tolerante' : 'equilibrado'} · vantagem {game.referee.advantage >= 60 ? 'frequente' : 'normal'}
             </Text>
           </View>
-        </Panel>
-
-        <Panel style={styles.commentaryPanel}>
-          <View style={styles.commentaryHeader}>
-            <Text style={styles.commentaryTitle}>LINHA DO TEMPO</Text>
-            <Text style={styles.commentaryClock}>{clock}</Text>
-          </View>
-          {recentEvents.length ? recentEvents.map((event) => (
-            <View key={event.id} style={[styles.commentaryRow, event.type.startsWith('var_') && styles.varEventRow]}>
-              <Text style={styles.commentaryMinute}>{event.minute > 90 ? '90+' + (event.minute - 90) : event.minute > 45 && game.phase === 'first_half' ? '45+' + (event.minute - 45) : event.minute}′</Text>
-              <Text style={styles.commentarySymbol}>{eventSymbol(event)}</Text>
-              <Text style={styles.commentaryText}>{event.text}</Text>
-            </View>
-          )) : <Text style={styles.commentaryEmpty}>Aguardando o apito inicial…</Text>}
-        </Panel>
-
-        <Panel style={styles.allMatchesPanel}>
-          <View style={styles.allMatchesHeader}>
-            <Text style={styles.allMatchesTitle}>TODOS OS JOGOS DA RODADA</Text>
-            <Text style={styles.allMatchesClock}>{clock}</Text>
-          </View>
-          {roundMatches.map((item) => (
-            <View key={item.fixture.id} style={[styles.allMatchRow, item.isUser && styles.allMatchRowUser]}>
-              <Text numberOfLines={1} style={styles.allMatchClub}>{item.home?.name ?? 'Casa'}</Text>
-              <Text style={styles.allMatchScore}>{item.homeGoals}</Text>
-              <Text style={styles.allMatchDash}>×</Text>
-              <Text style={styles.allMatchScore}>{item.awayGoals}</Text>
-              <Text numberOfLines={1} style={[styles.allMatchClub, { textAlign: 'right' }]}>{item.away?.name ?? 'Fora'}</Text>
-            </View>
-          ))}
         </Panel>
 
         <View style={styles.liveControls}>
@@ -498,7 +590,7 @@ export default function MatchScreen() {
   );
 }
 
-function Metric({ label, left, right }: { label: string; left: number; right: number }) {
+function Metric({ label, left, right }: { label: string; left: number | string; right: number | string }) {
   return (
     <View style={styles.metricRow}>
       <Text style={styles.metricValue}>{left}</Text>
@@ -527,8 +619,21 @@ const styles = StyleSheet.create({
   featuredClock: { color: '#ffe66a', fontSize: 18, fontWeight: '900' },
   featuredVs: { color: '#dce8df', fontSize: 11, fontWeight: '900', marginTop: 1 },
   featuredStatus: { color: '#b9c8be', fontSize: 7, fontWeight: '900', marginTop: 3 },
-  featuredStats: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: '#14351f', paddingHorizontal: 8 },
-  featuredStat: { color: '#cfddcf', fontSize: 7, fontWeight: '800' },
+  featuredActions: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#14351f', paddingHorizontal: 8 },
+  roundLiveButton: { minHeight: 28, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#0d2618', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roundLiveButtonActive: { backgroundColor: '#79ef91', borderColor: '#79ef91' },
+  roundLiveButtonText: { color: '#79ef91', fontSize: 7, fontWeight: '900', letterSpacing: 0.5 },
+  roundLiveButtonTextActive: { color: '#07150d' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef5b5b' },
+  roundLivePanel: { padding: 0, overflow: 'hidden', backgroundColor: '#10291d', borderColor: '#315f3f' },
+  roundLiveHeader: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, backgroundColor: '#0d2618' },
+  roundLiveTitle: { color: '#dce8df', fontSize: 7.5, fontWeight: '900', letterSpacing: 0.6 },
+  roundLiveClock: { color: '#ffe66a', fontSize: 9, fontWeight: '900' },
+  roundLiveRow: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#214231' },
+  roundLiveRowUser: { backgroundColor: '#225034' },
+  roundLiveClub: { flex: 1, minWidth: 0, color: '#edf4ef', fontSize: 8.2, fontWeight: '800' },
+  roundLiveScore: { width: 44, textAlign: 'center', color: '#ffffff', fontSize: 10, fontWeight: '900' },
+  roundLiveNote: { color: '#789080', fontSize: 6.5, textAlign: 'center', paddingVertical: 7 },
 
   varPanel: { alignItems: 'center', gap: 8, backgroundColor: '#101820', borderColor: '#5fb5ff', borderWidth: 2 },
   varBadge: { paddingHorizontal: 13, paddingVertical: 5, borderRadius: 7, backgroundColor: '#e8f5ff' },
@@ -570,11 +675,18 @@ const styles = StyleSheet.create({
   shotArrow: { position: 'absolute', right: 21, top: '41%', color: '#ffffff', fontSize: 28, fontWeight: '900' },
   centerBall: { position: 'absolute', left: '50%', top: '50%', marginLeft: -4, marginTop: -8 },
   ballGlyph: { color: '#ffffff', fontSize: 12, textShadowColor: '#000', textShadowRadius: 2 },
-  pressureRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  pressureTeam: { width: 30, color: '#f5f7f5', fontSize: 7, fontWeight: '900', textAlign: 'center' },
-  pressureTrack: { flex: 1, height: 9, borderRadius: 99, overflow: 'hidden', backgroundColor: '#9b765c', borderWidth: 1, borderColor: '#38533f' },
-  pressureHome: { height: '100%', backgroundColor: '#79ef91' },
-  pressureLabel: { color: '#779083', fontSize: 5.8, fontWeight: '900', letterSpacing: 0.6, textAlign: 'center' },
+  broadcastReadingBox: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#31513d', paddingTop: 8, gap: 3 },
+  broadcastReadingLabel: { color: '#ffe66a', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.7 },
+  broadcastReadingText: { color: '#dce8df', fontSize: 8, lineHeight: 12 },
+  broadcastLead: { color: '#dce8df', fontSize: 8.5, lineHeight: 13, paddingVertical: 2 },
+  tacticalBars: { gap: 8 },
+  tacticalMetric: { gap: 4 },
+  tacticalMetricHeader: { flexDirection: 'row', alignItems: 'center' },
+  tacticalSideValue: { width: 56, color: '#ffffff', fontSize: 7.5, fontWeight: '900' },
+  tacticalMetricLabel: { flex: 1, color: '#91a498', fontSize: 6.5, fontWeight: '900', textAlign: 'center', letterSpacing: 0.5 },
+  dualBar: { height: 10, borderRadius: 99, overflow: 'hidden', flexDirection: 'row', backgroundColor: '#172b20' },
+  dualBarLeft: { height: '100%', backgroundColor: '#79ef91' },
+  dualBarRight: { height: '100%', backgroundColor: '#b9825b' },
 
   matchIntelligence: { gap: 8, backgroundColor: '#10291d', borderColor: '#315f3f' },
   intelligenceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -587,6 +699,13 @@ const styles = StyleSheet.create({
   cardsText: { color: '#dce8df', fontSize: 7.5, fontWeight: '800' },
   xgText: { color: '#79ef91', fontSize: 8, fontWeight: '900' },
 
+  liveInfoPanel: { padding: 0, overflow: 'hidden', backgroundColor: '#0b2117', borderColor: '#315f3f' },
+  infoTabs: { flexDirection: 'row', gap: 6, padding: 7, backgroundColor: '#0d2618' },
+  infoTab: { flex: 1, minHeight: 34, borderRadius: 8, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#132d20', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  infoTabActive: { backgroundColor: '#79ef91', borderColor: '#79ef91' },
+  infoTabText: { color: '#9fb2a5', fontSize: 7, fontWeight: '900', letterSpacing: 0.4 },
+  infoTabTextActive: { color: '#07150d' },
+  tabContent: { maxHeight: 300 },
   refereePanel: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#171e18', borderColor: '#3d493f' },
   refereeIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: '#2a3027', alignItems: 'center', justifyContent: 'center' },
   refereeLabel: { color: '#a39869', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.7 },
