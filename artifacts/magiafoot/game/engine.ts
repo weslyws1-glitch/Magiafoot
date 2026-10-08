@@ -519,6 +519,22 @@ export function updateTactics(career: Career, tactics: Career['tactics']): Caree
   return { ...career, tactics: { ...tactics } };
 }
 
+export function setSetPieceTaker(
+  career: Career,
+  role: keyof Career['setPieceTakers'],
+  playerId: string,
+): Career {
+  const player = career.players.find((item) => item.id === playerId);
+  if (!player || player.status !== 'available') return career;
+  return {
+    ...career,
+    setPieceTakers: {
+      ...(career.setPieceTakers ?? { penalties: null, freeKicks: null, leftCorners: null, rightCorners: null }),
+      [role]: playerId,
+    },
+  };
+}
+
 export function setCaptain(career: Career, playerId: string): Career {
   return career.lineup.some((slot) => slot.playerId === playerId) ? { ...career, captainId: playerId } : career;
 }
@@ -2187,11 +2203,11 @@ export function finalizeMatch(career: Career): Career {
   const eventPlayerIds = new Set(game.events.filter((item) => item.playerId && item.clubId === career.clubId).map((item) => item.playerId as string));
   const appearedIds = new Set([...(game.appearedPlayerIds ?? []), ...finalLineupIds, ...eventPlayerIds]);
   const updatedPlayers = career.players.map((player) => {
-    const redEvent = game.events.find((item) => item.type === 'red' && item.playerId === player.id && item.clubId === career.clubId);
+    const redEvent = game.events.find((item) => (item.type === 'red' || item.type === 'second_yellow') && item.playerId === player.id && item.clubId === career.clubId);
     const appeared = appearedIds.has(player.id);
     const started = startedIds.has(player.id);
     const goals = game.events.filter((item) => item.type === 'goal' && item.playerId === player.id && item.clubId === career.clubId).length;
-    const yellows = game.events.filter((item) => item.type === 'yellow' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const yellows = game.events.filter((item) => (item.type === 'yellow' || item.type === 'second_yellow') && item.playerId === player.id && item.clubId === career.clubId).length;
     const reds = redEvent ? 1 : 0;
     const role = player.squadRole ?? 'rotacao';
     const expectedToPlay = role === 'estrela' || role === 'titular';
@@ -2247,7 +2263,11 @@ export function finalizeMatch(career: Career): Career {
         ratingSum: baseStats.ratingSum + rating,
         ratedMatches: baseStats.ratedMatches + 1,
       } : baseStats,
-      ...(redEvent ? { status: 'suspended' as const, suspendedUntilRound: game.fixture.roundIndex + 1 } : {}),
+      ...(redEvent ? {
+        status: 'suspended' as const,
+        suspendedUntilRound: game.fixture.roundIndex + 1,
+        suspensionReason: player.suspensionReason ?? (redEvent.type === 'second_yellow' ? 'Expulso por segundo cartão amarelo' : 'Expulsão direta'),
+      } : {}),
       ...(promiseActive && player.promisedMinutesUntilRound === career.roundIndex ? { promisedMinutesUntilRound: null } : {}),
     };
   });
@@ -2449,6 +2469,8 @@ export function parseCareer(saved: string | null): Career | null {
     const rawLiveMatch = (parsed as Career).liveMatch;
     const migratedLiveMatch: Career['liveMatch'] = rawLiveMatch ? {
       ...rawLiveMatch,
+      homeStats: { ...EMPTY_STATS, ...(rawLiveMatch.homeStats ?? {}) },
+      awayStats: { ...EMPTY_STATS, ...(rawLiveMatch.awayStats ?? {}) },
       substitutedOutIds: Array.isArray(rawLiveMatch.substitutedOutIds) ? rawLiveMatch.substitutedOutIds : [],
       startedPlayerIds: Array.isArray(rawLiveMatch.startedPlayerIds) ? rawLiveMatch.startedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
       appearedPlayerIds: Array.isArray(rawLiveMatch.appearedPlayerIds) ? rawLiveMatch.appearedPlayerIds : rawLiveMatch.userLineup.map((slot) => slot.playerId),
