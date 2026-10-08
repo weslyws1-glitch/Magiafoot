@@ -818,6 +818,14 @@ export function resolveVarReview(career: Career): Career {
 
   if (review.decision === 'overturned') {
     if (review.reverseGoalForClubId) removeGoal(game, review.reverseGoalForClubId);
+    if (review.reason === 'second_yellow' && review.clubId && review.playerId) {
+      const stats = statLine(game, review.clubId);
+      stats.yellowCards = Math.max(0, stats.yellowCards - 1);
+      game.yellowCardCounts = {
+        ...(game.yellowCardCounts ?? {}),
+        [review.playerId]: Math.max(1, (game.yellowCardCounts?.[review.playerId] ?? 2) - 1),
+      };
+    }
     addEvent(game, 'var_overturn', `DECISÃO ALTERADA! ${review.detail}`, review.clubId, review.playerId);
   } else {
     if ((review.reason === 'red_card' || review.reason === 'second_yellow') && review.clubId === career.clubId && review.playerId) {
@@ -1203,8 +1211,9 @@ function simulateMinute(career: Career, game: MatchSession) {
   maybeKeeperEightSeconds(game, game.fixture.homeClubId);
   maybeKeeperEightSeconds(game, game.fixture.awayClubId);
 
-  if (game.minute === 45 && game.phase === 'first_half' && game.firstHalfAddedTime === 0) {
-    game.firstHalfAddedTime = clamp(1 + Math.floor(gameRandom(game) * 4) + Math.min(3, Math.floor(game.events.filter((event) => event.type === 'medical' || event.type === 'var_start').length / 2)), 1, 7);
+  if (game.minute === 45 && game.phase === 'first_half') {
+    const baseAdded = 1 + Math.floor(gameRandom(game) * 4);
+    game.firstHalfAddedTime = clamp(Math.max(game.firstHalfAddedTime, baseAdded), 1, 9);
     addEvent(game, 'stoppage_time', `O quarto árbitro indica +${game.firstHalfAddedTime} de acréscimos no primeiro tempo.`);
   }
   if (game.phase === 'first_half' && game.minute >= 45 + game.firstHalfAddedTime) {
@@ -1213,8 +1222,9 @@ function simulateMinute(career: Career, game: MatchSession) {
     return career;
   }
 
-  if (game.minute === 90 && game.phase === 'second_half' && game.secondHalfAddedTime === 0) {
-    game.secondHalfAddedTime = clamp(2 + Math.floor(gameRandom(game) * 5) + Math.min(4, Math.floor(game.events.filter((event) => event.type === 'medical' || event.type === 'var_start' || event.type === 'substitution').length / 3)), 2, 10);
+  if (game.minute === 90 && game.phase === 'second_half') {
+    const baseAdded = 2 + Math.floor(gameRandom(game) * 5);
+    game.secondHalfAddedTime = clamp(Math.max(game.secondHalfAddedTime, baseAdded), 2, 12);
     addEvent(game, 'stoppage_time', `Teremos +${game.secondHalfAddedTime} de acréscimos.`);
   }
   if (game.phase === 'second_half' && game.minute >= 90 + game.secondHalfAddedTime) {
@@ -1244,8 +1254,12 @@ export function advanceMatch(career: Career, minutes = 5): Career {
   let next: Career = { ...career, liveMatch: game };
 
   if (game.phase === 'pregame') {
-    const unavailable = game.userLineup
-      .map((slot) => career.players.find((player) => player.id === slot.playerId))
+    const selectedIds = [
+      ...game.userLineup.map((slot) => slot.playerId),
+      ...game.userBenchIds,
+    ];
+    const unavailable = selectedIds
+      .map((id) => career.players.find((player) => player.id === id))
       .filter((player) => !player || player.status !== 'available');
     if (unavailable.length) return next;
     game.phase = 'first_half';
@@ -2206,7 +2220,9 @@ export function finalizeMatch(career: Career): Career {
     const redEvent = game.events.find((item) => (item.type === 'red' || item.type === 'second_yellow') && item.playerId === player.id && item.clubId === career.clubId);
     const appeared = appearedIds.has(player.id);
     const started = startedIds.has(player.id);
-    const goals = game.events.filter((item) => item.type === 'goal' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const scoredGoals = game.events.filter((item) => item.type === 'goal' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const overturnedGoals = game.events.filter((item) => item.type === 'var_overturn' && item.playerId === player.id && item.clubId === career.clubId).length;
+    const goals = Math.max(0, scoredGoals - overturnedGoals);
     const yellows = game.events.filter((item) => (item.type === 'yellow' || item.type === 'second_yellow') && item.playerId === player.id && item.clubId === career.clubId).length;
     const reds = redEvent ? 1 : 0;
     const role = player.squadRole ?? 'rotacao';
@@ -2274,7 +2290,7 @@ export function finalizeMatch(career: Career): Career {
   const revenue = gateIncome - wageBill;
   const leagueResult = { ...result, attendance };
   const resultText = isDraw ? 'Um ponto para cada lado.' : userWon ? 'Vitória! A torcida comemora.' : 'A diretoria espera uma reação na próxima rodada.';
-  const redCardsThisMatch = game.events.filter((event) => event.type === 'red' && event.clubId === career.clubId).length;
+  const redCardsThisMatch = game.events.filter((event) => (event.type === 'red' || event.type === 'second_yellow') && event.clubId === career.clubId).length;
   const lowMoraleCases = updatedPlayers.filter((player) => player.morale < 30).length;
   const playersWithHistory = updatedPlayers.map((player) => {
     const stats = player.seasonStats;
