@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,7 +7,6 @@ import { useCareer } from '@/context/CareerContext';
 import { FORMATIONS } from '@/game/data';
 import { effectiveStrength } from '@/game/engine';
 import type { Intensity, Mentality, Player } from '@/game/types';
-import { useColors } from '@/hooks/useColors';
 
 const POSITION_ORDER = ['GOL','LD','ZAG','LE','VOL','MC','MEI','PE','PD','ATA'];
 
@@ -16,7 +15,6 @@ function sortPlayers(players: Player[]) {
 }
 
 export default function TacticsScreen() {
-  const colors = useColors();
   const router = useRouter();
   const {
     career, setFormation, movePlayer, chooseCaptain, makeSubstitution, setTactics,
@@ -45,12 +43,11 @@ export default function TacticsScreen() {
   const substitutedOut = live
     ? sortPlayers(career.players.filter((p) => (career.liveMatch?.substitutedOutIds ?? []).includes(p.id)))
     : [];
-  const outside = useMemo(() => {
-    if (live) return [];
-    const currentStarterIds = new Set((career.liveMatch?.phase === 'pregame' ? career.liveMatch.userLineup : career.lineup).map((slot) => slot.playerId));
-    const currentBenchIds = new Set(career.liveMatch?.phase === 'pregame' ? career.liveMatch.userBenchIds : career.benchIds);
-    return sortPlayers(career.players.filter((p) => !currentStarterIds.has(p.id) && !currentBenchIds.has(p.id)));
-  }, [career, live]);
+  const currentStarterIds = new Set((career.liveMatch?.phase === 'pregame' ? career.liveMatch.userLineup : career.lineup).map((slot) => slot.playerId));
+  const currentBenchIds = new Set(career.liveMatch?.phase === 'pregame' ? career.liveMatch.userBenchIds : career.benchIds);
+  const outside = live
+    ? []
+    : sortPlayers(career.players.filter((p) => !currentStarterIds.has(p.id) && !currentBenchIds.has(p.id)));
 
   const selectedPlayer = selectedPlayerId ? career.players.find((p) => p.id === selectedPlayerId) : undefined;
   const selectedIsBench = selectedPlayer ? benchIds.includes(selectedPlayer.id) : false;
