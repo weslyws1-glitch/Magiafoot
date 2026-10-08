@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
@@ -18,6 +18,25 @@ function eventSymbol(event: MatchEvent) {
   if (event.type === 'halftime') return 'Ⅱ';
   if (event.type === 'fulltime') return '■';
   return '•';
+}
+
+const HOME_DOTS = [
+  [8,50],[25,16],[25,38],[25,62],[25,84],[43,26],[43,50],[43,74],[61,24],[61,50],[61,76],
+];
+const AWAY_DOTS = HOME_DOTS.map(([x,y]) => [100 - x, y]);
+
+function momentLabel(event: MatchEvent | undefined) {
+  if (!event) return '';
+  if (event.type === 'goal') return 'GOOOL!';
+  if (event.type === 'save') return 'DEFESA!';
+  if (event.type === 'shot') return 'FINALIZAÇÃO';
+  if (event.type === 'corner') return 'ESCANTEIO';
+  if (event.type === 'yellow') return 'CARTÃO AMARELO';
+  if (event.type === 'red') return 'CARTÃO VERMELHO';
+  if (event.type === 'substitution') return 'SUBSTITUIÇÃO';
+  if (event.type === 'medical') return 'ATENDIMENTO';
+  if (event.type === 'foul') return 'FALTA';
+  return '';
 }
 
 function hashText(value: string) {
@@ -45,18 +64,60 @@ function cpuLiveScore(fixtureId: string, season: number, minute: number, homeRat
 export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch } = useCareer();
+  const { career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch, pauseMatchForTactics } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
+  const [momentText, setMomentText] = useState('');
   const game = career?.liveMatch ?? null;
+  const ballX = useRef(new Animated.Value(0)).current;
+  const ballY = useRef(new Animated.Value(0)).current;
+  const momentOpacity = useRef(new Animated.Value(0)).current;
+  const momentScale = useRef(new Animated.Value(0.9)).current;
+  const latestEvent = game?.events?.length ? game.events[game.events.length - 1] : undefined;
 
   useEffect(() => {
-    if (!game || !autoRunning) return;
+    if (!game || !autoRunning || game.pausedForTactics) return;
     if (game.phase !== 'first_half' && game.phase !== 'second_half') return;
     const intervalMs = speed === 1 ? 900 : speed === 2 ? 450 : 300;
     const timer = setInterval(() => advanceCurrentMatch(1), intervalMs);
     return () => clearInterval(timer);
-  }, [game?.phase, game?.minute, autoRunning, speed, advanceCurrentMatch]);
+  }, [game?.phase, game?.minute, game?.pausedForTactics, autoRunning, speed, advanceCurrentMatch]);
+
+  useEffect(() => {
+    if (!game || !latestEvent) return;
+
+    const homeAttack = latestEvent.clubId === game.fixture.homeClubId;
+    const awayAttack = latestEvent.clubId === game.fixture.awayClubId;
+    const direction = homeAttack ? 1 : awayAttack ? -1 : 0;
+    const eventDistance =
+      latestEvent.type === 'goal' ? 118 :
+      latestEvent.type === 'shot' || latestEvent.type === 'save' ? 96 :
+      latestEvent.type === 'corner' ? 110 :
+      latestEvent.type === 'foul' || latestEvent.type === 'yellow' || latestEvent.type === 'red' ? 48 :
+      latestEvent.type === 'substitution' || latestEvent.type === 'medical' ? 12 : 30;
+    const targetX = direction * eventDistance;
+    const targetY = ((latestEvent.minute * 13 + latestEvent.type.length * 7) % 74) - 37;
+
+    Animated.parallel([
+      Animated.spring(ballX, { toValue: targetX, useNativeDriver: true, speed: 12, bounciness: 5 }),
+      Animated.spring(ballY, { toValue: targetY, useNativeDriver: true, speed: 12, bounciness: 5 }),
+    ]).start();
+
+    const label = momentLabel(latestEvent);
+    if (label) {
+      setMomentText(label);
+      momentOpacity.setValue(0);
+      momentScale.setValue(0.88);
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(momentOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+          Animated.spring(momentScale, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 7 }),
+        ]),
+        Animated.delay(latestEvent.type === 'goal' ? 900 : 520),
+        Animated.timing(momentOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [latestEvent?.id, game?.fixture.homeClubId, game?.fixture.awayClubId, ballX, ballY, momentOpacity, momentScale]);
 
   if (!career) {
     return <><GameHeader title="Partida" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira antes de entrar em campo.</Text></Screen></>;
@@ -99,7 +160,7 @@ export default function MatchScreen() {
   const clock = game.phase === 'halftime' ? 'INTERVALO' : isFinal ? 'FIM' : game.phase === 'pregame' ? '0′' : game.minute + '′';
   const recentEvents = [...game.events].slice(-6).reverse();
 
-  const roundMatches = LEAGUE_FIXTURES
+  const roundMatches = (career.leagueFixtures?.length ? career.leagueFixtures : LEAGUE_FIXTURES)
     .filter((fixture) => fixture.roundIndex === game.fixture.roundIndex)
     .map((fixture) => {
       const fixtureHome = getClub(fixture.homeClubId);
@@ -116,6 +177,11 @@ export default function MatchScreen() {
           );
       return { fixture, home: fixtureHome, away: fixtureAway, ...live, isUser };
     });
+
+  const openTactics = () => {
+    pauseMatchForTactics();
+    router.push('/tactics');
+  };
 
   const handleMain = () => {
     if (isFinal) {
@@ -158,7 +224,7 @@ export default function MatchScreen() {
           </Panel>
 
           <View style={styles.halftimeActions}>
-            <GameButton label="AJUSTAR TÁTICA" icon="layout" variant="outline" onPress={() => router.push('/tactics')} />
+            <GameButton label="AJUSTAR TÁTICA" icon="layout" variant="outline" onPress={openTactics} />
             <GameButton label="COMEÇAR 2º TEMPO" icon="play" onPress={() => advanceCurrentMatch(1)} />
           </View>
         </Screen>
@@ -193,7 +259,7 @@ export default function MatchScreen() {
             <View style={styles.featuredCenter}>
               <Text style={styles.featuredClock}>{clock}</Text>
               <Text style={styles.featuredVs}>×</Text>
-              <Text style={styles.featuredStatus}>{autoRunning ? speed + 'x' : 'PAUSADO'}</Text>
+              <Text style={styles.featuredStatus}>{game.pausedForTactics ? 'TÁTICA' : autoRunning ? speed + 'x' : 'PAUSADO'}</Text>
             </View>
 
             <View style={[styles.featuredTeam, { alignItems: 'flex-end' }]}>
@@ -208,6 +274,53 @@ export default function MatchScreen() {
             <Text style={styles.featuredStat}>Faltas {game.homeStats.fouls} - {game.awayStats.fouls}</Text>
           </View>
         </View>
+
+        <Panel style={styles.animationPanel}>
+          <View style={styles.animationHeader}>
+            <View>
+              <Text style={styles.animationKicker}>CAMPO AO VIVO</Text>
+              <Text style={styles.animationTitle}>{latestEvent ? latestEvent.text : 'A partida está em andamento'}</Text>
+            </View>
+            <Text style={styles.animationMinute}>{clock}</Text>
+          </View>
+
+          <View style={styles.animationPitch}>
+            <View style={styles.animationHalfLine} />
+            <View style={styles.animationCircle} />
+            <View style={styles.animationLeftBox} />
+            <View style={styles.animationRightBox} />
+
+            {HOME_DOTS.map(([x,y], index) => (
+              <View
+                key={'home-dot-' + index}
+                style={[styles.teamDot,{ left:(x + '%') as any, top:(y + '%') as any, backgroundColor:home.color }]}
+              />
+            ))}
+            {AWAY_DOTS.map(([x,y], index) => (
+              <View
+                key={'away-dot-' + index}
+                style={[styles.teamDot,{ left:(x + '%') as any, top:(y + '%') as any, backgroundColor:away.color }]}
+              />
+            ))}
+
+            <Animated.View style={[styles.liveBall,{ transform:[{ translateX:ballX },{ translateY:ballY }] }]}>
+              <Text style={styles.liveBallText}>●</Text>
+            </Animated.View>
+
+            <Animated.View pointerEvents="none" style={[styles.momentOverlay,{ opacity:momentOpacity, transform:[{ scale:momentScale }] }]}>
+              <Text style={styles.momentText}>{momentText}</Text>
+            </Animated.View>
+          </View>
+
+          <View style={styles.pressureRow}>
+            <Text style={styles.pressureTeam}>{home.initials}</Text>
+            <View style={styles.pressureTrack}>
+              <View style={[styles.pressureHome,{ width:(Math.max(15,Math.min(85,50 + (game.homeStats.shots - game.awayStats.shots) * 4 + (game.homeStats.corners - game.awayStats.corners) * 2)) + '%') as any }]} />
+            </View>
+            <Text style={styles.pressureTeam}>{away.initials}</Text>
+          </View>
+          <Text style={styles.pressureLabel}>PRESSÃO DA PARTIDA</Text>
+        </Panel>
 
         <Panel style={styles.commentaryPanel}>
           <View style={styles.commentaryHeader}>
@@ -258,7 +371,7 @@ export default function MatchScreen() {
             ))}
           </View>
 
-          <Pressable onPress={() => router.push('/tactics')} style={styles.controlDark}>
+          <Pressable onPress={openTactics} style={styles.controlDark}>
             <Text style={styles.controlDarkText}>TÁTICA</Text>
           </Pressable>
         </View>
@@ -360,6 +473,26 @@ const styles = StyleSheet.create({
   halftimeActions: { gap: 8 },
 
   liveTopCard: { borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#163a25', overflow: 'hidden' },
+  animationPanel: { gap: 8, backgroundColor: '#0d2618', borderColor: '#315f3f', overflow: 'hidden' },
+  animationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  animationKicker: { color: '#79ef91', fontSize: 7, fontWeight: '900', letterSpacing: 0.7 },
+  animationTitle: { color: '#dce8df', fontSize: 8, lineHeight: 11, marginTop: 2, maxWidth: 270 },
+  animationMinute: { color: '#79ef91', fontSize: 13, fontWeight: '900' },
+  animationPitch: { height: 178, position: 'relative', overflow: 'hidden', borderRadius: 10, borderWidth: 2, borderColor: '#aacd92', backgroundColor: '#3f7a3c' },
+  animationHalfLine: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: 'rgba(255,255,255,.65)' },
+  animationCircle: { position: 'absolute', width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: 'rgba(255,255,255,.65)', left: '50%', top: '50%', transform: [{ translateX: -27 }, { translateY: -27 }] },
+  animationLeftBox: { position: 'absolute', left: 0, top: '27%', width: 42, height: '46%', borderWidth: 1, borderColor: 'rgba(255,255,255,.65)' },
+  animationRightBox: { position: 'absolute', right: 0, top: '27%', width: 42, height: '46%', borderWidth: 1, borderColor: 'rgba(255,255,255,.65)' },
+  teamDot: { position: 'absolute', width: 10, height: 10, borderRadius: 99, borderWidth: 1.5, borderColor: '#ffffff', transform: [{ translateX: -5 }, { translateY: -5 }] },
+  liveBall: { position: 'absolute', width: 16, height: 16, borderRadius: 99, left: '50%', top: '50%', marginLeft: -8, marginTop: -8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#1b2b20', zIndex: 5 },
+  liveBallText: { color: '#111111', fontSize: 7, lineHeight: 9 },
+  momentOverlay: { position: 'absolute', left: 24, right: 24, top: '40%', minHeight: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(7,21,13,.82)', borderWidth: 1, borderColor: '#79ef91', zIndex: 8 },
+  momentText: { color: '#ffffff', fontSize: 16, fontWeight: '900', letterSpacing: 0.7 },
+  pressureRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  pressureTeam: { width: 30, color: '#f5f7f5', fontSize: 7, fontWeight: '900', textAlign: 'center' },
+  pressureTrack: { flex: 1, height: 9, borderRadius: 99, overflow: 'hidden', backgroundColor: '#9b765c', borderWidth: 1, borderColor: '#38533f' },
+  pressureHome: { height: '100%', backgroundColor: '#79ef91' },
+  pressureLabel: { color: '#779083', fontSize: 5.8, fontWeight: '900', letterSpacing: 0.6, textAlign: 'center' },
   liveTopBar: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: '#0d2618' },
   liveCompetition: { flex: 1, color: '#dce8df', fontSize: 8, fontWeight: '900' },
   liveProgress: { width: 74, height: 8, borderWidth: 1, borderColor: '#94b46d', backgroundColor: '#e5eadb' },
