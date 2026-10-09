@@ -5,8 +5,7 @@ import { useRouter } from 'expo-router';
 import { BarStat, ClubBadge, GameButton, GameHeader, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { calculateStandings, formatCurrency, getCurrentFixture, getCurrentLeaguePosition, getClubName } from '@/game/engine';
-import { LEAGUE_ROUNDS } from '@/game/engine';
+import { calculateCareerStandings, formatCurrency, getCareerDivision, getCurrentFixture, getCurrentLeaguePosition, getClubName, getLeagueRoundCount } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 function HubTile({ title, detail, icon, onPress }: { title: string; detail: string; icon: keyof typeof Feather.glyphMap; onPress: () => void }) {
@@ -39,6 +38,8 @@ export default function ClubScreen() {
   const isHome = fixture?.homeClubId === career.clubId;
   const opponent = opponentId ? getClub(opponentId) : undefined;
   const position = getCurrentLeaguePosition(career);
+  const leagueRounds = Math.max(1, getLeagueRoundCount(career));
+  const division = getCareerDivision(career);
   const positionText = position ? `${position}º` : '—';
   const playLabel = career.liveMatch?.phase === 'finished'
     ? 'Ver resultado final'
@@ -71,7 +72,7 @@ export default function ClubScreen() {
           </View>
           <View style={[styles.identityDivider, { backgroundColor: colors.primaryForeground, opacity: 0.2 }]} />
           <View style={styles.identityStats}>
-            <View><Text style={[styles.identityStatValue, { color: colors.primaryForeground }]}>{career.roundIndex}/{LEAGUE_ROUNDS}</Text><Text style={[styles.identityStatLabel, { color: colors.primaryForeground }]}>rodadas</Text></View>
+            <View><Text style={[styles.identityStatValue, { color: colors.primaryForeground }]}>{career.roundIndex}/{leagueRounds}</Text><Text style={[styles.identityStatLabel, { color: colors.primaryForeground }]}>rodadas</Text></View>
             <View><Text style={[styles.identityStatValue, { color: colors.primaryForeground }]}>{career.players.length}</Text><Text style={[styles.identityStatLabel, { color: colors.primaryForeground }]}>jogadores</Text></View>
             <View><Text style={[styles.identityStatValue, { color: colors.primaryForeground }]}>{formatCurrency(career.balance)}</Text><Text style={[styles.identityStatLabel, { color: colors.primaryForeground }]}>caixa</Text></View>
           </View>
@@ -131,8 +132,8 @@ export default function ClubScreen() {
         <View style={styles.hubGrid}>
           <HubTile title="Elenco" detail={`${career.players.length} atletas`} icon="users" onPress={() => router.push('/squad')} />
           <HubTile title="Táticas" detail="Formação e onze" icon="layout" onPress={() => router.push('/tactics')} />
-          <HubTile title="Classificação" detail={`${calculateStandings(career.results).length} clubes`} icon="award" onPress={() => router.push('/league')} />
-          <HubTile title="Calendário" detail="Temporada fictícia" icon="calendar" onPress={() => router.push('/calendar')} />
+          <HubTile title="Classificação" detail={`${calculateCareerStandings(career).length} clubes`} icon="award" onPress={() => router.push('/league')} />
+          <HubTile title="Calendário" detail={division?.name ?? 'Liga nacional'} icon="calendar" onPress={() => router.push('/calendar')} />
           <HubTile title="Mercado" detail="Contratações" icon="repeat" onPress={() => router.push('/market')} />
           <HubTile title="Finanças" detail="Caixa e estádio" icon="briefcase" onPress={() => router.push('/finances')} />
         </View>
