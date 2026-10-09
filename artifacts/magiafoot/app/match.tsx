@@ -197,7 +197,7 @@ export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
   const {
-    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch,
+    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch, manualSave,
     pauseMatchForTactics, resolveVAR,
   } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
@@ -206,6 +206,17 @@ export default function MatchScreen() {
   const [showRoundLive, setShowRoundLive] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const game = career?.liveMatch ?? null;
+
+  useEffect(() => {
+    if (!savingResult || !career || career.liveMatch) return;
+    let active = true;
+    manualSave().then((saved) => {
+      if (!active) return;
+      if (saved) router.replace('/');
+      else setSavingResult(false);
+    }).catch(() => { if (active) setSavingResult(false); });
+    return () => { active = false; };
+  }, [savingResult, career, manualSave, router]);
 
   useEffect(() => {
     if (!game || !autoRunning || game.pausedForTactics || game.pausedForVar || game.requiredSubstitutionPlayerId) return;
@@ -314,9 +325,7 @@ export default function MatchScreen() {
       if (savingResult) return;
       setSavingResult(true);
       closeCurrentMatch();
-      // O salvamento automático é acionado pela atualização da carreira.
-      // Mantemos a tela aberta para que o usuário confirme o resultado.
-      setSavingResult(false);
+      // A tela só retorna à carreira depois da confirmação do salvamento.
       return;
     }
     advanceCurrentMatch(1);
