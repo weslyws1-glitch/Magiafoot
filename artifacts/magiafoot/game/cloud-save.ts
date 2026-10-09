@@ -5,6 +5,7 @@ import { sha256 } from './save-protection';
 
 const SUPABASE_URL = 'https://jrajtpnxyiwgfbjkuxaf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Fw2Gmc9zOdTa9bHgZzIEfQ_HaVZsh8W';
+const AUTH_REDIRECT_URL = 'https://magiafoot-git-restore-manager-ui-weslyws1-glitch.vercel.app/account-save';
 const REMEMBERED_SESSION_KEY = 'magiafoot.cloud.session.v1';
 
 export interface CloudSession {
@@ -120,7 +121,7 @@ export async function clearRememberedCloudSession() {
 }
 
 export async function signUpCloudAccount(email: string, password: string) {
-  const response = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+  const response = await fetch(SUPABASE_URL + '/auth/v1/signup?redirect_to=' + encodeURIComponent(AUTH_REDIRECT_URL), {
     method: 'POST',
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
