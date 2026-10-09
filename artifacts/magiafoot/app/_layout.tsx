@@ -23,17 +23,24 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
-  const { isReady, cloudEmail } = useCareer();
+  const { isReady, cloudEmail, activeCareerSlot, authRestoring } = useCareer();
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || authRestoring) return;
     const firstSegment = segments[0];
     const isAccountEntry = firstSegment === 'account-save';
+    const isSlotEntry = firstSegment === 'career-slots';
+    const isNewCareer = firstSegment === 'new-career';
 
-    if (!cloudEmail && !isAccountEntry) {
-      router.replace('/account-save');
+    if (!cloudEmail) {
+      if (!isAccountEntry) router.replace('/account-save');
+      return;
     }
-  }, [isReady, cloudEmail, segments, router]);
+
+    if (!activeCareerSlot && !isSlotEntry && !isAccountEntry && !isNewCareer) {
+      router.replace('/career-slots');
+    }
+  }, [isReady, authRestoring, cloudEmail, activeCareerSlot, segments, router]);
 
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Voltar' }} />
