@@ -19,6 +19,7 @@ export default function FinancesScreen() {
   const wages = career.players.reduce((sum, player) => sum + player.wage, 0);
   const wageBudget = career.finance?.weeklyWageBudget ?? wages;
   const wageRoom = Math.max(0, wageBudget - wages);
+  const wageUsage = wageBudget > 0 ? Math.round((wages / wageBudget) * 100) : 100;
   const transferBudget = career.finance?.transferBudget ?? 0;
   const squadValue = career.players.reduce((sum, player) => sum + player.value, 0);
   const capacity = (club?.stadiumCapacity ?? 0) + Math.max(0, (career.stadiumUpgrades?.stands ?? 1) - 1) * 4_000;
@@ -34,6 +35,14 @@ export default function FinancesScreen() {
   const estimatedMonthlyCosts = wages * 4 + adminWeekly * 4;
   const monthlyResult = estimatedMonthlyIncome - estimatedMonthlyCosts;
   const finance = career.finance;
+  const financeStatus =
+    monthlyResult >= 0 && wageUsage <= 90 ? 'SAUDÁVEL'
+    : monthlyResult >= 0 && wageUsage <= 100 ? 'ATENÇÃO'
+    : 'PRESSÃO';
+  const financeStatusStyle =
+    financeStatus === 'SAUDÁVEL' ? styles.healthGood
+    : financeStatus === 'ATENÇÃO' ? styles.healthWarn
+    : styles.healthBad;
 
   const seasonRows = [
     { label: 'Bilheteria', value: finance?.seasonMatchdayIncome ?? 0 },
@@ -53,7 +62,10 @@ export default function FinancesScreen() {
             <Text style={styles.heroValue}>{formatCurrency(career.balance, currency)}</Text>
             <Text style={styles.heroSub}>Moeda da carreira: {currency}</Text>
           </View>
-          <View style={styles.heroIcon}><Feather name="bar-chart-2" size={27} color="#79ef91" /></View>
+          <View style={styles.heroSide}>
+            <View style={styles.heroIcon}><Feather name="bar-chart-2" size={27} color="#79ef91" /></View>
+            <View style={[styles.healthBadge, financeStatusStyle]}><Text style={styles.healthText}>{financeStatus}</Text></View>
+          </View>
         </Panel>
 
         <Text style={styles.sectionTitle}>ORÇAMENTOS</Text>
@@ -66,7 +78,7 @@ export default function FinancesScreen() {
           <Panel style={styles.metric}>
             <Text style={styles.label}>FOLHA / LIMITE</Text>
             <Text style={styles.value}>{formatCurrency(wages, currency)}</Text>
-            <Text style={styles.detail}>de {formatCurrency(wageBudget, currency)} por semana</Text>
+            <Text style={styles.detail}>de {formatCurrency(wageBudget, currency)} por semana · {wageUsage}% usado</Text>
           </Panel>
           <Panel style={styles.metric}>
             <Text style={styles.label}>MARGEM SALARIAL</Text>
@@ -147,7 +159,13 @@ const styles = StyleSheet.create({
   heroLabel: { color: '#b7c7bd', fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
   heroValue: { color: '#f5f7f5', fontSize: 27, fontWeight: '900', marginTop: 7 },
   heroSub: { color: '#a6b9ac', fontSize: 9, marginTop: 6 },
+  heroSide: { alignItems: 'center', gap: 7 },
   heroIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#0b2117', alignItems: 'center', justifyContent: 'center' },
+  healthBadge: { minWidth: 62, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 5, alignItems: 'center' },
+  healthGood: { backgroundColor: '#173f29' },
+  healthWarn: { backgroundColor: '#584816' },
+  healthBad: { backgroundColor: '#512424' },
+  healthText: { color: '#f5f7f5', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.5 },
   sectionTitle: { color: '#dce8df', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metric: { width: '48%', minHeight: 110, justifyContent: 'center', gap: 5 },
