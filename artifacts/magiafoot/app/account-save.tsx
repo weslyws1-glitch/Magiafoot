@@ -53,34 +53,68 @@ export default function AccountSaveScreen() {
   }
 
   if (cloudEmail) {
+    const goBackToGame = () => {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+    };
+
     return (
-      <Screen style={styles.page}>
-        <View style={styles.logoBox}>
-          <Text style={styles.logo}>MAGIA<Text style={styles.logoGreen}>FOOT</Text></Text>
-          <Text style={styles.subtitle}>Sua conta está conectada</Text>
+      <Screen style={styles.accountPage}>
+        <View style={styles.accountSheetHandle} />
+
+        <View style={styles.accountHeader}>
+          <View>
+            <Text style={styles.accountKicker}>MAGIAFOOT</Text>
+            <Text style={styles.accountTitle}>Conta</Text>
+          </View>
+          <View style={styles.onlineBadge}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>CONECTADO</Text>
+          </View>
         </View>
 
         <View style={styles.connectedCard}>
-          <View style={styles.connectedIcon}><Feather name="check-circle" size={28} color="#79ef91" /></View>
-          <Text style={styles.connectedTitle}>Login ativo</Text>
+          <View style={styles.connectedIcon}><Feather name="user" size={27} color="#79ef91" /></View>
+          <Text style={styles.connectedTitle}>Sua conta</Text>
           <Text style={styles.connectedEmail}>{cloudEmail}</Text>
-          {cloudMagiaId ? <Text style={styles.magiaId}>{cloudMagiaId}</Text> : null}
+          {cloudMagiaId ? (
+            <View style={styles.magiaIdBox}>
+              <Text style={styles.magiaIdLabel}>MAGIA ID</Text>
+              <Text selectable style={styles.magiaId}>{cloudMagiaId}</Text>
+            </View>
+          ) : null}
+        </View>
 
-          <Pressable onPress={() => router.replace('/career-slots')} style={styles.primaryButton}>
-            <Feather name="play" size={17} color="#07150d" />
-            <Text style={styles.primaryText}>ESCOLHER CARREIRA</Text>
+        <View style={styles.accountActions}>
+          <Pressable onPress={goBackToGame} style={styles.accountAction}>
+            <View style={styles.accountActionSquare}>
+              <Feather name="arrow-left" size={25} color="#79ef91" />
+            </View>
+            <Text style={styles.accountActionLabel}>VOLTAR</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.replace('/career-slots')} style={styles.accountAction}>
+            <View style={styles.accountActionSquare}>
+              <Feather name="grid" size={25} color="#79ef91" />
+            </View>
+            <Text style={styles.accountActionLabel}>CARREIRAS</Text>
           </Pressable>
 
           <Pressable
             onPress={async () => {
               await signOutCloud();
+              router.replace('/account-save');
             }}
-            style={styles.secondaryButton}
+            style={styles.accountAction}
           >
-            <Feather name="log-out" size={15} color="#dce8df" />
-            <Text style={styles.secondaryText}>SAIR DA CONTA</Text>
+            <View style={[styles.accountActionSquare, styles.logoutSquare]}>
+              <Feather name="log-out" size={25} color="#ff9a9a" />
+            </View>
+            <Text style={[styles.accountActionLabel, styles.logoutLabel]}>SAIR</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.accountHint}>Use Carreiras para trocar entre os quatro salvamentos. Sair encerra o login salvo neste aparelho.</Text>
       </Screen>
     );
   }
@@ -240,9 +274,26 @@ const styles = StyleSheet.create({
   helpText: { color: '#7f9487', fontSize: 7.5, lineHeight: 11, textAlign: 'center' },
   message: { color: '#c5d4ca', fontSize: 8, lineHeight: 12, textAlign: 'center' },
   securityText: { color: '#64796c', fontSize: 7.5, textAlign: 'center', letterSpacing: 0.25 },
-  connectedCard: { borderWidth: 1, borderColor: '#31513d', borderRadius: 22, backgroundColor: '#0b2117', padding: 20, gap: 12, alignItems: 'center' },
+  connectedCard: { borderWidth: 1, borderColor: '#31513d', borderRadius: 22, backgroundColor: '#0b2117', padding: 20, gap: 10, alignItems: 'center' },
   connectedIcon: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#153426' },
   connectedTitle: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
   connectedEmail: { color: '#aebfb4', fontSize: 10.5 },
-  magiaId: { color: '#79ef91', fontSize: 12, fontWeight: '900', letterSpacing: 0.7, marginBottom: 5 },
+  magiaId: { color: '#79ef91', fontSize: 12, fontWeight: '900', letterSpacing: 0.7 },
+  accountPage: { backgroundColor: '#07150d', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 34, gap: 18 },
+  accountSheetHandle: { alignSelf: 'center', width: 46, height: 5, borderRadius: 99, backgroundColor: '#31513d', marginBottom: 2 },
+  accountHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  accountKicker: { color: '#79ef91', fontSize: 7, fontWeight: '900', letterSpacing: 1.1 },
+  accountTitle: { color: '#f5f7f5', fontSize: 28, fontWeight: '900', marginTop: 2 },
+  onlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#10291d', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 7 },
+  onlineDot: { width: 7, height: 7, borderRadius: 99, backgroundColor: '#79ef91' },
+  onlineText: { color: '#79ef91', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.7 },
+  magiaIdBox: { width: '100%', borderRadius: 12, backgroundColor: '#07150d', borderWidth: 1, borderColor: '#264937', padding: 11, alignItems: 'center', gap: 4 },
+  magiaIdLabel: { color: '#708579', fontSize: 6.5, fontWeight: '900', letterSpacing: 0.7 },
+  accountActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  accountAction: { flex: 1, alignItems: 'center', gap: 7 },
+  accountActionSquare: { width: '100%', aspectRatio: 1, maxHeight: 112, borderRadius: 20, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#0b2117', alignItems: 'center', justifyContent: 'center' },
+  accountActionLabel: { color: '#dce8df', fontSize: 7.5, fontWeight: '900', letterSpacing: 0.6 },
+  logoutSquare: { borderColor: '#593536', backgroundColor: '#211616' },
+  logoutLabel: { color: '#ff9a9a' },
+  accountHint: { color: '#6f8377', fontSize: 7.5, lineHeight: 11, textAlign: 'center', paddingHorizontal: 18 },
 });
