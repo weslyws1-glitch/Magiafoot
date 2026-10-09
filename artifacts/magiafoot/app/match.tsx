@@ -221,7 +221,7 @@ export default function MatchScreen() {
   useEffect(() => {
     if (!game || !autoRunning || game.pausedForTactics || game.pausedForVar || game.requiredSubstitutionPlayerId) return;
     if (game.phase !== 'first_half' && game.phase !== 'second_half') return;
-    const intervalMs = speed === 1 ? 900 : speed === 2 ? 320 : 110;
+    const intervalMs = speed === 1 ? 900 : speed === 2 ? 260 : 75;
     const timer = setInterval(() => advanceCurrentMatch(1), intervalMs);
     return () => clearInterval(timer);
   }, [
