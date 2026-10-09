@@ -1,5 +1,6 @@
 import type { Club, FormationId, FormationOption, FormationSlot, Player, Position } from './types.ts';
 import { REAL_BRAZIL_CLUBS, getDivisionDefinition } from './real-clubs.ts';
+import { SOUTH_AMERICA_CLUBS, getInternationalDivision } from './international-clubs.ts';
 
 export const LEAGUE_NAME = '3ª Divisão';
 
@@ -26,7 +27,7 @@ const LEGACY_CLUBS: Club[] = [
   { id: 'estacao-1912', name: 'Estação 1912', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
 ].map((club) => ({ ...club, selectable: false, stateCode: null, competitionGroup: null, prestige: 55, fanBase: 50 }));
 
-export const CLUBS: Club[] = [...REAL_BRAZIL_CLUBS, ...LEGACY_CLUBS];
+export const CLUBS: Club[] = [...REAL_BRAZIL_CLUBS, ...SOUTH_AMERICA_CLUBS, ...LEGACY_CLUBS];
 
 export function selectableClubs(): Club[] {
   return CLUBS.filter((club) => club.selectable !== false);
@@ -34,14 +35,15 @@ export function selectableClubs(): Club[] {
 
 export function clubsForDivision(divisionId: string, userClubId?: string): Club[] {
   const divisionClubs = CLUBS.filter((club) => club.divisionId === divisionId);
-  if (divisionId !== 'br-d' || !userClubId) return divisionClubs;
+  const division = getDivisionDefinition(divisionId) ?? getInternationalDivision(divisionId);
+  if (division?.format !== 'regional_groups' || !userClubId) return divisionClubs;
   const userClub = CLUBS.find((club) => club.id === userClubId);
   if (!userClub?.competitionGroup) return divisionClubs;
   return divisionClubs.filter((club) => club.competitionGroup === userClub.competitionGroup);
 }
 
 export function getDivision(id: string) {
-  return getDivisionDefinition(id);
+  return getDivisionDefinition(id) ?? getInternationalDivision(id);
 }
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
