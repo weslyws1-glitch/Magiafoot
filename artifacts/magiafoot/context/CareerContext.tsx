@@ -43,15 +43,21 @@ import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImag
 import { getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
 import type { LocalIdentity, SaveHealth } from '@/game/save-protection';
 import {
+  clearRememberedCloudSession,
   fetchCloudProfile,
+  listCareerSlots,
+  loadRememberedCloudSession,
   refreshCloudSession,
+  restoreCareerFromCloud,
   restoreLatestCareerFromCloud,
   saveCareerToCloud,
+  saveRememberedCloudSession,
   signInCloudAccount,
   signOutCloudAccount,
   signUpCloudAccount,
+  upsertCareerSlot,
 } from '@/game/cloud-save';
-import type { CloudProfile, CloudSession } from '@/game/cloud-save';
+import type { CareerSlotSummary, CloudProfile, CloudSession } from '@/game/cloud-save';
 
 interface CareerContextValue {
   career: Career | null;
@@ -67,9 +73,15 @@ interface CareerContextValue {
   cloudStatus: 'signed_out' | 'connecting' | 'connected' | 'syncing' | 'error';
   cloudLastSavedAt: string | null;
   cloudMessage: string | null;
-  createCloudAccount: (email: string, password: string) => Promise<boolean>;
-  signInCloud: (email: string, password: string) => Promise<boolean>;
+  careerSlots: CareerSlotSummary[];
+  activeCareerSlot: 1 | 2 | 3 | 4 | null;
+  authRestoring: boolean;
+  createCloudAccount: (email: string, password: string, remember?: boolean) => Promise<boolean>;
+  signInCloud: (email: string, password: string, remember?: boolean) => Promise<boolean>;
   signOutCloud: () => Promise<void>;
+  refreshCareerSlots: () => Promise<void>;
+  chooseCareerSlot: (slot: 1 | 2 | 3 | 4) => Promise<boolean>;
+  chooseEmptyCareerSlot: (slot: 1 | 2 | 3 | 4) => void;
   syncCloudNow: () => Promise<boolean>;
   restoreCloudLatest: () => Promise<boolean>;
   createNewCareer: (coachName: string, clubId: string) => void;
@@ -127,8 +139,31 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const [cloudStatus, setCloudStatus] = useState<'signed_out' | 'connecting' | 'connected' | 'syncing' | 'error'>('signed_out');
   const [cloudLastSavedAt, setCloudLastSavedAt] = useState<string | null>(null);
   const [cloudMessage, setCloudMessage] = useState<string | null>(null);
+  const [careerSlots, setCareerSlots] = useState<CareerSlotSummary[]>([]);
+  const [activeCareerSlot, setActiveCareerSlot] = useState<1 | 2 | 3 | 4 | null>(null);
+  const [rememberLogin, setRememberLogin] = useState(false);
+  const [authRestoring, setAuthRestoring] = useState(true);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const revisionRef = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    loadRememberedCloudSession()
+      .then(async (session) => {
+        if (!active || !session) return;
+        setCloudSession(session);
+        setRememberLogin(true);
+        const profile = await fetchCloudProfile(session);
+        if (active && profile) setCloudProfile(profile);
+        const slots = await listCareerSlots(session);
+        if (active) setCareerSlots(slots);
+        if (active) setCloudStatus('connected');
+      })
+      .finally(() => {
+        if (active) setAuthRestoring(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -206,6 +241,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
         setCloudStatus('syncing');
         const cloudSaved = await saveCareerToCloud(session, snapshot, identity.installationId, 'manual');
         if (cloudSaved) {
+          if (activeCareerSlot) {
+            await upsertCareerSlot(session, activeCareerSlot, snapshot);
+            setCareerSlots(await listCareerSlots(session));
+          }
           setCloudLastSavedAt(cloudSaved.savedAt);
           setCloudStatus('connected');
           setCloudMessage('Save local e nuvem atualizados.');
@@ -239,7 +278,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return profile;
   }, []);
 
-  const createCloudAccount = useCallback(async (email: string, password: string) => {
+  const createCloudAccount = useCallback(async (email: string, password: string, remember = false) => {
     setCloudStatus('connecting');
     setCloudMessage(null);
     const result = await signUpCloudAccount(email, password);
@@ -253,12 +292,15 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       return true;
     }
     setCloudSession(result.session);
+    setRememberLogin(remember);
+    if (remember) await saveRememberedCloudSession(result.session);
     await hydrateCloudProfile(result.session);
+    setCareerSlots(await listCareerSlots(result.session));
     setCloudStatus('connected');
     return true;
   }, [hydrateCloudProfile]);
 
-  const signInCloud = useCallback(async (email: string, password: string) => {
+  const signInCloud = useCallback(async (email: string, password: string, remember = false) => {
     setCloudStatus('connecting');
     setCloudMessage(null);
     const result = await signInCloudAccount(email, password);
@@ -268,19 +310,56 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       return false;
     }
     setCloudSession(result.session);
+    setRememberLogin(remember);
+    if (remember) await saveRememberedCloudSession(result.session);
+    else await clearRememberedCloudSession();
     await hydrateCloudProfile(result.session);
+    setCareerSlots(await listCareerSlots(result.session));
     setCloudStatus('connected');
     return true;
   }, [hydrateCloudProfile]);
 
   const signOutCloud = useCallback(async () => {
     if (cloudSession) await signOutCloudAccount(cloudSession);
+    await clearRememberedCloudSession();
     setCloudSession(null);
     setCloudProfile(null);
+    setCareerSlots([]);
+    setActiveCareerSlot(null);
     setCloudLastSavedAt(null);
     setCloudStatus('signed_out');
     setCloudMessage('Conta desconectada deste aparelho.');
   }, [cloudSession]);
+
+  const refreshCareerSlots = useCallback(async () => {
+    const session = await ensureFreshCloudSession();
+    if (!session) return;
+    setCareerSlots(await listCareerSlots(session));
+  }, [ensureFreshCloudSession]);
+
+  const chooseCareerSlot = useCallback(async (slot: 1 | 2 | 3 | 4) => {
+    const session = await ensureFreshCloudSession();
+    if (!session) return false;
+    const summary = careerSlots.find((item) => item.slot === slot);
+    if (!summary) return false;
+    setCloudStatus('syncing');
+    const restored = await restoreCareerFromCloud(session, summary.careerId);
+    if (!restored) {
+      setCloudStatus('error');
+      setCloudMessage('Não foi possível carregar esta carreira.');
+      return false;
+    }
+    setCareer(restored.career);
+    setActiveCareerSlot(slot);
+    setCloudLastSavedAt(restored.savedAt);
+    setCloudStatus('connected');
+    return true;
+  }, [careerSlots, ensureFreshCloudSession]);
+
+  const chooseEmptyCareerSlot = useCallback((slot: 1 | 2 | 3 | 4) => {
+    setActiveCareerSlot(slot);
+    setCareer(null);
+  }, []);
 
   const syncCloudNow = useCallback(async () => {
     if (!career || !identity) return false;
@@ -295,11 +374,15 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    if (activeCareerSlot) {
+      await upsertCareerSlot(session, activeCareerSlot, career);
+      setCareerSlots(await listCareerSlots(session));
+    }
     setCloudLastSavedAt(saved.savedAt);
     setCloudStatus('connected');
     setCloudMessage('Carreira sincronizada e protegida na nuvem.');
     return true;
-  }, [career, identity, ensureFreshCloudSession]);
+  }, [career, identity, ensureFreshCloudSession, activeCareerSlot]);
 
   const restoreCloudLatest = useCallback(async () => {
     const session = await ensureFreshCloudSession();
@@ -328,6 +411,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       setCloudStatus('syncing');
       const saved = await saveCareerToCloud(session, career, identity.installationId, 'auto');
       if (saved) {
+        if (activeCareerSlot) {
+          await upsertCareerSlot(session, activeCareerSlot, career);
+          setCareerSlots(await listCareerSlots(session));
+        }
         setCloudLastSavedAt(saved.savedAt);
         setCloudStatus('connected');
       } else {
@@ -336,12 +423,22 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       }
     }, 12000);
     return () => clearTimeout(timer);
-  }, [career, identity, cloudSession, ensureFreshCloudSession]);
+  }, [career, identity, cloudSession, ensureFreshCloudSession, activeCareerSlot]);
 
   const createNewCareer = useCallback((coachName: string, clubId: string) => {
     if (!isReady) return;
-    setCareer(makeCareer(coachName, clubId));
-  }, [isReady]);
+    const next = makeCareer(coachName, clubId);
+    setCareer(next);
+    if (cloudSession && activeCareerSlot) {
+      void (async () => {
+        const session = await refreshCloudSession(cloudSession);
+        if (!session) return;
+        await saveCareerToCloud(session, next, identity?.installationId ?? 'web', 'manual');
+        await upsertCareerSlot(session, activeCareerSlot, next);
+        setCareerSlots(await listCareerSlots(session));
+      })();
+    }
+  }, [isReady, cloudSession, activeCareerSlot, identity]);
 
   const update = useCallback((action: (current: Career) => Career) => {
     setCareer((current) => current ? action(current) : current);
@@ -537,9 +634,15 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     cloudStatus,
     cloudLastSavedAt,
     cloudMessage,
+    careerSlots,
+    activeCareerSlot,
+    authRestoring,
     createCloudAccount,
     signInCloud,
     signOutCloud,
+    refreshCareerSlots,
+    chooseCareerSlot,
+    chooseEmptyCareerSlot,
     syncCloudNow,
     restoreCloudLatest,
     createNewCareer,
@@ -586,7 +689,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
     cloudSession, cloudProfile, cloudStatus, cloudLastSavedAt, cloudMessage,
-    createCloudAccount, signInCloud, signOutCloud, syncCloudNow, restoreCloudLatest,
+    careerSlots, activeCareerSlot, authRestoring,
+    createCloudAccount, signInCloud, signOutCloud, refreshCareerSlots, chooseCareerSlot, chooseEmptyCareerSlot, syncCloudNow, restoreCloudLatest,
   ]);
 
   return <CareerContext.Provider value={value}>{children}</CareerContext.Provider>;
