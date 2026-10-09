@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ClubBadge, GameButton, GameHeader, LoadingState, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { CLUBS } from '@/game/data';
+import { CLUBS, selectableClubs } from '@/game/data';
 import type { CurrencyCode } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -25,11 +25,13 @@ export default function NewCareerScreen() {
   const router = useRouter();
   const { isReady, createNewCareer } = useCareer();
 
+  const availableClubs = useMemo(() => selectableClubs(), []);
+
   const countries = useMemo(() => {
     const byCountry = new Map<string, { name: string; code: string }>();
-    for (const club of CLUBS) byCountry.set(club.country, { name: club.country, code: club.countryCode });
+    for (const club of availableClubs) byCountry.set(club.country, { name: club.country, code: club.countryCode });
     return Array.from(byCountry.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, []);
+  }, [availableClubs]);
 
   const [coachName, setCoachName] = useState('');
   const [country, setCountry] = useState<string | null>(null);
@@ -44,24 +46,24 @@ export default function NewCareerScreen() {
   const divisions = useMemo(() => {
     if (!country) return [];
     const seen = new Map<string, { id: string; name: string; level: number }>();
-    for (const club of CLUBS.filter((item) => item.country === country)) {
+    for (const club of availableClubs.filter((item) => item.country === country)) {
       seen.set(club.divisionId, { id: club.divisionId, name: club.divisionName, level: club.divisionLevel });
     }
     return Array.from(seen.values()).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'pt-BR'));
-  }, [country]);
+  }, [country, availableClubs]);
 
   const effectiveDivisionId = divisionId ?? (divisions.length === 1 ? divisions[0]?.id ?? null : null);
 
   const clubsForSelection = useMemo(
-    () => CLUBS
+    () => availableClubs
       .filter((club) => club.country === country && (!effectiveDivisionId || club.divisionId === effectiveDivisionId))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
-    [country, effectiveDivisionId],
+    [country, effectiveDivisionId, availableClubs],
   );
 
   const selectedDivision = divisions.find((item) => item.id === effectiveDivisionId) ?? null;
-  const selectedClub = CLUBS.find((club) => club.id === clubId) ?? null;
+  const selectedClub = availableClubs.find((club) => club.id === clubId) ?? null;
   const selectedCurrency = CURRENCIES.find((item) => item.code === currency)!;
 
   const create = () => {
@@ -145,7 +147,7 @@ export default function NewCareerScreen() {
                   key={item.name}
                   onPress={() => {
                     const countryDivisions = Array.from(new Map(
-                      CLUBS.filter((club) => club.country === item.name)
+                      availableClubs.filter((club) => club.country === item.name)
                         .map((club) => [club.divisionId, club])
                     ).values()).sort((a, b) => a.divisionLevel - b.divisionLevel);
                     setCountry(item.name);
