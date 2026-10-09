@@ -257,7 +257,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       }
     }
     return succeeded;
-  }, [career, identity, cloudSession]);
+  }, [career, identity, cloudSession, activeCareerSlot]);
 
   const ensureFreshCloudSession = useCallback(async () => {
     if (!cloudSession) return null;
@@ -326,6 +326,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     await clearRememberedCloudSession();
     setCloudSession(null);
     setCloudProfile(null);
+    setCareer(null);
     setCareerSlots([]);
     setActiveCareerSlot(null);
     setCloudLastSavedAt(null);
@@ -336,7 +337,10 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const refreshCareerSlots = useCallback(async () => {
     const session = await ensureFreshCloudSession();
     if (!session) return;
-    setCareerSlots(await listCareerSlots(session));
+    const slots = await listCareerSlots(session);
+    setCareerSlots(slots);
+    setCloudStatus('connected');
+    setCloudMessage(null);
   }, [ensureFreshCloudSession]);
 
   const chooseCareerSlot = useCallback(async (slot: 1 | 2 | 3 | 4) => {
@@ -377,6 +381,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const chooseEmptyCareerSlot = useCallback((slot: 1 | 2 | 3 | 4) => {
     setActiveCareerSlot(slot);
     setCareer(null);
+    setCloudStatus('connected');
+    setCloudMessage(null);
   }, []);
 
   const syncCloudNow = useCallback(async () => {
