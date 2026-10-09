@@ -2728,6 +2728,94 @@ export function getClubName(clubId: string): string {
   return getClub(clubId)?.name ?? 'Clube';
 }
 
+export type TransferNegotiationResult = 'completed' | 'club_rejected' | 'player_rejected' | 'budget' | 'squad_full' | 'not_found';
+
+export function negotiateTransferPurchase(
+  career: Career,
+  playerId: string,
+  transferBid: number,
+  weeklyWage: number,
+  signingBonus: number,
+): { career: Career; result: TransferNegotiationResult; counterOffer?: number; wageDemand?: number } {
+  const player = career.market.find((item) => item.id === playerId);
+  if (!player) return { career, result: 'not_found' };
+  if (career.players.length >= 32) return { career, result: 'squad_full' };
+
+  const seller = player.currentClubId ? getClub(player.currentClubId) : undefined;
+  const seed = hash('negotiation-' + career.id + '-' + player.id + '-' + career.roundIndex);
+  const sellerPremium = seller
+    ? 0.94 + Math.min(0.16, Math.max(0, seller.rating - (getClub(career.clubId)?.rating ?? 65)) * 0.008) + (seed % 7) / 100
+    : 0.90 + (seed % 8) / 100;
+  const minimumFee = Math.round(player.value * sellerPremium);
+  const wageFactor = 0.97 + ((seed >> 5) % 12) / 100;
+  const minimumWage = Math.round(player.wage * wageFactor / 100) * 100;
+  const minimumBonus = Math.max(player.wage * 2, Math.round((player.signingBonus ?? player.wage * 3) * 0.75));
+
+  const fee = Math.max(0, Math.round(transferBid));
+  const wage = Math.max(0, Math.round(weeklyWage / 100) * 100);
+  const bonus = Math.max(0, Math.round(signingBonus));
+
+  if (fee < minimumFee) {
+    return {
+      career,
+      result: 'club_rejected',
+      counterOffer: Math.round(Math.max(minimumFee, fee * 1.08) / 1000) * 1000,
+    };
+  }
+
+  if (wage < minimumWage || bonus < minimumBonus) {
+    return {
+      career,
+      result: 'player_rejected',
+      wageDemand: Math.round(Math.max(minimumWage, wage * 1.05) / 100) * 100,
+    };
+  }
+
+  const currentWages = career.players.reduce((sum, item) => sum + item.wage, 0);
+  const transferBudget = career.finance?.transferBudget ?? career.balance;
+  const wageBudget = career.finance?.weeklyWageBudget ?? Number.POSITIVE_INFINITY;
+  const totalCashCost = fee + bonus;
+  if (
+    transferBudget < fee
+    || career.balance < totalCashCost
+    || currentWages + wage > wageBudget
+  ) {
+    return { career, result: 'budget' };
+  }
+
+  const signedPlayer = initializePlayerCareerProfile({
+    ...player,
+    wage,
+    signingBonus: bonus,
+    status: 'available',
+    fitness: 90,
+    morale: 72,
+    currentClubId: career.clubId,
+  }, career.season, career.roundIndex);
+
+  let next: Career = {
+    ...career,
+    balance: career.balance - totalCashCost,
+    finance: {
+      ...career.finance,
+      transferBudget: Math.max(0, transferBudget - fee),
+      seasonTransferSpend: (career.finance?.seasonTransferSpend ?? 0) + fee,
+    },
+    players: [...career.players, signedPlayer],
+    market: career.market.filter((item) => item.id !== playerId),
+    lastNews: player.name + ' assinou com ' + getClubName(career.clubId) + ' após negociação com ' + (seller?.name ?? 'o clube vendedor') + '.',
+  };
+  next = addFinanceEntry(next, { category: 'transfer_out', description: 'Transferência - ' + player.name, amount: -fee });
+  next = addFinanceEntry(next, { category: 'other', description: 'Luvas - ' + player.name, amount: -bonus });
+  next = addCareerNews(
+    next,
+    'Reforço confirmado',
+    player.name + ' chega de ' + (seller?.name ?? 'outro clube') + ' por ' + formatCurrency(fee, career.currency) + ', salário de ' + formatCurrency(wage, career.currency) + '/semana.',
+    'market',
+  );
+  return { career: next, result: 'completed' };
+}
+
 export function addTransferPlayer(career: Career, playerId: string): Career {
   const player = career.market.find((item) => item.id === playerId);
   const finance = career.finance;
@@ -2851,10 +2939,16 @@ export function promisePlayerMinutes(career: Career, playerId: string): Career {
   };
 }
 
-const TRANSFER_INTEREST_CLUBS = [
-  'Atlético Serrano', 'União Portuária', 'Estrela do Norte', 'Real do Vale',
-  'Ferroviário Azul', 'Nacional da Serra', 'Sporting Litoral', 'Juventude Imperial',
-];
+function transferInterestClubs(career: Career): Club[] {
+  const current = getClub(career.clubId);
+  return CLUBS
+    .filter((club) => club.selectable !== false && club.id !== career.clubId)
+    .sort((a, b) => {
+      const da = Math.abs(a.rating - (current?.rating ?? 68));
+      const db = Math.abs(b.rating - (current?.rating ?? 68));
+      return da - db || a.name.localeCompare(b.name, 'pt-BR');
+    });
+}
 
 function generatePlayerTransferOffers(career: Career): Career {
   const existing = (career.playerTransferOffers ?? []).filter((offer) => offer.expiresRound >= career.roundIndex);
@@ -2875,7 +2969,8 @@ function generatePlayerTransferOffers(career: Career): Career {
 
     const prefersLoan = player.marketStatus === 'emprestimo' || (player.age <= 22 && (seed % 3 === 0));
     const type: PlayerTransferOffer['type'] = prefersLoan ? 'loan' : 'sale';
-    const clubName = TRANSFER_INTEREST_CLUBS[(seed >> 5) % TRANSFER_INTEREST_CLUBS.length]!;
+    const interested = transferInterestClubs(career);
+    const clubName = interested.length ? interested[(seed >> 5) % interested.length]!.name : 'Clube interessado';
     const amount = type === 'sale'
       ? Math.round(player.value * (0.72 + ((seed >> 7) % 41) / 100))
       : Math.round(player.value * (0.05 + ((seed >> 7) % 8) / 100));
