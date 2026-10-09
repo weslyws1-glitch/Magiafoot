@@ -205,6 +205,7 @@ export default function MatchScreen() {
   const [infoTab, setInfoTab] = useState<'timeline' | 'stats'>('timeline');
   const [showRoundLive, setShowRoundLive] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
+  const [resultSaved, setResultSaved] = useState(false);
   const game = career?.liveMatch ?? null;
 
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function MatchScreen() {
     let active = true;
     manualSave().then((saved) => {
       if (!active) return;
-      if (saved) router.replace('/');
+      if (saved) { setResultSaved(true); setSavingResult(false); }
       else setSavingResult(false);
     }).catch(() => { if (active) setSavingResult(false); });
     return () => { active = false; };
@@ -323,6 +324,7 @@ export default function MatchScreen() {
   const handleMain = async () => {
     if (isFinal) {
       if (savingResult) return;
+      if (resultSaved) { router.replace('/'); return; }
       setSavingResult(true);
       closeCurrentMatch();
       // A tela só retorna à carreira depois da confirmação do salvamento.
@@ -609,7 +611,7 @@ export default function MatchScreen() {
 
         {isFinal ? (
           <>
-            <GameButton label={savingResult ? "SALVANDO RESULTADO..." : "FIM DE JOGO · SALVAR RESULTADO"} icon="flag" onPress={handleMain} />
+            <GameButton label={savingResult ? "SALVANDO RESULTADO..." : resultSaved ? "VOLTAR À CARREIRA" : "FIM DE JOGO · SALVAR RESULTADO"} icon="flag" onPress={handleMain} />
             <Panel style={styles.finalPanel}>
               <Text style={styles.finalTitle}>Fim de jogo</Text>
               <Text style={styles.finalText}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
