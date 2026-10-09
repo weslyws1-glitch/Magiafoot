@@ -221,6 +221,11 @@ export interface Club {
   divisionLevel: number;
   nativeCurrency: CurrencyCode;
   badgeUrl?: string | null;
+  selectable?: boolean;
+  stateCode?: string | null;
+  competitionGroup?: string | null;
+  prestige?: number;
+  fanBase?: number;
   city: string;
   initials: string;
   rating: number;
@@ -428,6 +433,7 @@ export interface Career {
   sponsorships: SponsorshipState;
   playerTransferOffers: PlayerTransferOffer[];
   results: LeagueResult[];
+  leagueClubIds: string[];
   leagueFixtures: Fixture[];
   seasonHistory: SeasonHistoryEntry[];
   liveMatch: MatchSession | null;
