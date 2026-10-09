@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Career } from './types';
 import { parseCareer, serializeCareer } from './engine';
 import { sha256 } from './save-protection';
 
 const SUPABASE_URL = 'https://jrajtpnxyiwgfbjkuxaf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Fw2Gmc9zOdTa9bHgZzIEfQ_HaVZsh8W';
+const REMEMBERED_SESSION_KEY = 'magiafoot.cloud.session.v1';
 
 export interface CloudSession {
   accessToken: string;
@@ -28,6 +30,16 @@ export interface CloudRestoreResult {
   career: Career;
   revision: number;
   savedAt: string;
+}
+
+export interface CareerSlotSummary {
+  slot: 1 | 2 | 3 | 4;
+  careerId: string;
+  coachName: string;
+  clubId: string;
+  season: number;
+  roundIndex: number;
+  updatedAt: string;
 }
 
 type AuthPayload = {
@@ -75,6 +87,36 @@ function sessionFrom(payload: AuthPayload): CloudSession | null {
     userId,
     email,
   };
+}
+
+export async function saveRememberedCloudSession(session: CloudSession | null) {
+  if (!session) {
+    await AsyncStorage.removeItem(REMEMBERED_SESSION_KEY);
+    return;
+  }
+  await AsyncStorage.setItem(REMEMBERED_SESSION_KEY, JSON.stringify(session));
+}
+
+export async function loadRememberedCloudSession(): Promise<CloudSession | null> {
+  try {
+    const raw = await AsyncStorage.getItem(REMEMBERED_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CloudSession;
+    if (!parsed?.refreshToken || !parsed?.accessToken || !parsed?.userId || !parsed?.email) return null;
+    const refreshed = await refreshCloudSession({ ...parsed, expiresAt: 0 });
+    if (!refreshed) {
+      await AsyncStorage.removeItem(REMEMBERED_SESSION_KEY);
+      return null;
+    }
+    await AsyncStorage.setItem(REMEMBERED_SESSION_KEY, JSON.stringify(refreshed));
+    return refreshed;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearRememberedCloudSession() {
+  await AsyncStorage.removeItem(REMEMBERED_SESSION_KEY);
 }
 
 export async function signUpCloudAccount(email: string, password: string) {
@@ -250,4 +292,64 @@ export async function restoreLatestCareerFromCloud(session: CloudSession): Promi
     revision: Number(row.revision ?? 0),
     savedAt: String(row.saved_at ?? new Date().toISOString()),
   };
+}
+
+
+export async function listCareerSlots(session: CloudSession): Promise<CareerSlotSummary[]> {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/career_slots?select=slot,career_id,coach_name,club_id,season,round_index,updated_at&order=slot.asc',
+    { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + session.accessToken } },
+  );
+  if (!response.ok) return [];
+  const data = await readJson(response);
+  if (!Array.isArray(data)) return [];
+  return data.map((row: any) => ({
+    slot: Number(row.slot) as 1 | 2 | 3 | 4,
+    careerId: String(row.career_id),
+    coachName: String(row.coach_name),
+    clubId: String(row.club_id),
+    season: Number(row.season ?? 1),
+    roundIndex: Number(row.round_index ?? 0),
+    updatedAt: String(row.updated_at ?? new Date().toISOString()),
+  }));
+}
+
+export async function upsertCareerSlot(session: CloudSession, slot: 1 | 2 | 3 | 4, career: Career) {
+  const response = await fetch(SUPABASE_URL + '/rest/v1/career_slots?on_conflict=user_id,slot', {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: 'Bearer ' + session.accessToken,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify({
+      user_id: session.userId,
+      slot,
+      career_id: career.id,
+      coach_name: career.coachName,
+      club_id: career.clubId,
+      season: career.season,
+      round_index: career.roundIndex,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  return response.ok;
+}
+
+export async function restoreCareerFromCloud(session: CloudSession, careerId: string): Promise<CloudRestoreResult | null> {
+  const response = await fetch(
+    SUPABASE_URL + '/rest/v1/career_save_versions?select=career_id,revision,schema_version,checksum,payload,saved_at&career_id=eq.' +
+      encodeURIComponent(careerId) + '&order=revision.desc&limit=1',
+    { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + session.accessToken } },
+  );
+  if (!response.ok) return null;
+  const data = await readJson(response);
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row?.payload || !row?.checksum) return null;
+  if (sha256(canonicalJson(row.payload)) !== String(row.checksum).toLowerCase()) return null;
+  const payloadText = JSON.stringify(row.payload);
+  const career = parseCareer(payloadText);
+  if (!career) return null;
+  return { career, revision: Number(row.revision ?? 0), savedAt: String(row.saved_at ?? new Date().toISOString()) };
 }
