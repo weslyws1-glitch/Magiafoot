@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { formatCurrency, getCurrentFixture, LEAGUE_FIXTURES } from '@/game/engine';
+import { formatCurrency, getCareerDivision, getCurrentFixture, LEAGUE_FIXTURES } from '@/game/engine';
 import type { MatchEvent, MatchSession } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -199,7 +199,7 @@ export default function MatchScreen() {
   useEffect(() => {
     if (!game || !autoRunning || game.pausedForTactics || game.pausedForVar || game.requiredSubstitutionPlayerId) return;
     if (game.phase !== 'first_half' && game.phase !== 'second_half') return;
-    const intervalMs = speed === 1 ? 900 : speed === 2 ? 450 : 300;
+    const intervalMs = speed === 1 ? 900 : speed === 2 ? 320 : 110;
     const timer = setInterval(() => advanceCurrentMatch(1), intervalMs);
     return () => clearInterval(timer);
   }, [
@@ -244,6 +244,7 @@ export default function MatchScreen() {
   const away = getClub(game.fixture.awayClubId);
   if (!home || !away) return null;
 
+  const divisionName = getCareerDivision(career)?.name ?? 'DIVISÃO';
   const clock = clockLabel(game);
   const isFinal = game.phase === 'finished';
   const latestEvent = game.events.length ? game.events[game.events.length - 1] : undefined;
@@ -311,7 +312,7 @@ export default function MatchScreen() {
       <>
         <GameHeader
           title="Intervalo"
-          eyebrow={'3ª DIVISÃO · RODADA ' + (game.fixture.roundIndex + 1)}
+          eyebrow={divisionName.toUpperCase() + ' · RODADA ' + (game.fixture.roundIndex + 1)}
           back={false}
           right={<Text style={styles.headerClock}>{clock}</Text>}
         />
@@ -372,7 +373,7 @@ export default function MatchScreen() {
       <Screen>
         <View style={styles.liveTopCard}>
           <View style={styles.liveTopBar}>
-            <Text style={styles.liveCompetition}>3ª DIVISÃO · RODADA {game.fixture.roundIndex + 1}</Text>
+            <Text style={styles.liveCompetition}>{divisionName.toUpperCase()} · RODADA {game.fixture.roundIndex + 1}</Text>
             <Text style={styles.refereeMini}>Árbitro: {game.referee.name}</Text>
           </View>
 
@@ -382,7 +383,7 @@ export default function MatchScreen() {
               <Text style={styles.featuredScore}>{game.homeGoals}</Text>
             </View>
             <View style={styles.featuredCenter}>
-              <Text style={styles.featuredClock}>{clock}</Text>
+              <Text style={styles.featuredClock}>{isFinal ? 'FIM DE JOGO' : clock}</Text>
               <Text style={styles.featuredVs}>×</Text>
               <Text style={styles.featuredStatus}>
                 {game.pausedForVar ? 'VAR' : game.requiredSubstitutionPlayerId ? 'LESÃO' : game.pausedForTactics ? 'TÁTICA' : autoRunning ? speed + 'x' : 'PAUSADO'}
@@ -401,6 +402,34 @@ export default function MatchScreen() {
               <Feather name={showRoundLive ? 'chevron-up' : 'chevron-down'} size={13} color={showRoundLive ? '#07150d' : '#79ef91'} />
             </Pressable>
           </View>
+        </View>
+
+        <View style={styles.liveControls}>
+          <Pressable
+            disabled={game.phase === 'pregame' || game.pausedForVar || Boolean(game.requiredSubstitutionPlayerId)}
+            onPress={() => setAutoRunning((value) => !value)}
+            style={[styles.controlButton, (game.pausedForVar || game.requiredSubstitutionPlayerId) && styles.controlDisabled]}
+          >
+            <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
+            <Text style={styles.controlButtonText}>{game.phase === 'pregame' ? 'PRONTO' : autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
+          </Pressable>
+
+          <View style={styles.speedGroup}>
+            {[1, 2, 3].map((value) => (
+              <Pressable
+                key={value}
+                disabled={game.pausedForVar || Boolean(game.requiredSubstitutionPlayerId)}
+                onPress={() => setSpeed(value as 1 | 2 | 3)}
+                style={[styles.speedButton, speed === value && styles.speedButtonActive]}
+              >
+                <Text style={[styles.speedText, speed === value && styles.speedTextActive]}>{value}x</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable disabled={game.pausedForVar} onPress={openTactics} style={[styles.controlDark, game.pausedForVar && styles.controlDisabled]}>
+            <Text style={styles.controlDarkText}>TÁTICA</Text>
+          </Pressable>
         </View>
 
         {showRoundLive ? (
@@ -467,10 +496,7 @@ export default function MatchScreen() {
             <Text style={styles.momentMinute}>{clock}</Text>
           </View>
           <EventDiagram event={latestEvent} />
-          <View style={styles.broadcastReadingBox}>
-            <Text style={styles.broadcastReadingLabel}>LEITURA DA TRANSMISSÃO</Text>
-            <Text style={styles.broadcastReadingText}>{broadcastText}</Text>
-          </View>
+
           <View style={styles.tacticalBars}>
             <TacticalBar label="CONTROLE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
             <TacticalBar label="PERIGO" leftLabel={game.homeStats.xg.toFixed(2)} rightLabel={game.awayStats.xg.toFixed(2)} leftShare={xgShare} />
@@ -548,44 +574,9 @@ export default function MatchScreen() {
           )}
         </Panel>
 
-        <Panel style={styles.refereePanel}>
-          <View style={styles.refereeIcon}><Feather name="shield" size={18} color="#ffe66a" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.refereeLabel}>ARBITRAGEM</Text>
-            <Text style={styles.refereeName}>{game.referee.name}</Text>
-            <Text style={styles.refereeMeta}>
-              Critério {game.referee.strictness >= 66 ? 'rigoroso' : game.referee.strictness <= 50 ? 'tolerante' : 'equilibrado'} · vantagem {game.referee.advantage >= 60 ? 'frequente' : 'normal'}
-            </Text>
-          </View>
-        </Panel>
 
-        <View style={styles.liveControls}>
-          <Pressable
-            disabled={game.phase === 'pregame' || game.pausedForVar || Boolean(game.requiredSubstitutionPlayerId)}
-            onPress={() => setAutoRunning((value) => !value)}
-            style={[styles.controlButton, (game.pausedForVar || game.requiredSubstitutionPlayerId) && styles.controlDisabled]}
-          >
-            <Feather name={autoRunning ? 'pause' : 'play'} size={14} color="#07150d" />
-            <Text style={styles.controlButtonText}>{game.phase === 'pregame' ? 'PRONTO' : autoRunning ? 'PAUSAR' : 'CONTINUAR'}</Text>
-          </Pressable>
 
-          <View style={styles.speedGroup}>
-            {[1, 2, 3].map((value) => (
-              <Pressable
-                key={value}
-                disabled={game.pausedForVar || Boolean(game.requiredSubstitutionPlayerId)}
-                onPress={() => setSpeed(value as 1 | 2 | 3)}
-                style={[styles.speedButton, speed === value && styles.speedButtonActive]}
-              >
-                <Text style={[styles.speedText, speed === value && styles.speedTextActive]}>{value}x</Text>
-              </Pressable>
-            ))}
-          </View>
 
-          <Pressable disabled={game.pausedForVar} onPress={openTactics} style={[styles.controlDark, game.pausedForVar && styles.controlDisabled]}>
-            <Text style={styles.controlDarkText}>TÁTICA</Text>
-          </Pressable>
-        </View>
 
         {game.phase === 'pregame' && unavailableStarters.length === 0 && unavailableBench.length === 0 ? (
           <GameButton label="APITO INICIAL" icon="play" onPress={() => advanceCurrentMatch(1)} />
@@ -593,7 +584,7 @@ export default function MatchScreen() {
 
         {isFinal ? (
           <>
-            <GameButton label="ENCERRAR E ATUALIZAR CLASSIFICAÇÃO" icon="flag" onPress={handleMain} />
+            <GameButton label="FIM DE JOGO · SALVAR RESULTADO" icon="flag" onPress={handleMain} />
             <Panel style={styles.finalPanel}>
               <Text style={styles.finalTitle}>Fim de jogo</Text>
               <Text style={styles.finalText}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
