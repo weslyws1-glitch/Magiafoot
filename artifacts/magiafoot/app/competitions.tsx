@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { calculateStandings, LEAGUE_ROUNDS } from '@/game/engine';
+import { calculateCareerStandings, getCareerDivision, getLeagueRoundCount } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 export default function CompetitionsScreen() {
@@ -16,10 +16,12 @@ export default function CompetitionsScreen() {
     return <><GameHeader title="Competições" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para disputar competições.</Text></Screen></>;
   }
 
-  const standings = calculateStandings(career.results);
+  const standings = calculateCareerStandings(career);
+  const division = getCareerDivision(career);
+  const leagueRounds = Math.max(1, getLeagueRoundCount(career));
   const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
   const points = standings.find((row) => row.club.id === career.clubId)?.points ?? 0;
-  const progress = Math.min(100, Math.round((career.roundIndex / LEAGUE_ROUNDS) * 100));
+  const progress = Math.min(100, Math.round((career.roundIndex / leagueRounds) * 100));
 
   return (
     <>
@@ -28,26 +30,26 @@ export default function CompetitionsScreen() {
         <Pressable onPress={() => router.push('/league')} style={styles.card}>
           <View style={styles.trophy}><Feather name="award" size={28} color="#79ef91" /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>3ª Divisão</Text>
-            <Text style={styles.meta}>Liga nacional · {LEAGUE_ROUNDS} rodadas</Text>
+            <Text style={styles.name}>{division?.name ?? 'Liga nacional'}</Text>
+            <Text style={styles.meta}>Liga nacional · {leagueRounds} rodadas da fase atual</Text>
             <View style={styles.progressTrack}><View style={[styles.progressFill, { width: (progress + '%') as any }]} /></View>
             <Text style={styles.progressText}>Rodada {career.roundIndex + 1} · {position}º lugar · {points} pts</Text>
           </View>
         </Pressable>
 
         <Panel style={styles.locked}>
-          <Feather name="lock" size={22} color="#6f8b78" />
+          <Feather name="git-branch" size={22} color="#79ef91" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.lockedTitle}>Copa MagiaFoot</Text>
-            <Text style={styles.lockedText}>Será liberada em uma próxima fase do desenvolvimento.</Text>
+            <Text style={styles.lockedTitle}>Formato 2026</Text>
+            <Text style={styles.lockedText}>{division?.note ?? 'A competição segue o formato cadastrado para esta divisão.'}</Text>
           </View>
         </Panel>
 
         <Panel style={styles.locked}>
-          <Feather name="lock" size={22} color="#6f8b78" />
+          <Feather name="globe" size={22} color="#6f8b78" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.lockedTitle}>Copa Continental</Text>
-            <Text style={styles.lockedText}>Classifique o clube para futuras competições internacionais.</Text>
+            <Text style={styles.lockedTitle}>Copas e torneios continentais</Text>
+            <Text style={styles.lockedText}>A base internacional está preparada; mata-matas e classificação continental serão conectados na próxima evolução das competições.</Text>
           </View>
         </Panel>
       </Screen>
