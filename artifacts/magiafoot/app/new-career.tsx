@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ClubBadge, GameButton, GameHeader, LoadingState, Panel, Screen, SectionLabel } from '@/components/ManagerUI';
+import { ClubBadge, GameButton, GameHeader, LoadingState, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { CLUBS } from '@/game/data';
 import { useColors } from '@/hooks/useColors';
@@ -10,11 +10,28 @@ import { useColors } from '@/hooks/useColors';
 export default function NewCareerScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { career, isReady, createNewCareer } = useCareer();
+  const { isReady, createNewCareer } = useCareer();
+
+  const countries = useMemo(
+    () => Array.from(new Set(CLUBS.map((club) => club.country))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [],
+  );
+
   const [coachName, setCoachName] = useState('');
+  const [country, setCountry] = useState<string | null>(null);
   const [clubId, setClubId] = useState<string | null>(null);
-  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const [openSelector, setOpenSelector] = useState<'country' | 'club' | null>(null);
   const [error, setError] = useState('');
+
+  const clubsForCountry = useMemo(
+    () => CLUBS
+      .filter((club) => club.country === country)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [country],
+  );
+
+  const selectedClub = CLUBS.find((club) => club.id === clubId) ?? null;
 
   const create = () => {
     const cleanName = coachName.trim();
@@ -22,15 +39,15 @@ export default function NewCareerScreen() {
       setError('Digite um nome de treinador com pelo menos 2 caracteres.');
       return;
     }
+    if (!country) {
+      setError('Escolha o país do clube.');
+      return;
+    }
     if (!clubId) {
       setError('Escolha um clube para iniciar a carreira.');
       return;
     }
-    if (career && !confirmOverwrite) {
-      setConfirmOverwrite(true);
-      setError('');
-      return;
-    }
+
     createNewCareer(cleanName, clubId);
     router.replace('/');
   };
@@ -49,9 +66,9 @@ export default function NewCareerScreen() {
       <GameHeader title="Nova carreira" eyebrow="Sua jornada começa" />
       <Screen>
         <View style={styles.intro}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Quem vai comandar?</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>Monte sua carreira</Text>
           <Text style={[styles.description, { color: colors.mutedForeground }]}>
-            Seu nome à beira do campo. Um clube pronto para construir uma história nova.
+            Informe seu nome, escolha o país e depois o clube que você quer comandar.
           </Text>
         </View>
 
@@ -62,7 +79,6 @@ export default function NewCareerScreen() {
             onChangeText={(value) => {
               setCoachName(value);
               setError('');
-              setConfirmOverwrite(false);
             }}
             placeholder="Ex.: Wesley"
             placeholderTextColor={colors.mutedForeground}
@@ -74,67 +90,105 @@ export default function NewCareerScreen() {
           />
         </Panel>
 
-        <SectionLabel title="Escolha seu clube" />
-        <View style={styles.clubList}>
-          {CLUBS.map((club) => {
-            const selected = club.id === clubId;
-            return (
-              <Pressable
-                key={club.id}
-                onPress={() => {
-                  setClubId(club.id);
-                  setError('');
-                  setConfirmOverwrite(false);
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                testID={`club-choice-${club.id}`}
-                style={({ pressed }) => [
-                  styles.clubChoice,
-                  {
-                    backgroundColor: selected ? colors.secondary : colors.card,
-                    borderColor: selected ? colors.primary : colors.border,
-                    opacity: pressed ? 0.78 : 1,
-                  },
-                ]}
-              >
-                <ClubBadge clubId={club.id} size={46} />
-                <View style={styles.clubCopy}>
-                  <Text style={[styles.clubName, { color: colors.foreground }]}>{club.name}</Text>
-                  <Text style={[styles.clubCity, { color: colors.mutedForeground }]}>{club.city}</Text>
-                  <Text style={[styles.clubMeta, { color: colors.mutedForeground }]}>Elenco {club.rating} · estádio {club.stadiumCapacity.toLocaleString('pt-BR')}</Text>
-                </View>
-                <View style={[styles.selection, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : 'transparent' }]}>
-                  {selected ? <Feather name="check" size={13} color={colors.primaryForeground} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
+        <View style={styles.selectorGroup}>
+          <Pressable
+            onPress={() => setOpenSelector((current) => current === 'country' ? null : 'country')}
+            style={[styles.selectorCard, { backgroundColor: colors.card, borderColor: country ? colors.primary : colors.border }]}
+          >
+            <View style={styles.selectorIcon}>
+              <Feather name="globe" size={20} color="#79ef91" />
+            </View>
+            <View style={styles.selectorCopy}>
+              <Text style={[styles.selectorLabel, { color: colors.mutedForeground }]}>PAÍS</Text>
+              <Text style={[styles.selectorValue, { color: colors.foreground }]}>{country ?? 'Escolher país'}</Text>
+            </View>
+            <Feather name={openSelector === 'country' ? 'chevron-up' : 'chevron-down'} size={20} color="#79ef91" />
+          </Pressable>
+
+          {openSelector === 'country' ? (
+            <View style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {countries.map((item) => {
+                const selected = item === country;
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => {
+                      setCountry(item);
+                      setClubId(null);
+                      setOpenSelector('club');
+                      setError('');
+                    }}
+                    style={[styles.dropdownRow, selected && styles.dropdownRowSelected]}
+                  >
+                    <Text style={[styles.dropdownText, { color: colors.foreground }]}>{item}</Text>
+                    {selected ? <Feather name="check" size={17} color="#79ef91" /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <Pressable
+            disabled={!country}
+            onPress={() => setOpenSelector((current) => current === 'club' ? null : 'club')}
+            style={[
+              styles.selectorCard,
+              { backgroundColor: colors.card, borderColor: selectedClub ? colors.primary : colors.border },
+              !country && styles.selectorDisabled,
+            ]}
+          >
+            <View style={styles.selectorIcon}>
+              <Feather name="shield" size={20} color={country ? '#79ef91' : '#66796d'} />
+            </View>
+            <View style={styles.selectorCopy}>
+              <Text style={[styles.selectorLabel, { color: colors.mutedForeground }]}>CLUBE</Text>
+              <Text style={[styles.selectorValue, { color: country ? colors.foreground : colors.mutedForeground }]}>
+                {selectedClub?.name ?? (country ? 'Escolher clube' : 'Escolha o país primeiro')}
+              </Text>
+              {selectedClub ? (
+                <Text style={[styles.selectorMeta, { color: colors.mutedForeground }]}>{selectedClub.city}</Text>
+              ) : null}
+            </View>
+            <Feather name={openSelector === 'club' ? 'chevron-up' : 'chevron-down'} size={20} color={country ? '#79ef91' : '#66796d'} />
+          </Pressable>
+
+          {openSelector === 'club' && country ? (
+            <View style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {clubsForCountry.map((club) => {
+                const selected = club.id === clubId;
+                return (
+                  <Pressable
+                    key={club.id}
+                    onPress={() => {
+                      setClubId(club.id);
+                      setOpenSelector(null);
+                      setError('');
+                    }}
+                    style={[styles.clubRow, selected && styles.dropdownRowSelected]}
+                  >
+                    <ClubBadge clubId={club.id} size={38} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.clubName, { color: colors.foreground }]}>{club.name}</Text>
+                      <Text style={[styles.clubCity, { color: colors.mutedForeground }]}>{club.city}</Text>
+                    </View>
+                    {selected ? <Feather name="check" size={17} color="#79ef91" /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
-        {error ? (
-          <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-        ) : null}
+        {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
 
-        {confirmOverwrite ? (
-          <Panel style={[styles.confirmPanel, { borderColor: colors.destructive }]}>
-            <View style={styles.confirmLine}>
-              <Feather name="alert-triangle" size={18} color={colors.destructive} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.confirmTitle, { color: colors.foreground }]}>Substituir a carreira salva?</Text>
-                <Text style={[styles.confirmText, { color: colors.mutedForeground }]}>
-                  A nova carreira vai ocupar o único espaço de salvamento deste aparelho.
-                </Text>
-              </View>
-            </View>
-            <GameButton label="Substituir e começar" icon="refresh-cw" variant="danger" onPress={create} />
-          </Panel>
-        ) : (
-          <GameButton label="Criar carreira" icon="arrow-right" onPress={create} />
-        )}
+        <GameButton
+          label={selectedClub ? `Começar no ${selectedClub.name}` : 'Criar carreira'}
+          icon="arrow-right"
+          onPress={create}
+        />
 
         <Text style={[styles.fictionNote, { color: colors.mutedForeground }]}>
-          Liga, clubes e jogadores pertencem ao universo fictício do MagiaFoot.
+          Países e clubes aparecerão aqui em ordem alfabética conforme o universo do MagiaFoot for expandido.
         </Text>
       </Screen>
     </>
@@ -144,21 +198,25 @@ export default function NewCareerScreen() {
 const styles = StyleSheet.create({
   intro: { gap: 6, marginBottom: 4 },
   title: { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  description: { fontSize: 12, lineHeight: 18, maxWidth: 320 },
+  description: { fontSize: 12, lineHeight: 18, maxWidth: 330 },
   formPanel: { gap: 9 },
   inputLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, fontSize: 15, fontWeight: '600' },
-  clubList: { gap: 9 },
-  clubChoice: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  clubCopy: { flex: 1, gap: 3 },
-  clubName: { fontSize: 13, fontWeight: '800' },
-  clubCity: { fontSize: 10 },
-  clubMeta: { fontSize: 9, marginTop: 1 },
-  selection: { width: 22, height: 22, borderWidth: 1.5, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  errorText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
-  confirmPanel: { gap: 14 },
-  confirmLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  confirmTitle: { fontSize: 13, fontWeight: '800', marginBottom: 4 },
-  confirmText: { fontSize: 11, lineHeight: 16 },
-  fictionNote: { fontSize: 10, textAlign: 'center', lineHeight: 15, paddingHorizontal: 12, paddingBottom: 7 },
+  selectorGroup: { gap: 9 },
+  selectorCard: { minHeight: 70, borderWidth: 1, borderRadius: 17, paddingHorizontal: 13, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  selectorDisabled: { opacity: 0.48 },
+  selectorIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#153426', alignItems: 'center', justifyContent: 'center' },
+  selectorCopy: { flex: 1, minWidth: 0 },
+  selectorLabel: { fontSize: 7.5, fontWeight: '900', letterSpacing: 0.8 },
+  selectorValue: { fontSize: 14, fontWeight: '900', marginTop: 3 },
+  selectorMeta: { fontSize: 9, marginTop: 2 },
+  dropdown: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  dropdownRow: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#284837' },
+  dropdownRowSelected: { backgroundColor: '#173b28' },
+  dropdownText: { flex: 1, fontSize: 12, fontWeight: '800' },
+  clubRow: { minHeight: 60, paddingHorizontal: 11, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#284837' },
+  clubName: { fontSize: 12, fontWeight: '900' },
+  clubCity: { fontSize: 8.5, marginTop: 2 },
+  errorText: { fontSize: 11, fontWeight: '700', lineHeight: 16 },
+  fictionNote: { fontSize: 9, textAlign: 'center', lineHeight: 14, paddingHorizontal: 12, paddingBottom: 7 },
 });
