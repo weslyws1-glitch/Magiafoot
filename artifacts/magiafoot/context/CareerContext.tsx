@@ -100,7 +100,16 @@ interface CareerContextValue {
   setTactics: (tactics: Tactics) => void;
   closeCurrentMatch: () => void;
   signPlayer: (playerId: string) => boolean;
-  negotiateMarketPlayer: (playerId: string, transferBid: number, weeklyWage: number, signingBonus: number) => 'completed' | 'club_rejected' | 'player_rejected' | 'budget' | 'squad_full' | 'not_found';
+  negotiateMarketPlayer: (
+    playerId: string,
+    transferBid: number,
+    weeklyWage: number,
+    signingBonus: number,
+  ) => {
+    result: 'completed' | 'club_rejected' | 'player_rejected' | 'budget' | 'squad_full' | 'not_found';
+    counterOffer?: number;
+    wageDemand?: number;
+  };
   transferPlayer: (playerId: string) => boolean;
   expandStadium: () => boolean;
   upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
@@ -514,10 +523,14 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return true;
   }, [career]);
   const negotiateMarketPlayer = useCallback((playerId: string, transferBid: number, weeklyWage: number, signingBonus: number) => {
-    if (!career) return 'not_found' as const;
+    if (!career) return { result: 'not_found' as const };
     const negotiation = negotiateTransferPurchase(career, playerId, transferBid, weeklyWage, signingBonus);
     if (negotiation.career !== career) setCareer(negotiation.career);
-    return negotiation.result;
+    return {
+      result: negotiation.result,
+      ...(typeof negotiation.counterOffer === 'number' ? { counterOffer: negotiation.counterOffer } : {}),
+      ...(typeof negotiation.wageDemand === 'number' ? { wageDemand: negotiation.wageDemand } : {}),
+    };
   }, [career]);
 
   const transferPlayer = useCallback((playerId: string) => {
