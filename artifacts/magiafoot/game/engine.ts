@@ -1621,7 +1621,7 @@ export function hireAdministrativeProfessional(career: Career, department: Admin
   const candidate = administrativeCandidate(career, department);
   if (career.balance < candidate.hireCost) return career;
 
-  const next: Career = {
+  let next: Career = {
     ...career,
     balance: career.balance - candidate.hireCost,
     administrationStaff: {
@@ -1630,6 +1630,7 @@ export function hireAdministrativeProfessional(career: Career, department: Admin
     },
     lastNews: `${candidate.name} foi contratado para ${ADMIN_DEPARTMENT_LABELS[department]}.`,
   };
+  next = addFinanceEntry(next, { category: 'staff', description: 'Contratação administrativa - ' + candidate.name, amount: -candidate.hireCost });
   return addCareerNews(next, 'Novo profissional na administração', `${candidate.name}, ${candidate.role}, assinou por ${candidate.contractRounds} jogos com ${ADMIN_DEPARTMENT_LABELS[department]}.`, 'club');
 }
 
@@ -1639,7 +1640,7 @@ export function fireAdministrativeProfessional(career: Career, department: Admin
   const professional = current.find((item) => item.id === professionalId);
   if (!professional || career.balance < professional.fireCost) return career;
 
-  const next: Career = {
+  let next: Career = {
     ...career,
     balance: career.balance - professional.fireCost,
     administrationStaff: {
@@ -1649,7 +1650,8 @@ export function fireAdministrativeProfessional(career: Career, department: Admin
     boardTrust: clamp(career.boardTrust - (department === 'board' ? 1 : 0), 0, 100),
     lastNews: `${professional.name} deixou ${ADMIN_DEPARTMENT_LABELS[department]}.`,
   };
-  return addCareerNews(next, 'Mudança na administração', `${professional.name} foi desligado de ${ADMIN_DEPARTMENT_LABELS[department]}. Rescisão de ${formatCurrency(professional.fireCost)}.`, 'club');
+  next = addFinanceEntry(next, { category: 'staff', description: 'Rescisão administrativa - ' + professional.name, amount: -professional.fireCost });
+  return addCareerNews(next, 'Mudança na administração', `${professional.name} foi desligado de ${ADMIN_DEPARTMENT_LABELS[department]}. Rescisão de ${formatCurrency(professional.fireCost, career.currency)}.`, 'club');
 }
 
 export function administrationDepartmentEfficiency(career: Career, department: AdministrationDepartmentKey): number {
@@ -2745,11 +2747,13 @@ export function renewPlayerContract(career: Career, playerId: string, seasons = 
   const player = career.players.find((item) => item.id === playerId);
   if (!player) return career;
   const signingCost = Math.max(player.signingBonus ?? player.wage * 3, Math.round(player.wage * (2.5 + seasons * 0.7)));
-  if (career.balance < signingCost) return career;
   const newWage = Math.round(player.wage * (1.06 + seasons * 0.025));
+  const currentWages = career.players.reduce((sum, item) => sum + item.wage, 0);
+  const projectedWages = currentWages - player.wage + newWage;
+  if (career.balance < signingCost || projectedWages > (career.finance?.weeklyWageBudget ?? Number.POSITIVE_INFINITY)) return career;
   const extension = LEAGUE_ROUNDS * seasons;
   const currentEnd = player.contractEndRound ?? career.roundIndex + LEAGUE_ROUNDS;
-  return addCareerNews({
+  let nextRenewal: Career = {
     ...career,
     balance: career.balance - signingCost,
     players: career.players.map((item) => item.id === playerId ? {
@@ -2768,7 +2772,9 @@ export function renewPlayerContract(career: Career, playerId: string, seasons = 
       }, ...(item.careerEvents ?? [])].slice(0, 40),
     } : item),
     lastNews: player.name + ' renovou contrato com o clube.',
-  }, 'Contrato renovado', player.name + ' renovou por mais ' + seasons + ' temporada(s).', 'club');
+  };
+  nextRenewal = addFinanceEntry(nextRenewal, { category: 'other', description: 'Luvas de renovação - ' + player.name, amount: -signingCost });
+  return addCareerNews(nextRenewal, 'Contrato renovado', player.name + ' renovou por mais ' + seasons + ' temporada(s).', 'club');
 }
 
 export function promisePlayerMinutes(career: Career, playerId: string): Career {
@@ -2860,16 +2866,24 @@ export function acceptPlayerTransferOffer(career: Career, offerId: string): Care
     const available = players.filter((item) => item.status === 'available');
     const lineup = buildBestLineup(available, career.formationId);
     const benchIds = buildBench(available, lineup);
-    return addCareerNews({
+    const reinvestment = Math.round(offer.amount * 0.82);
+    let nextSale: Career = {
       ...career,
       balance: career.balance + offer.amount,
+      finance: {
+        ...career.finance,
+        transferBudget: (career.finance?.transferBudget ?? 0) + reinvestment,
+        seasonTransferIncome: (career.finance?.seasonTransferIncome ?? 0) + offer.amount,
+      },
       players,
       lineup,
       benchIds,
       captainId: lineup.some((slot) => slot.playerId === career.captainId) ? career.captainId : (lineup[0]?.playerId ?? ''),
       playerTransferOffers: remainingOffers,
-      lastNews: player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.',
-    }, 'Transferência concluída', player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount) + '.', 'market');
+      lastNews: player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount, career.currency) + '.',
+    };
+    nextSale = addFinanceEntry(nextSale, { category: 'transfer_in', description: 'Venda de ' + player.name + ' para ' + offer.clubName, amount: offer.amount });
+    return addCareerNews(nextSale, 'Transferência concluída', player.name + ' foi vendido ao ' + offer.clubName + ' por ' + formatCurrency(offer.amount, career.currency) + '.', 'market');
   }
 
   const loanedPlayers = career.players.map((item) => item.id === player.id ? appendPlayerEvent({
@@ -2890,16 +2904,22 @@ export function acceptPlayerTransferOffer(career: Career, offerId: string): Care
   const availableAfterLoan = loanedPlayers.filter((item) => item.status === 'available');
   const lineupAfterLoan = buildBestLineup(availableAfterLoan, career.formationId);
   const benchAfterLoan = buildBench(availableAfterLoan, lineupAfterLoan);
-  return addCareerNews({
+  let nextLoan: Career = {
     ...career,
     balance: career.balance + offer.amount,
+    finance: {
+      ...career.finance,
+      seasonTransferIncome: (career.finance?.seasonTransferIncome ?? 0) + offer.amount,
+    },
     players: loanedPlayers,
     lineup: lineupAfterLoan,
     benchIds: benchAfterLoan,
     captainId: lineupAfterLoan.some((slot) => slot.playerId === career.captainId) ? career.captainId : (lineupAfterLoan[0]?.playerId ?? ''),
     playerTransferOffers: remainingOffers,
     lastNews: player.name + ' foi emprestado ao ' + offer.clubName + '.',
-  }, 'Jogador emprestado', player.name + ' saiu por empréstimo para o ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.', 'market');
+  };
+  nextLoan = addFinanceEntry(nextLoan, { category: 'transfer_in', description: 'Taxa de empréstimo - ' + player.name, amount: offer.amount });
+  return addCareerNews(nextLoan, 'Jogador emprestado', player.name + ' saiu por empréstimo para o ' + offer.clubName + ' por ' + offer.durationRounds + ' rodadas.', 'market');
 }
 
 export function declinePlayerTransferOffer(career: Career, offerId: string): Career {
@@ -3018,12 +3038,14 @@ export function upgradeHeadquartersFacility(career: Career, key: HeadquartersUpg
     members: 'sócio-torcedor', museum: 'museu', press: 'centro de imprensa',
     events: 'auditório e eventos', history: 'arquivo histórico',
   };
-  return {
+  let next: Career = {
     ...career,
     balance: career.balance - cost,
     headquartersUpgrades: { ...career.headquartersUpgrades, [key]: current + 1 },
     lastNews: `A sede recebeu investimento em ${names[key]}. Estrutura agora no nível ${current + 1}.`,
   };
+  next = addFinanceEntry(next, { category: 'infrastructure', description: 'Melhoria da sede - ' + names[key], amount: -cost });
+  return next;
 }
 
 export const STADIUM_UPGRADE_BASE_COST: Record<StadiumUpgradeKey, number> = {
@@ -3068,13 +3090,15 @@ export function upgradeStadiumFacility(career: Career, key: StadiumUpgradeKey): 
     drainage: 'drenagem',
     irrigation: 'irrigação',
   };
-  return {
+  let next: Career = {
     ...career,
     balance: career.balance - cost,
     stadiumLevel: nextStadiumLevel,
     stadiumUpgrades: upgrades,
     lastNews: `O estádio recebeu uma melhoria em ${names[key]}. Estrutura agora no nível ${current + 1}.`,
   };
+  next = addFinanceEntry(next, { category: 'infrastructure', description: 'Melhoria do estádio - ' + names[key], amount: -cost });
+  return next;
 }
 
 export function upgradeStadium(career: Career): Career {
