@@ -1,8 +1,9 @@
 import type { Club, FormationId, FormationOption, FormationSlot, Player, Position } from './types.ts';
+import { REAL_BRAZIL_CLUBS, getDivisionDefinition } from './real-clubs.ts';
 
 export const LEAGUE_NAME = '3ª Divisão';
 
-export const CLUBS: Club[] = [
+const LEGACY_CLUBS: Club[] = [
   { id: 'aurora-vale', name: 'Aurora do Vale', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
   { id: 'lobos-azuis', name: 'Lobos Azuis', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Lago das Brumas', initials: 'LA', rating: 68, color: '#416b77', balance: 1_850_000, stadiumCapacity: 14_200, ticketPrice: 38 },
   { id: 'mare-prata', name: 'Maré de Prata', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Costa da Lua', initials: 'MP', rating: 71, color: '#397984', balance: 2_100_000, stadiumCapacity: 20_000, ticketPrice: 40 },
@@ -23,7 +24,25 @@ export const CLUBS: Club[] = [
   { id: 'rio-dourado', name: 'Rio Dourado', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Dourado das Águas', initials: 'RD', rating: 70, color: '#b58c2d', balance: 1920000, stadiumCapacity: 17200, ticketPrice: 37 },
   { id: 'montanha-fc', name: 'Montanha FC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Monte Azul', initials: 'MF', rating: 66, color: '#3f5575', balance: 1470000, stadiumCapacity: 13300, ticketPrice: 32 },
   { id: 'estacao-1912', name: 'Estação 1912', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
-];
+].map((club) => ({ ...club, selectable: false, stateCode: null, competitionGroup: null, prestige: 55, fanBase: 50 }));
+
+export const CLUBS: Club[] = [...REAL_BRAZIL_CLUBS, ...LEGACY_CLUBS];
+
+export function selectableClubs(): Club[] {
+  return CLUBS.filter((club) => club.selectable !== false);
+}
+
+export function clubsForDivision(divisionId: string, userClubId?: string): Club[] {
+  const divisionClubs = CLUBS.filter((club) => club.divisionId === divisionId);
+  if (divisionId !== 'br-d' || !userClubId) return divisionClubs;
+  const userClub = CLUBS.find((club) => club.id === userClubId);
+  if (!userClub?.competitionGroup) return divisionClubs;
+  return divisionClubs.filter((club) => club.competitionGroup === userClub.competitionGroup);
+}
+
+export function getDivision(id: string) {
+  return getDivisionDefinition(id);
+}
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
   { name: 'Raul Venturi', position: 'GOL', age: 29, skill: 3 },
@@ -178,12 +197,36 @@ export function makeRoster(club: Club): Player[] {
 }
 
 export function makeMarketPlayers(club: Club): Player[] {
-  return MARKET_SEED.map((player, index) => ({
-    ...makePlayer(player, `market-${club.id}-${index + 1}`, club.rating - 1, index + 51),
-    nationality: club.country,
-    nationalityCode: club.countryCode,
-    currentClubId: null,
-  }));
+  const sourceClubs = CLUBS
+    .filter((candidate) => candidate.selectable !== false && candidate.id !== club.id)
+    .sort((a, b) => {
+      const da = Math.abs(a.rating - club.rating);
+      const db = Math.abs(b.rating - club.rating);
+      return da - db || a.name.localeCompare(b.name, 'pt-BR');
+    })
+    .slice(0, 28);
+
+  const pool = Array.from({ length: 28 }, (_, index) => {
+    const seed = MARKET_SEED[index % MARKET_SEED.length]!;
+    const source = sourceClubs[index % Math.max(1, sourceClubs.length)] ?? club;
+    const strengthShift = Math.round((source.rating - club.rating) * 0.35);
+    const player = makePlayer(
+      { ...seed, name: seed.name + (index >= MARKET_SEED.length ? ' ' + (Math.floor(index / MARKET_SEED.length) + 1) : ''), skill: seed.skill + strengthShift },
+      `market-${club.id}-${source.id}-${index + 1}`,
+      source.rating,
+      index + 51,
+    );
+    return {
+      ...player,
+      nationality: source.country,
+      nationalityCode: source.countryCode,
+      currentClubId: source.id,
+      value: Math.round(player.value * (1.08 + Math.max(0, source.divisionLevel - club.divisionLevel) * -0.03)),
+      wage: Math.round(player.wage * (1 + Math.max(0, club.divisionLevel - source.divisionLevel) * 0.08)),
+    };
+  });
+
+  return pool;
 }
 
 function positionMatchScore(player: Player, target: Position): number {
