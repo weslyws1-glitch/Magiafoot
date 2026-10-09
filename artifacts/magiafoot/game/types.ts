@@ -188,6 +188,7 @@ export interface Player {
 export interface Club {
   id: string;
   name: string;
+  country: string;
   city: string;
   initials: string;
   rating: number;
