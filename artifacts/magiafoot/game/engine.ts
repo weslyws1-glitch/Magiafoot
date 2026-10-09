@@ -429,6 +429,7 @@ export function createCareer(coachName: string, clubId: string, currency: Curren
     .map((slot) => roster.find((player) => player.id === slot.playerId))
     .filter((player): player is Player => Boolean(player))
     .sort((a, b) => b.morale + b.strength - a.morale - a.strength)[0];
+  const leagueClubIds = clubsForDivision(club.divisionId, club.id).map((item) => item.id);
   return {
     schemaVersion: 1,
     id: `carreira-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -468,7 +469,8 @@ export function createCareer(coachName: string, clubId: string, currency: Curren
     sponsorships: { proposals: [], contracts: [], lastMarketRound: -1, history: [] },
     playerTransferOffers: [],
     results: [],
-    leagueFixtures: balanceClubVenueSequence(makeLeagueSchedule(1), clubId),
+    leagueClubIds,
+    leagueFixtures: balanceClubVenueSequence(makeLeagueSchedule(1, club.divisionId, clubId, leagueClubIds), clubId),
     seasonHistory: [],
     liveMatch: null,
     lastResult: null,
@@ -618,7 +620,7 @@ export function setCaptain(career: Career, playerId: string): Career {
 export function getCurrentFixture(career: Career): Fixture | undefined {
   const schedule = Array.isArray(career.leagueFixtures) && career.leagueFixtures.length
     ? career.leagueFixtures
-    : makeLeagueSchedule(career.season);
+    : makeLeagueSchedule(career.season, career.divisionId, career.clubId, career.leagueClubIds);
   return schedule.find((fixture) => fixture.roundIndex === career.roundIndex
     && (fixture.homeClubId === career.clubId || fixture.awayClubId === career.clubId));
 }
@@ -2033,7 +2035,7 @@ function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
   const history = [...state.history];
   let next = career;
   const attendance = career.lastResult?.attendance ?? 0;
-  const standings = calculateStandings(career.results);
+  const standings = calculateCareerStandings(career);
   const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
 
   for (const contract of state.contracts) {
@@ -2280,7 +2282,7 @@ function advanceToNextSeason(career: Career): Career {
 export function finalizeMatch(career: Career): Career {
   const game = career.liveMatch;
   if (!game || game.phase !== 'finished') return career;
-  const roundFixtures = (career.leagueFixtures?.length ? career.leagueFixtures : makeLeagueSchedule(career.season)).filter((fixture) => fixture.roundIndex === game.fixture.roundIndex);
+  const roundFixtures = (career.leagueFixtures?.length ? career.leagueFixtures : makeLeagueSchedule(career.season, career.divisionId, career.clubId, career.leagueClubIds)).filter((fixture) => fixture.roundIndex === game.fixture.roundIndex);
   const newResults: LeagueResult[] = roundFixtures.map((fixture) => {
     const isUserMatch = fixture.id === game.fixture.id;
     const home = getClub(fixture.homeClubId);
@@ -2431,55 +2433,55 @@ export function finalizeMatch(career: Career): Career {
   if (gateIncome > 0) afterMatch = addFinanceEntry(afterMatch, { category: 'matchday', description: 'Bilheteria da rodada ' + (career.roundIndex + 1), amount: gateIncome });
   afterMatch = addFinanceEntry(afterMatch, { category: 'wages', description: 'Folha semanal do elenco', amount: -wageBill });
   const settled = processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
-  if (settled.roundIndex >= LEAGUE_ROUNDS) return advanceToNextSeason(settled);
+  if (settled.roundIndex >= getLeagueRoundCount(settled)) return advanceToNextSeason(settled);
   return generatePlayerTransferOffers(settled);
 }
 
-export function calculateStandings(results: LeagueResult[]): StandingRow[] {
-  const rows = CLUBS.map((club) => ({
-    club,
-    played: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
-    goalsFor: 0,
-    goalsAgainst: 0,
-    points: 0,
+export function calculateStandings(results: LeagueResult[], clubIds?: string[]): StandingRow[] {
+  const ids = clubIds?.length
+    ? clubIds
+    : Array.from(new Set(results.flatMap((result) => [result.homeClubId, result.awayClubId])));
+  const base = ids.length ? ids.map((id) => getClub(id)).filter((club): club is Club => Boolean(club)) : CLUBS;
+  const rows = base.map((club) => ({
+    club, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0,
   }));
   for (const result of results) {
     const home = rows.find((row) => row.club.id === result.homeClubId);
     const away = rows.find((row) => row.club.id === result.awayClubId);
     if (!home || !away) continue;
-    home.played += 1;
-    away.played += 1;
-    home.goalsFor += result.homeGoals;
-    home.goalsAgainst += result.awayGoals;
-    away.goalsFor += result.awayGoals;
-    away.goalsAgainst += result.homeGoals;
-    if (result.homeGoals > result.awayGoals) {
-      home.wins += 1; home.points += 3; away.losses += 1;
-    } else if (result.homeGoals < result.awayGoals) {
-      away.wins += 1; away.points += 3; home.losses += 1;
-    } else {
-      home.draws += 1; away.draws += 1; home.points += 1; away.points += 1;
-    }
+    home.played += 1; away.played += 1;
+    home.goalsFor += result.homeGoals; home.goalsAgainst += result.awayGoals;
+    away.goalsFor += result.awayGoals; away.goalsAgainst += result.homeGoals;
+    if (result.homeGoals > result.awayGoals) { home.wins += 1; home.points += 3; away.losses += 1; }
+    else if (result.homeGoals < result.awayGoals) { away.wins += 1; away.points += 3; home.losses += 1; }
+    else { home.draws += 1; away.draws += 1; home.points += 1; away.points += 1; }
   }
   return rows.sort((a, b) =>
     b.points - a.points
     || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst)
     || b.goalsFor - a.goalsFor
-    || a.club.name.localeCompare(b.club.name, 'pt-BR'),
+    || a.club.name.localeCompare(b.club.name, 'pt-BR')
   );
 }
 
+export function calculateCareerStandings(career: Pick<Career, 'results' | 'leagueClubIds'>): StandingRow[] {
+  return calculateStandings(career.results, career.leagueClubIds);
+}
+
 export function getCurrentLeaguePosition(career: Career): number {
-  return calculateStandings(career.results).findIndex((row) => row.club.id === career.clubId) + 1;
+  return calculateCareerStandings(career).findIndex((row) => row.club.id === career.clubId) + 1;
 }
 
 function migrateLeagueScheduleForCareer(parsed: Partial<Career>): Fixture[] {
   const season = parsed.season ?? 1;
   const currentRound = parsed.roundIndex ?? 0;
-  const generated = makeLeagueSchedule(season);
+  const clubId = parsed.clubId;
+  const parsedClub = clubId ? getClub(clubId) : undefined;
+  const divisionId = (parsed as Career).divisionId ?? parsedClub?.divisionId ?? 'br-3';
+  const leagueClubIds = Array.isArray((parsed as Career).leagueClubIds) && (parsed as Career).leagueClubIds.length
+    ? (parsed as Career).leagueClubIds
+    : (clubId ? clubsForDivision(divisionId, clubId).map((club) => club.id) : []);
+  const generated = makeLeagueSchedule(season, divisionId, clubId, leagueClubIds);
   const generatedById = new Map(generated.map((fixture) => [fixture.id, fixture]));
   const saved = Array.isArray((parsed as Career).leagueFixtures) && (parsed as Career).leagueFixtures.length
     ? (parsed as Career).leagueFixtures
@@ -2517,7 +2519,6 @@ function migrateLeagueScheduleForCareer(parsed: Partial<Career>): Fixture[] {
       : fixture);
   }
 
-  const clubId = parsed.clubId;
   if (!clubId) return schedule;
 
   const completedVenues = (parsed.results ?? [])
@@ -2639,6 +2640,9 @@ export function parseCareer(saved: string | null): Career | null {
       divisionId: (parsed as Career).divisionId ?? parsedClub.divisionId,
       currency: parsedCurrency,
       finance: { ...fallbackFinance, ...((parsed as Career).finance ?? {}), ledger: Array.isArray((parsed as Career).finance?.ledger) ? (parsed as Career).finance.ledger : [] },
+      leagueClubIds: Array.isArray((parsed as Career).leagueClubIds) && (parsed as Career).leagueClubIds.length
+        ? (parsed as Career).leagueClubIds
+        : clubsForDivision((parsed as Career).divisionId ?? parsedClub.divisionId, parsed.clubId).map((club) => club.id),
       players: assignSquadNumbers((parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0))),
       market: ((parsed as Career).market ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
@@ -2794,8 +2798,9 @@ export function renewPlayerContract(career: Career, playerId: string, seasons = 
   const currentWages = career.players.reduce((sum, item) => sum + item.wage, 0);
   const projectedWages = currentWages - player.wage + newWage;
   if (career.balance < signingCost || projectedWages > (career.finance?.weeklyWageBudget ?? Number.POSITIVE_INFINITY)) return career;
-  const extension = LEAGUE_ROUNDS * seasons;
-  const currentEnd = player.contractEndRound ?? career.roundIndex + LEAGUE_ROUNDS;
+  const seasonRounds = Math.max(1, getLeagueRoundCount(career));
+  const extension = seasonRounds * seasons;
+  const currentEnd = player.contractEndRound ?? career.roundIndex + seasonRounds;
   let nextRenewal: Career = {
     ...career,
     balance: career.balance - signingCost,
