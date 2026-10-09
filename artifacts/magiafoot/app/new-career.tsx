@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ClubBadge, GameButton, GameHeader, LoadingState, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { CLUBS, selectableClubs } from '@/game/data';
+import { selectableClubs } from '@/game/data';
 import type { CurrencyCode } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
