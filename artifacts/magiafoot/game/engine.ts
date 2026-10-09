@@ -1903,6 +1903,10 @@ export function acceptSponsorshipProposal(career: Career, proposalId: string): C
   let next: Career = {
     ...career,
     balance: career.balance + proposal.signingBonus,
+    finance: {
+      ...career.finance,
+      seasonSponsorshipIncome: (career.finance?.seasonSponsorshipIncome ?? 0) + proposal.signingBonus,
+    },
     boardTrust: clamp(career.boardTrust + proposal.boardImpact, 0, 100),
     fanTrust: clamp(career.fanTrust + proposal.fanImpact, 0, 100),
     sponsorships: {
@@ -1913,7 +1917,8 @@ export function acceptSponsorshipProposal(career: Career, proposalId: string): C
     },
     lastNews: `${proposal.sponsorName} é o novo patrocinador do clube. Acordo de ${proposal.durationMatches} jogos.`,
   };
-  return addCareerNews(next, 'Novo patrocinador anunciado', `${proposal.sponsorName} fechou contrato para ${SLOT_LABELS_ENGINE[proposal.slot]} por ${proposal.durationMatches} jogos. Luvas de ${formatCurrency(proposal.signingBonus)}.`);
+  next = addFinanceEntry(next, { category: 'sponsorship', description: 'Luvas de patrocínio - ' + proposal.sponsorName, amount: proposal.signingBonus });
+  return addCareerNews(next, 'Novo patrocinador anunciado', `${proposal.sponsorName} fechou contrato para ${SLOT_LABELS_ENGINE[proposal.slot]} por ${proposal.durationMatches} jogos. Luvas de ${formatCurrency(proposal.signingBonus, career.currency)}.`);
 }
 
 const SLOT_LABELS_ENGINE: Record<SponsorshipSlot, string> = SPONSORSHIP_PLACEMENT_LABELS;
@@ -2016,8 +2021,15 @@ function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
   next = {
     ...next,
     balance: next.balance + sponsorIncome,
+    finance: {
+      ...next.finance,
+      seasonSponsorshipIncome: (next.finance?.seasonSponsorshipIncome ?? 0) + sponsorIncome,
+    },
     sponsorships: { proposals: [], contracts: active, lastMarketRound: -1, history: history.slice(0, 20) },
   };
+  if (sponsorIncome > 0) {
+    next = addFinanceEntry(next, { category: 'sponsorship', description: 'Receitas de patrocínio da rodada', amount: sponsorIncome });
+  }
   return refreshSponsorshipMarket(next, true);
 }
 
@@ -2195,6 +2207,14 @@ function advanceToNextSeason(career: Career): Career {
       proposals: [],
       lastMarketRound: -1,
     },
+    finance: {
+      ...career.finance,
+      seasonTransferSpend: 0,
+      seasonTransferIncome: 0,
+      seasonMatchdayIncome: 0,
+      seasonWagesPaid: 0,
+      seasonSponsorshipIncome: 0,
+    },
     legalWorkloadEvents: Math.max(0, Math.floor((career.legalWorkloadEvents ?? 0) * 0.35)),
     lastNews: 'A temporada ' + completedYear + ' terminou. A temporada ' + (completedYear + 1) + ' começou com um novo calendário de 38 rodadas.',
   };
@@ -2347,19 +2367,26 @@ export function finalizeMatch(career: Career): Career {
       detail: 'Atuou na rodada ' + (career.roundIndex + 1) + ' da temporada.',
     });
   });
-  const afterMatch: Career = {
+  let afterMatch: Career = {
     ...career,
     players: playersWithHistory,
     results: [...career.results.filter((item) => item.roundIndex !== game.fixture.roundIndex), ...newResults],
     roundIndex: career.roundIndex + 1,
     balance: Math.max(0, career.balance + revenue),
+    finance: {
+      ...career.finance,
+      seasonMatchdayIncome: (career.finance?.seasonMatchdayIncome ?? 0) + gateIncome,
+      seasonWagesPaid: (career.finance?.seasonWagesPaid ?? 0) + wageBill,
+    },
     boardTrust: clamp(career.boardTrust + trustDelta, 0, 100),
     fanTrust: clamp(career.fanTrust + (userWon ? 3 : isDraw ? 0 : -3), 0, 100),
     legalWorkloadEvents: Math.max(0, (career.legalWorkloadEvents ?? 0) + redCardsThisMatch + (lowMoraleCases > 0 ? 1 : 0)),
     liveMatch: null,
     lastResult: leagueResult,
-    lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome)}; salários de ${formatCurrency(wageBill)}.`,
+    lastNews: `${resultText} Bilheteria de ${formatCurrency(gateIncome, career.currency)}; salários de ${formatCurrency(wageBill, career.currency)}.`,
   };
+  if (gateIncome > 0) afterMatch = addFinanceEntry(afterMatch, { category: 'matchday', description: 'Bilheteria da rodada ' + (career.roundIndex + 1), amount: gateIncome });
+  afterMatch = addFinanceEntry(afterMatch, { category: 'wages', description: 'Folha semanal do elenco', amount: -wageBill });
   const settled = processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
   if (settled.roundIndex >= LEAGUE_ROUNDS) return advanceToNextSeason(settled);
   return generatePlayerTransferOffers(settled);
@@ -2491,6 +2518,19 @@ export function parseCareer(saved: string | null): Career | null {
     const fallbackAdministrationStaff: Career['administrationStaff'] = { board: [], finance: [], legal: [] };
     const fallbackTrainingCenter: Career['trainingCenterUpgrades'] = { field: 1, medical: 1, physio: 1, gym: 1, analysis: 1 };
     const fallbackSponsorships: Career['sponsorships'] = { proposals: [], contracts: [], lastMarketRound: -1, history: [] };
+    const parsedClub = getClub(parsed.clubId)!;
+    const parsedWeeklyWages = (parsed.players ?? []).reduce((sum, player) => sum + (player.wage ?? 0), 0);
+    const fallbackFinance: Career['finance'] = {
+      transferBudget: Math.round((typeof parsed.balance === 'number' ? parsed.balance : parsedClub.balance) * 0.42),
+      weeklyWageBudget: Math.max(Math.round(parsedWeeklyWages * 1.18), parsedWeeklyWages + 25_000),
+      debt: 0,
+      seasonTransferSpend: 0,
+      seasonTransferIncome: 0,
+      seasonMatchdayIncome: 0,
+      seasonWagesPaid: 0,
+      seasonSponsorshipIncome: 0,
+      ledger: [],
+    };
     const rawSponsorships = (parsed as Career).sponsorships ?? fallbackSponsorships;
     const migratedProposals = Array.isArray(rawSponsorships.proposals)
       ? rawSponsorships.proposals.map((proposal) => ({
@@ -2551,6 +2591,9 @@ export function parseCareer(saved: string | null): Career | null {
     };
     return {
       ...(parsed as Career),
+      divisionId: (parsed as Career).divisionId ?? parsedClub.divisionId,
+      currency: (parsed as Career).currency ?? 'BRL',
+      finance: { ...fallbackFinance, ...((parsed as Career).finance ?? {}), ledger: Array.isArray((parsed as Career).finance?.ledger) ? (parsed as Career).finance.ledger : [] },
       players: assignSquadNumbers((parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0))),
       market: ((parsed as Career).market ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
       ticketPrice: typeof (parsed as Career).ticketPrice === 'number' ? (parsed as Career).ticketPrice : (getClub(parsed.clubId)?.ticketPrice ?? 25),
