@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { ReactNode } from 'react';
 import {
   addTransferPlayer,
+  negotiateTransferPurchase,
   fireAdministrativeProfessional,
   hireAdministrativeProfessional,
   refreshSponsorshipMarket,
@@ -99,6 +100,7 @@ interface CareerContextValue {
   setTactics: (tactics: Tactics) => void;
   closeCurrentMatch: () => void;
   signPlayer: (playerId: string) => boolean;
+  negotiateMarketPlayer: (playerId: string, transferBid: number, weeklyWage: number, signingBonus: number) => 'completed' | 'club_rejected' | 'player_rejected' | 'budget' | 'squad_full' | 'not_found';
   transferPlayer: (playerId: string) => boolean;
   expandStadium: () => boolean;
   upgradeStadiumItem: (key: StadiumUpgradeKey) => boolean;
@@ -505,6 +507,13 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setCareer(next);
     return true;
   }, [career]);
+  const negotiateMarketPlayer = useCallback((playerId: string, transferBid: number, weeklyWage: number, signingBonus: number) => {
+    if (!career) return 'not_found' as const;
+    const negotiation = negotiateTransferPurchase(career, playerId, transferBid, weeklyWage, signingBonus);
+    if (negotiation.career !== career) setCareer(negotiation.career);
+    return negotiation.result;
+  }, [career]);
+
   const transferPlayer = useCallback((playerId: string) => {
     if (!career) return false;
     const next = sellPlayer(career, playerId);
@@ -676,6 +685,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setTactics,
     closeCurrentMatch,
     signPlayer,
+    negotiateMarketPlayer,
     transferPlayer,
     expandStadium,
     upgradeStadiumItem,
@@ -702,7 +712,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }), [
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
-    setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
+    setTactics, signPlayer, negotiateMarketPlayer, startCurrentMatch, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
     cloudSession, cloudProfile, cloudStatus, cloudLastSavedAt, cloudMessage,
     careerSlots, activeCareerSlot, authRestoring,
