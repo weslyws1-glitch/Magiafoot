@@ -1,4 +1,4 @@
-import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
+import { buildBestLineup, buildBench, CLUBS, FORMATIONS, clubsForDivision, getClub, getDivision, getFormation, makeCareerMarket, makeRoster } from './data.ts';
 import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, CurrencyCode, FinanceState, FinanceTransaction, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, PlayerTransferOffer, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
@@ -100,11 +100,26 @@ function recentVenueStreak(history: Array<'H' | 'A'>, next: 'H' | 'A'): number {
   return streak;
 }
 
-export function makeLeagueSchedule(season = 1): Fixture[] {
-  const baseClubs = CLUBS.map((club) => club.id);
+export function makeLeagueSchedule(
+  season = 1,
+  divisionId = 'br-3',
+  userClubId?: string,
+  explicitClubIds?: string[],
+): Fixture[] {
+  const division = getDivision(divisionId);
+  const sourceClubs = explicitClubIds?.length
+    ? explicitClubIds.map((id) => getClub(id)).filter((club): club is Club => Boolean(club))
+    : clubsForDivision(divisionId, userClubId);
+
+  const baseClubs = sourceClubs.map((club) => club.id);
+  if (baseClubs.length < 2) return [];
+
+  const hasBye = baseClubs.length % 2 === 1;
   const shift = baseClubs.length ? ((season - 1) * 3) % baseClubs.length : 0;
   const rotated = [...baseClubs.slice(shift), ...baseClubs.slice(0, shift)];
   const ring = season % 2 === 0 ? [...rotated].reverse() : [...rotated];
+  if (hasBye) ring.push('__BYE__');
+
   const roundPairings: Array<Array<[string, string]>> = [];
   const firstHalfRounds = Math.max(0, ring.length - 1);
 
@@ -113,7 +128,7 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
     for (let pairIndex = 0; pairIndex < ring.length / 2; pairIndex += 1) {
       const left = ring[pairIndex];
       const right = ring[ring.length - 1 - pairIndex];
-      if (left && right) pairs.push([left, right]);
+      if (left && right && left !== '__BYE__' && right !== '__BYE__') pairs.push([left, right]);
     }
     roundPairings.push(pairs);
     const last = ring.pop();
@@ -124,7 +139,7 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
   for (const club of baseClubs) venueHistory.set(club, []);
 
   const firstHalf: Fixture[][] = roundPairings.map((pairs, roundIndex) => {
-    const optionCount = 1 << pairs.length;
+    const optionCount = Math.min(1 << Math.min(pairs.length, 20), 1_048_576);
     let bestMask = 0;
     let bestPenalty = Number.POSITIVE_INFINITY;
 
@@ -141,15 +156,12 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
           const streak = recentVenueStreak(history, venue);
           if (streak > 2) penalty += 1000 * (streak - 2);
           if (history[history.length - 1] === venue) penalty += 2;
-
           const homeCount = history.filter((item) => item === 'H').length + (venue === 'H' ? 1 : 0);
           const awayCount = history.length + 1 - homeCount;
           penalty += Math.pow(homeCount - awayCount, 2) * 0.35;
         }
       }
-
-      const tieBreaker = (hash('schedule-' + season + '-' + roundIndex + '-' + mask) % 1000) / 1_000_000;
-      penalty += tieBreaker;
+      penalty += (hash('schedule-' + divisionId + '-' + season + '-' + roundIndex + '-' + mask) % 1000) / 1_000_000;
       if (penalty < bestPenalty) {
         bestPenalty = penalty;
         bestMask = mask;
@@ -163,7 +175,7 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
       venueHistory.get(homeClubId)?.push('H');
       venueHistory.get(awayClubId)?.push('A');
       return {
-        id: 'liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
+        id: divisionId + '-liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
         roundIndex,
         homeClubId,
         awayClubId,
@@ -173,10 +185,13 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
     });
   });
 
+  const legs = division?.legs ?? 2;
+  if (legs === 1) return firstHalf.flat();
+
   const secondHalf = [...firstHalf].reverse().map((roundFixtures, secondIndex) => {
     const roundIndex = firstHalfRounds + secondIndex;
     return roundFixtures.map((fixture, pairIndex) => ({
-      id: 'liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
+      id: divisionId + '-liga-' + (roundIndex + 1) + '-' + (pairIndex + 1),
       roundIndex,
       homeClubId: fixture.awayClubId,
       awayClubId: fixture.homeClubId,
@@ -188,8 +203,20 @@ export function makeLeagueSchedule(season = 1): Fixture[] {
   return [...firstHalf, ...secondHalf].flat();
 }
 
-export const LEAGUE_ROUNDS = CLUBS.length * 2 - 2;
-export const LEAGUE_FIXTURES = makeLeagueSchedule(1);
+export const LEAGUE_ROUNDS = 38;
+export const LEAGUE_FIXTURES = makeLeagueSchedule(1, 'br-3');
+
+export function getLeagueRoundCount(career: Pick<Career, 'leagueFixtures' | 'divisionId' | 'clubId' | 'leagueClubIds' | 'season'>): number {
+  const fixtures = career.leagueFixtures?.length
+    ? career.leagueFixtures
+    : makeLeagueSchedule(career.season, career.divisionId, career.clubId, career.leagueClubIds);
+  if (!fixtures.length) return 0;
+  return Math.max(...fixtures.map((fixture) => fixture.roundIndex)) + 1;
+}
+
+export function getCareerDivision(career: Pick<Career, 'divisionId'>) {
+  return getDivision(career.divisionId);
+}
 
 export function seasonYear(season: number): number {
   return 2026 + Math.max(0, season - 1);
@@ -239,7 +266,8 @@ function balanceClubVenueSequence(
   const venues: Array<'H' | 'A'> = [...completedVenues];
   const nextSchedule = schedule.map((fixture) => ({ ...fixture }));
 
-  for (let roundIndex = startRound; roundIndex < LEAGUE_ROUNDS; roundIndex += 1) {
+  const totalRounds = nextSchedule.length ? Math.max(...nextSchedule.map((fixture) => fixture.roundIndex)) + 1 : 0;
+  for (let roundIndex = startRound; roundIndex < totalRounds; roundIndex += 1) {
     const fixtureIndex = nextSchedule.findIndex((fixture) =>
       fixture.roundIndex === roundIndex
       && (fixture.homeClubId === clubId || fixture.awayClubId === clubId)
