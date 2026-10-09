@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,6 +94,13 @@ export function SectionLabel({ title, action }: { title: string; action?: React.
 export function ClubBadge({ clubId, size = 48 }: { clubId: string; size?: number }) {
   const colors = useColors();
   const club = getClub(clubId);
+  if (club?.badgeUrl) {
+    return (
+      <View style={[styles.clubBadgeImageWrap, { width: size, height: size }]}>
+        <Image source={{ uri: club.badgeUrl }} resizeMode="contain" style={{ width: size, height: size }} />
+      </View>
+    );
+  }
   return (
     <View style={[styles.clubBadge, { width: size, height: size, borderRadius: size * 0.29, backgroundColor: club?.color ?? colors.primary }]}>
       <View style={[styles.badgeInner, { borderColor: 'rgba(255,255,255,0.42)' }]}>
@@ -174,6 +181,7 @@ const styles = StyleSheet.create({
   sectionLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1, marginTop: 3 },
   sectionTitle: { fontSize: 16, fontWeight: '900', letterSpacing: 0.2 },
   clubBadge: { padding: 3, alignItems: 'center', justifyContent: 'center' },
+  clubBadgeImageWrap: { alignItems: 'center', justifyContent: 'center' },
   badgeInner: { width: '100%', height: '100%', borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontWeight: '900', letterSpacing: -0.4 },
   ratingPill: { minWidth: 38, height: 37, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
