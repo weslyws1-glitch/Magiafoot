@@ -224,6 +224,7 @@ export interface Club {
   selectable?: boolean;
   stateCode?: string | null;
   competitionGroup?: string | null;
+  confederation?: string | null;
   prestige?: number;
   fanBase?: number;
   city: string;
