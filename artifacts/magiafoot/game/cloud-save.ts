@@ -50,6 +50,13 @@ async function readJson(response: Response) {
   }
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map((item) => canonicalJson(item)).join(',') + ']';
+  const record = value as Record<string, unknown>;
+  return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(record[key])).join(',') + '}';
+}
+
 function authMessage(payload: any, fallback: string) {
   return payload?.msg || payload?.error_description || payload?.error || fallback;
 }
@@ -180,7 +187,7 @@ export async function saveCareerToCloud(
 ): Promise<CloudSaveMeta | null> {
   const payloadText = serializeCareer(career);
   const payload = JSON.parse(payloadText);
-  const checksum = sha256(payloadText);
+  const checksum = sha256(canonicalJson(payload));
 
   const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/save_career_version', {
     method: 'POST',
@@ -226,7 +233,7 @@ export async function restoreLatestCareerFromCloud(session: CloudSession): Promi
   if (!row?.payload || !row?.checksum) return null;
 
   const payloadText = JSON.stringify(row.payload);
-  if (sha256(payloadText) !== String(row.checksum).toLowerCase()) {
+  if (sha256(canonicalJson(row.payload)) !== String(row.checksum).toLowerCase()) {
     return null;
   }
 
