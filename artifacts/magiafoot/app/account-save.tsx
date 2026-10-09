@@ -23,6 +23,8 @@ export default function AccountSaveScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -110,34 +112,52 @@ export default function AccountSaveScreen() {
           placeholderTextColor="#63766a"
           style={styles.input}
         />
-        <TextInput
-          value={password}
-          onChangeText={(value) => {
-            setPassword(value);
-            if (formError) setFormError(null);
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          placeholder="Senha com pelo menos 8 caracteres"
-          placeholderTextColor="#63766a"
-          style={styles.input}
-        />
-
-        {mode === 'signup' ? (
+        <View style={styles.passwordField}>
           <TextInput
-            value={confirmPassword}
+            value={password}
             onChangeText={(value) => {
-              setConfirmPassword(value);
+              setPassword(value);
               if (formError) setFormError(null);
             }}
             autoCapitalize="none"
             autoCorrect={false}
-            secureTextEntry
-            placeholder="Confirme sua senha"
+            secureTextEntry={!showPassword}
+            placeholder="Senha com pelo menos 8 caracteres"
             placeholderTextColor="#63766a"
-            style={[styles.input, confirmPassword.length > 0 && password !== confirmPassword && styles.inputError]}
+            style={styles.passwordInput}
           />
+          <Pressable
+            onPress={() => setShowPassword((value) => !value)}
+            style={styles.eyeButton}
+            accessibilityLabel={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+          >
+            <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color="#9fb2a5" />
+          </Pressable>
+        </View>
+
+        {mode === 'signup' ? (
+          <View style={[styles.passwordField, confirmPassword.length > 0 && password !== confirmPassword && styles.inputError]}>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                if (formError) setFormError(null);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry={!showConfirmPassword}
+              placeholder="Confirme sua senha"
+              placeholderTextColor="#63766a"
+              style={styles.passwordInput}
+            />
+            <Pressable
+              onPress={() => setShowConfirmPassword((value) => !value)}
+              style={styles.eyeButton}
+              accessibilityLabel={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Exibir confirmação de senha'}
+            >
+              <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={18} color="#9fb2a5" />
+            </Pressable>
+          </View>
         ) : null}
 
         {formError ? <Text style={styles.formError}>{formError}</Text> : null}
@@ -202,6 +222,9 @@ const styles = StyleSheet.create({
   tabText: { color: '#83968a', fontSize: 8, fontWeight: '900', letterSpacing: 0.55 },
   tabTextActive: { color: '#79ef91' },
   input: { minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#07150d', color: '#ffffff', paddingHorizontal: 13, fontSize: 12 },
+  passwordField: { minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#07150d', flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, minHeight: 48, color: '#ffffff', paddingLeft: 13, paddingRight: 8, fontSize: 12 },
+  eyeButton: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   inputError: { borderColor: '#d96b6b' },
   formError: { color: '#ff9a9a', fontSize: 8, lineHeight: 12, textAlign: 'center', fontWeight: '700' },
   rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
