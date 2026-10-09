@@ -193,31 +193,35 @@ export default function HomeScreen() {
         ]}
       >
         <View style={styles.topHeader}>
-          <View style={styles.logoArea}>
-            <Text style={styles.brandName}>MAGIA<Text style={styles.brandGreen}>FOOT</Text></Text>
-            <Text style={styles.brandTagline}>SEU FUTEBOL, SUAS HISTÓRIAS</Text>
+          <View style={styles.topHeaderMainRow}>
+            <View style={styles.logoArea}>
+              <Text style={styles.brandName}>MAGIA<Text style={styles.brandGreen}>FOOT</Text></Text>
+              <Text style={styles.brandTagline}>SEU FUTEBOL, SUAS HISTÓRIAS</Text>
+            </View>
+
+            <Pressable onPress={() => router.push('/account-save' as never)} style={styles.accountButton}>
+              <Feather name="user" size={16} color="#79ef91" />
+              <Text style={styles.accountButtonText}>CONTA</Text>
+            </Pressable>
           </View>
 
-          <View style={styles.clubIdentity}>
-            <ClubBadge clubId={career.clubId} size={36} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={styles.clubIdentityName}>{dashboard.club?.name ?? 'Clube'}</Text>
-              <Text numberOfLines={1} style={styles.clubIdentityMeta}>{division?.name ?? 'Liga'} · {position ? position + 'º lugar' : '—'}</Text>
+          <View style={styles.topHeaderMetaRow}>
+            <View style={styles.clubIdentity}>
+              <ClubBadge clubId={career.clubId} size={34} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={styles.clubIdentityName}>{dashboard.club?.name ?? 'Clube'}</Text>
+                <Text numberOfLines={1} style={styles.clubIdentityMeta}>{division?.name ?? 'Liga'} · {position ? position + 'º lugar' : '—'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.seasonChip}>
+              <Feather name="calendar" size={15} color="#dce8df" />
+              <View>
+                <Text style={styles.seasonChipText}>Temporada {seasonYear(career.season)}</Text>
+                <Text style={styles.seasonChipSub}>Rodada {currentRound}</Text>
+              </View>
             </View>
           </View>
-
-          <View style={styles.seasonChip}>
-            <Feather name="calendar" size={15} color="#dce8df" />
-            <View>
-              <Text style={styles.seasonChipText}>Temporada {seasonYear(career.season)}</Text>
-              <Text style={styles.seasonChipSub}>Rodada {currentRound}</Text>
-            </View>
-          </View>
-
-          <Pressable onPress={() => router.push('/account-save' as never)} style={styles.accountButton}>
-            <Feather name="user" size={16} color="#79ef91" />
-            <Text style={styles.accountButtonText}>CONTA</Text>
-          </Pressable>
         </View>
 
         <View style={styles.heroRow}>
@@ -296,24 +300,24 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storyStrip}>
-          {(smallStories.length ? smallStories : [
-            { id: 'market', category: 'market', title: 'Mercado esquenta antes da próxima rodada', body: 'Clubes monitoram oportunidades e reforços.', visualKey: 'market' },
-            { id: 'competition', category: 'match', title: 'Rivais disputam posições no topo', body: 'A competição ganha intensidade.', visualKey: 'competition' },
-            { id: 'club', category: 'club', title: 'Diretoria avalia orçamento para reforços', body: 'Decisões financeiras entram em pauta.', visualKey: 'club' },
-            { id: 'stadium', category: 'club', title: 'Estrutura do clube segue em evolução', body: 'Projetos internos avançam.', visualKey: 'club' },
-          ] as CareerNewsItem[]).map((item) => (
-            <Pressable key={item.id} onPress={() => router.push('/news')} style={styles.storyCard}>
-              <ImageBackground source={{ uri: newsImage(item) }} style={styles.storyCardImage} imageStyle={styles.storyCardImageRadius}>
-                <LinearGradient colors={['rgba(7,21,13,0.05)', 'rgba(7,21,13,0.88)']} style={styles.storyCardOverlay}>
-                  <View style={styles.storyCardSpacer} />
-                  <Text style={styles.storyCardBadge}>{newsLabel(item)}</Text>
-                  <Text numberOfLines={3} style={styles.storyCardTitle}>{item.title}</Text>
-                </LinearGradient>
-              </ImageBackground>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <View style={styles.latestNewsPanel}>
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelTitle}>ÚLTIMAS NOTÍCIAS</Text>
+            <Pressable onPress={() => router.push('/news')}><Text style={styles.panelLink}>Ver todas ›</Text></Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.latestNewsRow}>
+            {(career.newsFeed?.length ? career.newsFeed.slice(0, 8) : smallStories).map((item) => (
+              <Pressable key={item.id} onPress={() => router.push('/news')} style={styles.latestNewsCard}>
+                <ImageBackground source={{ uri: newsImage(item) }} style={styles.latestNewsImage} imageStyle={styles.latestNewsImageRadius}>
+                  <LinearGradient colors={['rgba(7,21,13,0.0)', 'rgba(7,21,13,0.94)']} style={styles.latestNewsOverlay}>
+                    <View style={{ flex: 1 }} />
+                    <Text numberOfLines={3} style={styles.latestNewsTitle}>{item.title}</Text>
+                  </LinearGradient>
+                </ImageBackground>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={styles.dashboardRow}>
           <View style={styles.performancePanel}>
@@ -343,25 +347,6 @@ export default function HomeScreen() {
             <FinanceLine label="Receitas da temporada" value={formatCurrency(seasonIncome, career.currency)} positive />
             <FinanceLine label="Despesas da temporada" value={formatCurrency(seasonExpenses, career.currency)} negative />
           </View>
-        </View>
-
-        <View style={styles.latestNewsPanel}>
-          <View style={styles.panelHeader}>
-            <Text style={styles.panelTitle}>ÚLTIMAS NOTÍCIAS</Text>
-            <Pressable onPress={() => router.push('/news')}><Text style={styles.panelLink}>Ver todas ›</Text></Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.latestNewsRow}>
-            {(career.newsFeed?.length ? career.newsFeed.slice(0, 8) : smallStories).map((item) => (
-              <Pressable key={item.id} onPress={() => router.push('/news')} style={styles.latestNewsCard}>
-                <ImageBackground source={{ uri: newsImage(item) }} style={styles.latestNewsImage} imageStyle={styles.latestNewsImageRadius}>
-                  <LinearGradient colors={['rgba(7,21,13,0.0)', 'rgba(7,21,13,0.94)']} style={styles.latestNewsOverlay}>
-                    <View style={{ flex: 1 }} />
-                    <Text numberOfLines={3} style={styles.latestNewsTitle}>{item.title}</Text>
-                  </LinearGradient>
-                </ImageBackground>
-              </Pressable>
-            ))}
-          </ScrollView>
         </View>
 
         <View style={styles.trustRow}>
@@ -421,12 +406,14 @@ const styles = StyleSheet.create({
   brandName: { color: '#f3f7f3', fontSize: 24, lineHeight: 28, fontWeight: '900', letterSpacing: -1.1 },
   brandGreen: { color: '#76f08f' },
   brandTagline: { color: '#8ea295', fontSize: 6.5, fontWeight: '800', letterSpacing: 0.7, marginTop: 1 },
-  topHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: '#234334' },
-  logoArea: { width: 122 },
-  clubIdentity: { flex: 1.1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7, borderLeftWidth: 1, borderLeftColor: '#1f3c2c', paddingLeft: 8 },
+  topHeader: { gap: 9, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#234334' },
+  topHeaderMainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  topHeaderMetaRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  logoArea: { flex: 1, minWidth: 0 },
+  clubIdentity: { flex: 1.25, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: '#254637', borderRadius: 11, backgroundColor: '#0b2117', paddingHorizontal: 9 },
   clubIdentityName: { color: '#f5f7f5', fontSize: 9.5, fontWeight: '900' },
   clubIdentityMeta: { color: '#92a79a', fontSize: 6.5, marginTop: 2 },
-  seasonChip: { flex: 0.9, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: '#254637', borderRadius: 11, backgroundColor: '#0b2117' },
+  seasonChip: { flex: 0.95, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderWidth: 1, borderColor: '#254637', borderRadius: 11, backgroundColor: '#0b2117' },
   seasonChipText: { color: '#f0f5f1', fontSize: 7, fontWeight: '800' },
   seasonChipSub: { color: '#8ea295', fontSize: 6, marginTop: 1 },
   accountButton: { minHeight: 38, paddingHorizontal: 9, borderRadius: 11, borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#10291d', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
@@ -467,15 +454,7 @@ const styles = StyleSheet.create({
   miniClubName: { flex: 1, color: '#f3f6f4', fontSize: 6.8, fontWeight: '700' },
   miniPts: { width: 18, textAlign: 'right', color: '#f3f6f4', fontSize: 7, fontWeight: '900' },
   miniOwnText: { color: '#ffffff' },
-  storyStrip: { gap: 9, paddingRight: 8 },
-  storyCard: { width: 164, height: 150, borderRadius: 13, borderWidth: 1, borderColor: '#315f3f', overflow: 'hidden', backgroundColor: '#10291d' },
-  storyCardImage: { flex: 1 },
-  storyCardImageRadius: { borderRadius: 12 },
-  storyCardOverlay: { flex: 1, padding: 9 },
-  storyCardSpacer: { flex: 1 },
-  storyCardBadge: { alignSelf: 'flex-start', color: '#ffffff', fontSize: 6.5, fontWeight: '900', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 5, backgroundColor: '#285dd2', marginBottom: 5 },
-  storyCardTitle: { color: '#ffffff', fontSize: 10.5, lineHeight: 13, fontWeight: '800' },
-  dashboardRow: { flexDirection: 'row', gap: 10 },
+   dashboardRow: { flexDirection: 'row', gap: 10 },
   performancePanel: { flex: 1.2, minHeight: 200, borderRadius: 15, borderWidth: 1, borderColor: '#2e6c44', backgroundColor: '#0b2117', padding: 10 },
   financesPanel: { flex: 1, minHeight: 200, borderRadius: 15, borderWidth: 1, borderColor: '#2e6c44', backgroundColor: '#0b2117', padding: 10 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7, marginBottom: 9 },
