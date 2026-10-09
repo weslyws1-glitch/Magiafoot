@@ -219,7 +219,7 @@ export interface Club {
   divisionId: string;
   divisionName: string;
   divisionLevel: number;
-  nativeCurrency: CurrencyCode;
+  nativeCurrency: string;
   badgeUrl?: string | null;
   selectable?: boolean;
   stateCode?: string | null;
