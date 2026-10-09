@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -17,8 +16,6 @@ import {
   changeFormation,
   createCareer as makeCareer,
   finalizeMatch,
-  parseCareer,
-  serializeCareer,
   setCaptain,
   sellPlayer,
   setPlayerTrainingFocus,
@@ -43,13 +40,18 @@ import {
   upgradeTrainingCenterFacility,
 } from '@/game/engine';
 import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
-
-const STORAGE_KEY = 'magiafoot.saved-career.v1';
+import { getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
+import type { LocalIdentity, SaveHealth } from '@/game/save-protection';
 
 interface CareerContextValue {
   career: Career | null;
   isReady: boolean;
   storageWarning: boolean;
+  magiaId: string | null;
+  saveHealth: SaveHealth;
+  lastSavedAt: string | null;
+  backupCount: number;
+  manualSave: () => Promise<boolean>;
   createNewCareer: (coachName: string, clubId: string) => void;
   startCurrentMatch: () => void;
   advanceCurrentMatch: (minutes?: number) => void;
@@ -96,19 +98,33 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const [career, setCareer] = useState<Career | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [storageWarning, setStorageWarning] = useState(false);
+  const [identity, setIdentity] = useState<LocalIdentity | null>(null);
+  const [saveHealth, setSaveHealth] = useState<SaveHealth>('empty');
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [backupCount, setBackupCount] = useState(0);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const revisionRef = useRef(0);
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((savedCareer) => {
+    loadProtectedCareer()
+      .then(async (loaded) => {
         if (!active) return;
-        const parsed = parseCareer(savedCareer);
-        setCareer(parsed);
-        if (savedCareer && !parsed) setStorageWarning(true);
+        setCareer(loaded.career);
+        setIdentity(loaded.identity);
+        setSaveHealth(loaded.health);
+        setLastSavedAt(loaded.lastSavedAt);
+        revisionRef.current = loaded.revision;
+        setBackupCount(await getBackupCount());
+        if (loaded.health === 'corrupt' || loaded.health === 'restored_backup') {
+          setStorageWarning(true);
+        }
       })
       .catch(() => {
-        if (active) setStorageWarning(true);
+        if (active) {
+          setStorageWarning(true);
+          setSaveHealth('corrupt');
+        }
       })
       .finally(() => {
         if (active) setIsReady(true);
@@ -119,14 +135,47 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isReady) return;
-    const snapshot = career ? serializeCareer(career) : null;
+    if (!isReady || !career || !identity) return;
+    const snapshot = career;
+    const nextRevision = revisionRef.current + 1;
+    revisionRef.current = nextRevision;
+
     saveQueue.current = saveQueue.current
       .then(async () => {
-        if (snapshot) await AsyncStorage.setItem(STORAGE_KEY, snapshot);
+        const saved = await persistProtectedCareer(snapshot, identity, nextRevision, 'auto');
+        setLastSavedAt(saved.savedAt);
+        setSaveHealth('healthy');
+        setBackupCount(await getBackupCount());
       })
-      .catch(() => setStorageWarning(true));
-  }, [career, isReady]);
+      .catch(() => {
+        setStorageWarning(true);
+        setSaveHealth('corrupt');
+      });
+  }, [career, identity, isReady]);
+
+  const manualSave = useCallback(async () => {
+    if (!career || !identity) return false;
+    const snapshot = career;
+    const nextRevision = revisionRef.current + 1;
+    revisionRef.current = nextRevision;
+    let succeeded = true;
+
+    saveQueue.current = saveQueue.current
+      .then(async () => {
+        const saved = await persistProtectedCareer(snapshot, identity, nextRevision, 'manual');
+        setLastSavedAt(saved.savedAt);
+        setSaveHealth('healthy');
+        setBackupCount(await getBackupCount());
+      })
+      .catch(() => {
+        succeeded = false;
+        setStorageWarning(true);
+        setSaveHealth('corrupt');
+      });
+
+    await saveQueue.current;
+    return succeeded;
+  }, [career, identity]);
 
   const createNewCareer = useCallback((coachName: string, clubId: string) => {
     if (!isReady) return;
@@ -317,6 +366,11 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     career,
     isReady,
     storageWarning,
+    magiaId: identity?.magiaId ?? null,
+    saveHealth,
+    lastSavedAt,
+    backupCount,
+    manualSave,
     createNewCareer,
     startCurrentMatch,
     advanceCurrentMatch,
@@ -359,6 +413,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
+    identity, saveHealth, lastSavedAt, backupCount, manualSave,
   ]);
 
   return <CareerContext.Provider value={value}>{children}</CareerContext.Provider>;
