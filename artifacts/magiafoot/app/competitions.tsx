@@ -2,8 +2,9 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { GameHeader, Panel, Screen } from '@/components/ManagerUI';
+import { ClubBadge, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
+import { buildContinentalSeedPool } from '@/game/data';
 import { calculateCareerStandings, getCareerDivision, getLeagueRoundCount } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
@@ -22,6 +23,8 @@ export default function CompetitionsScreen() {
   const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
   const points = standings.find((row) => row.club.id === career.clubId)?.points ?? 0;
   const progress = Math.min(100, Math.round((career.roundIndex / leagueRounds) * 100));
+  const continentalPool = buildContinentalSeedPool(32);
+  const continentalCountries = new Set(continentalPool.map((club) => club.country)).size;
 
   return (
     <>
@@ -45,11 +48,21 @@ export default function CompetitionsScreen() {
           </View>
         </Panel>
 
-        <Panel style={styles.locked}>
-          <Feather name="globe" size={22} color="#6f8b78" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.lockedTitle}>Copas e torneios continentais</Text>
-            <Text style={styles.lockedText}>A base internacional está preparada; mata-matas e classificação continental serão conectados na próxima evolução das competições.</Text>
+        <Panel style={styles.continental}>
+          <View style={styles.continentalTop}>
+            <View style={styles.continentalIcon}><Feather name="globe" size={22} color="#79ef91" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.lockedTitle}>Copa Continental · Base CONMEBOL</Text>
+              <Text style={styles.lockedText}>{continentalPool.length} clubes-semente de {continentalCountries} países já fazem parte do universo. A classificação esportiva e o mata-mata serão a próxima camada.</Text>
+            </View>
+          </View>
+          <View style={styles.clubPreview}>
+            {continentalPool.slice(0, 6).map((club) => (
+              <View key={club.id} style={styles.previewClub}>
+                <ClubBadge clubId={club.id} size={30} />
+                <Text numberOfLines={1} style={styles.previewName}>{club.name}</Text>
+              </View>
+            ))}
           </View>
         </Panel>
       </Screen>
@@ -66,6 +79,12 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#79ef91' },
   progressText: { color: '#c7d4cb', fontSize: 11, marginTop: 8, fontWeight: '700' },
   locked: { flexDirection: 'row', gap: 12, alignItems: 'center', opacity: 0.75 },
+  continental: { gap: 12, backgroundColor: '#10291d', borderColor: '#356a4a' },
+  continentalTop: { flexDirection: 'row', gap: 11, alignItems: 'center' },
+  continentalIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#153426' },
+  clubPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  previewClub: { width: '31.5%', minHeight: 66, borderRadius: 10, backgroundColor: '#07150d', borderWidth: 1, borderColor: '#284837', alignItems: 'center', justifyContent: 'center', padding: 5, gap: 4 },
+  previewName: { color: '#b9c8be', fontSize: 6.5, fontWeight: '800', textAlign: 'center', maxWidth: '100%' },
   lockedTitle: { color: '#f5f7f5', fontSize: 14, fontWeight: '900' },
   lockedText: { color: '#9fb2a5', fontSize: 11, marginTop: 4, lineHeight: 16 },
 });
