@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GameHeader, Panel, Screen, formatCurrency } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { calculateStandings, LEAGUE_ROUNDS } from '@/game/engine';
+import { calculateCareerStandings, getCareerDivision, getLeagueRoundCount } from '@/game/engine';
 import { getClub } from '@/game/data';
 import { useColors } from '@/hooks/useColors';
 
@@ -25,7 +25,9 @@ export default function CareerScreen() {
   }
 
   const club = getClub(career.clubId);
-  const standings = calculateStandings(career.results);
+  const standings = calculateCareerStandings(career);
+  const leagueRounds = Math.max(1, getLeagueRoundCount(career));
+  const division = getCareerDivision(career);
   const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
   const wins = career.results.filter((r) =>
     (r.homeClubId === career.clubId && r.homeGoals > r.awayGoals) ||
@@ -46,7 +48,7 @@ export default function CareerScreen() {
             <Feather name="user" size={28} color="#79ef91" />
           </View>
           <Text style={styles.coach}>{career.coachName}</Text>
-          <Text style={styles.club}>{club?.name ?? 'Clube'} · Temporada {career.season}</Text>
+          <Text style={styles.club}>{club?.name ?? 'Clube'} · {division?.name ?? 'Liga'} · Temporada {career.season}</Text>
           <View style={styles.trust}>
             <Text style={styles.trustLabel}>Confiança da diretoria</Text>
             <Text style={styles.trustValue}>{career.boardTrust}%</Text>
@@ -55,7 +57,7 @@ export default function CareerScreen() {
 
         <View style={styles.grid}>
           <Panel style={styles.metric}><Text style={styles.metricLabel}>POSIÇÃO</Text><Text style={styles.metricValue}>{position > 0 ? position + 'º' : '—'}</Text></Panel>
-          <Panel style={styles.metric}><Text style={styles.metricLabel}>RODADA</Text><Text style={styles.metricValue}>{career.roundIndex + 1}/{LEAGUE_ROUNDS}</Text></Panel>
+          <Panel style={styles.metric}><Text style={styles.metricLabel}>RODADA</Text><Text style={styles.metricValue}>{Math.min(career.roundIndex + 1, leagueRounds)}/{leagueRounds}</Text></Panel>
           <Panel style={styles.metric}><Text style={styles.metricLabel}>VITÓRIAS</Text><Text style={styles.metricValue}>{wins}</Text></Panel>
           <Panel style={styles.metric}><Text style={styles.metricLabel}>EMPATES</Text><Text style={styles.metricValue}>{draws}</Text></Panel>
           <Panel style={styles.metric}><Text style={styles.metricLabel}>DERROTAS</Text><Text style={styles.metricValue}>{losses}</Text></Panel>
