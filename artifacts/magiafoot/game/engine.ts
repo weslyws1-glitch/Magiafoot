@@ -2172,16 +2172,17 @@ function processSquadSocialDynamics(career: Career): Career {
 }
 
 function advanceToNextSeason(career: Career): Career {
-  const standings = calculateStandings(career.results);
+  const standings = calculateCareerStandings(career);
+  const seasonRounds = Math.max(1, getLeagueRoundCount(career));
   const userRow = standings.find((row) => row.club.id === career.clubId);
   const champion = standings[0];
   const completedSeason = career.season;
   const completedYear = seasonYear(completedSeason);
 
   const players = career.players.map((player) => {
-    const remainingContract = Math.max(0, (player.contractEndRound ?? LEAGUE_ROUNDS) - LEAGUE_ROUNDS);
+    const remainingContract = Math.max(0, (player.contractEndRound ?? seasonRounds) - seasonRounds);
     const remainingLoan = typeof player.loanedOutUntilRound === 'number'
-      ? Math.max(0, player.loanedOutUntilRound - LEAGUE_ROUNDS)
+      ? Math.max(0, player.loanedOutUntilRound - seasonRounds)
       : 0;
     const loanContinues = player.status === 'loaned' && remainingLoan > 0;
     return {
@@ -2196,7 +2197,7 @@ function advanceToNextSeason(career: Career): Career {
       loanClubName: loanContinues ? player.loanClubName ?? null : null,
       contractEndRound: remainingContract,
       promisedMinutesUntilRound: null,
-      lastSocialEventRound: (player.lastSocialEventRound ?? -99) - LEAGUE_ROUNDS,
+      lastSocialEventRound: (player.lastSocialEventRound ?? -99) - seasonRounds,
       seasonStats: { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedMatches: 0 },
     };
   });
@@ -2209,17 +2210,17 @@ function advanceToNextSeason(career: Career): Career {
     : lineup[0]?.playerId ?? '';
 
   const shiftStaff = (people: AdministrativeProfessional[]) => people
-    .filter((person) => person.contractEndRound > LEAGUE_ROUNDS)
+    .filter((person) => person.contractEndRound > seasonRounds)
     .map((person) => ({
       ...person,
-      hiredRound: Math.max(0, person.hiredRound - LEAGUE_ROUNDS),
-      contractEndRound: person.contractEndRound - LEAGUE_ROUNDS,
+      hiredRound: Math.max(0, person.hiredRound - seasonRounds),
+      contractEndRound: person.contractEndRound - seasonRounds,
     }));
 
   const historyEntry = {
     season: completedSeason,
     year: completedYear,
-    finalPosition: userRow ? standings.findIndex((row) => row.club.id === career.clubId) + 1 : CLUBS.length,
+    finalPosition: userRow ? standings.findIndex((row) => row.club.id === career.clubId) + 1 : career.leagueClubIds.length,
     points: userRow?.points ?? 0,
     wins: userRow?.wins ?? 0,
     draws: userRow?.draws ?? 0,
@@ -2238,7 +2239,10 @@ function advanceToNextSeason(career: Career): Career {
     benchIds,
     captainId: nextCaptain,
     results: [],
-    leagueFixtures: balanceClubVenueSequence(makeLeagueSchedule(completedSeason + 1), career.clubId),
+    leagueFixtures: balanceClubVenueSequence(
+      makeLeagueSchedule(completedSeason + 1, career.divisionId, career.clubId, career.leagueClubIds),
+      career.clubId,
+    ),
     seasonHistory: [...(career.seasonHistory ?? []), historyEntry],
     liveMatch: null,
     playerTransferOffers: [],
@@ -2261,13 +2265,13 @@ function advanceToNextSeason(career: Career): Career {
       seasonSponsorshipIncome: 0,
     },
     legalWorkloadEvents: Math.max(0, Math.floor((career.legalWorkloadEvents ?? 0) * 0.35)),
-    lastNews: 'A temporada ' + completedYear + ' terminou. A temporada ' + (completedYear + 1) + ' começou com um novo calendário de 38 rodadas.',
+    lastNews: 'A temporada ' + completedYear + ' terminou. A temporada ' + (completedYear + 1) + ' começou com um novo calendário de ' + seasonRounds + ' rodadas.',
   };
 
   next = addCareerNews(
     next,
     'Nova temporada iniciada',
-    'Temporada ' + (completedYear + 1) + ': calendário renovado, elenco reapresentado e 38 rodadas pela frente.',
+    'Temporada ' + (completedYear + 1) + ': calendário renovado, elenco reapresentado e ' + seasonRounds + ' rodadas pela frente.',
     'club',
   );
   next = addCareerNews(
