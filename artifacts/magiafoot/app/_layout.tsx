@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { CareerProvider } from '@/context/CareerContext';
+import { CareerProvider, useCareer } from '@/context/CareerContext';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -12,7 +12,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -21,6 +21,20 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const router = useRouter();
+  const segments = useSegments();
+  const { isReady, cloudEmail } = useCareer();
+
+  useEffect(() => {
+    if (!isReady) return;
+    const firstSegment = segments[0];
+    const isAccountEntry = firstSegment === 'account-save';
+
+    if (!cloudEmail && !isAccountEntry) {
+      router.replace('/account-save');
+    }
+  }, [isReady, cloudEmail, segments, router]);
+
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Voltar' }} />
   );
