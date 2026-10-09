@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { calculateStandings, formatFixtureDate, getCurrentFixture, seasonYear } from '@/game/engine';
+import { calculateCareerStandings, formatFixtureDate, getCareerDivision, getCurrentFixture, getLeagueRoundCount, seasonYear } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 type Shortcut = {
@@ -49,7 +49,7 @@ export default function HomeScreen() {
     const fixture = getCurrentFixture(career);
     const homeClub = fixture ? getClub(fixture.homeClubId) : undefined;
     const awayClub = fixture ? getClub(fixture.awayClubId) : undefined;
-    const standings = calculateStandings(career.results);
+    const standings = calculateCareerStandings(career);
     const userIndex = standings.findIndex((row) => row.club.id === career.clubId);
     const start = Math.max(0, userIndex - 2);
     const end = Math.min(standings.length, userIndex + 3);
@@ -100,7 +100,9 @@ export default function HomeScreen() {
     );
   }
 
-  const currentRound = Math.min(career.roundIndex + 1, dashboard.standings.length * 2 - 2);
+  const totalRounds = getLeagueRoundCount(career);
+  const division = getCareerDivision(career);
+  const currentRound = Math.min(career.roundIndex + 1, Math.max(1, totalRounds));
   const openMatch = () => {
     if (!dashboard.fixture) return;
     if (!career.liveMatch) startCurrentMatch();
@@ -121,7 +123,7 @@ export default function HomeScreen() {
             <Text style={styles.accountAccessText}>CONTA</Text>
           </Pressable>
         </View>
-        <Text style={styles.seasonLine}>{seasonYear(career.season)} • 3ª Divisão • Rodada {currentRound}</Text>
+        <Text style={styles.seasonLine}>{seasonYear(career.season)} • {division?.name ?? 'Liga'} • Rodada {currentRound}</Text>
       </View>
 
       <View style={styles.shortcutGrid}>
@@ -163,7 +165,7 @@ export default function HomeScreen() {
         <View style={styles.nextMatchHeader}>
           <View>
             <Text style={styles.nextMatchKicker}>PRÓXIMO JOGO</Text>
-            <Text style={styles.nextMatchCompetition}>3ª Divisão • Rodada {currentRound}</Text>
+            <Text style={styles.nextMatchCompetition}>{division?.name ?? 'Liga'} • Rodada {currentRound}</Text>
           </View>
           <View style={[styles.homeAwayBadge, isHome ? styles.homeBadge : styles.awayBadge]}>
             <Text style={[styles.homeAwayText, !isHome && styles.awayText]}>{isHome ? 'CASA' : 'FORA'}</Text>
