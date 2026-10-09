@@ -79,7 +79,13 @@ export default function HomeScreen() {
     return (
       <Screen style={{ paddingTop: insets.top + (Platform.OS === 'web' ? 28 : 16) }}>
         <View style={styles.brandLine}>
-          <Text style={[styles.brandName, { color: colors.foreground }]}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+          <View style={styles.brandTopRow}>
+            <Text style={[styles.brandName, { color: colors.foreground }]}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+            <Pressable onPress={() => router.push('/account-save' as never)} style={styles.accountAccess}>
+              <Feather name="shield" size={16} color="#79ef91" />
+              <Text style={styles.accountAccessText}>CONTA</Text>
+            </Pressable>
+          </View>
           <Text style={[styles.seasonLine, { color: colors.mutedForeground }]}>Manager de futebol</Text>
         </View>
         <View style={[styles.emptyCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -108,7 +114,13 @@ export default function HomeScreen() {
   return (
     <Screen style={[styles.page, { paddingTop: insets.top + (Platform.OS === 'web' ? 24 : 14), backgroundColor: '#07150d' }]}>
       <View style={styles.headerBlock}>
-        <Text style={styles.brandName}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+        <View style={styles.brandTopRow}>
+          <Text style={styles.brandName}>MAGIA<Text style={{ color: '#76f08f' }}>FOOT</Text></Text>
+          <Pressable onPress={() => router.push('/account-save' as never)} style={styles.accountAccess}>
+            <Feather name="shield" size={16} color="#79ef91" />
+            <Text style={styles.accountAccessText}>CONTA</Text>
+          </Pressable>
+        </View>
         <Text style={styles.seasonLine}>{seasonYear(career.season)} • 3ª Divisão • Rodada {currentRound}</Text>
       </View>
 
@@ -258,6 +270,9 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, fontSize: 12 },
   headerBlock: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#234334' },
   brandLine: { gap: 8, marginBottom: 12 },
+  brandTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  accountAccess: { minHeight: 38, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#315f3f', backgroundColor: '#10291d', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  accountAccessText: { color: '#79ef91', fontSize: 7.2, fontWeight: '900', letterSpacing: 0.6 },
   brandName: { color: '#f3f7f3', fontSize: 37, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
   seasonLine: { color: '#9fb2a5', fontSize: 18, fontWeight: '500', marginTop: 4 },
   shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
