@@ -321,7 +321,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }, [ensureFreshCloudSession]);
 
   useEffect(() => {
-    if (!career || !identity || !cloudSession || cloudStatus === 'connecting' || cloudStatus === 'syncing') return;
+    if (!career || !identity || !cloudSession) return;
     const timer = setTimeout(async () => {
       const session = await ensureFreshCloudSession();
       if (!session) return;
@@ -336,7 +336,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       }
     }, 12000);
     return () => clearTimeout(timer);
-  }, [career, identity, cloudSession, cloudStatus, ensureFreshCloudSession]);
+  }, [career, identity, cloudSession, ensureFreshCloudSession]);
 
   const createNewCareer = useCallback((coachName: string, clubId: string) => {
     if (!isReady) return;
