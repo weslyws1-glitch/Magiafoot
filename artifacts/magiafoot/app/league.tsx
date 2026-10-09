@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
-import { calculateStandings } from '@/game/engine';
+import { calculateCareerStandings, getCareerDivision } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 export default function LeagueScreen() {
@@ -13,11 +13,12 @@ export default function LeagueScreen() {
     return <><GameHeader title="Classificação" /><Screen><Text style={{ color: colors.foreground }}>Crie uma carreira para acompanhar a liga.</Text></Screen></>;
   }
 
-  const standings = calculateStandings(career.results);
+  const standings = calculateCareerStandings(career);
+  const division = getCareerDivision(career);
 
   return (
     <>
-      <GameHeader title="Classificação" eyebrow="3ª DIVISÃO" />
+      <GameHeader title="Classificação" eyebrow={(division?.shortName ?? division?.name ?? 'LIGA').toUpperCase()} />
       <Screen>
         <Panel style={styles.table}>
           <View style={styles.header}>
@@ -48,7 +49,7 @@ export default function LeagueScreen() {
             );
           })}
         </Panel>
-        <Text style={styles.legend}>1º colocado lidera a 3ª Divisão. Critérios: pontos, saldo de gols e gols marcados.</Text>
+        <Text style={styles.legend}>{division?.note ?? 'Critérios: pontos, saldo de gols e gols marcados.'}</Text>
       </Screen>
     </>
   );
