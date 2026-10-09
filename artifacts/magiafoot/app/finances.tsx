@@ -25,7 +25,11 @@ export default function FinancesScreen() {
   const expectedAttendance = Math.round(capacity * 0.72);
   const expectedGate = expectedAttendance * (career.ticketPrice ?? club?.ticketPrice ?? 0);
   const sponsorPerMatch = (career.sponsorships?.contracts ?? []).reduce((sum, contract) => sum + contract.perMatch, 0);
-  const adminWeekly = Object.values(career.administrationStaff ?? {}).flat().reduce((sum, person) => sum + person.salary, 0);
+  const adminWeekly = [
+    ...(career.administrationStaff?.board ?? []),
+    ...(career.administrationStaff?.finance ?? []),
+    ...(career.administrationStaff?.legal ?? []),
+  ].reduce((sum, person) => sum + person.salary, 0);
   const estimatedMonthlyIncome = expectedGate * 2 + sponsorPerMatch * 4;
   const estimatedMonthlyCosts = wages * 4 + adminWeekly * 4;
   const monthlyResult = estimatedMonthlyIncome - estimatedMonthlyCosts;
