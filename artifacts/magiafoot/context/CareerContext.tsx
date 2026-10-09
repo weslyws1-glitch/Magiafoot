@@ -42,6 +42,16 @@ import {
 import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
 import { getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
 import type { LocalIdentity, SaveHealth } from '@/game/save-protection';
+import {
+  fetchCloudProfile,
+  refreshCloudSession,
+  restoreLatestCareerFromCloud,
+  saveCareerToCloud,
+  signInCloudAccount,
+  signOutCloudAccount,
+  signUpCloudAccount,
+} from '@/game/cloud-save';
+import type { CloudProfile, CloudSession } from '@/game/cloud-save';
 
 interface CareerContextValue {
   career: Career | null;
@@ -52,6 +62,16 @@ interface CareerContextValue {
   lastSavedAt: string | null;
   backupCount: number;
   manualSave: () => Promise<boolean>;
+  cloudEmail: string | null;
+  cloudMagiaId: string | null;
+  cloudStatus: 'signed_out' | 'connecting' | 'connected' | 'syncing' | 'error';
+  cloudLastSavedAt: string | null;
+  cloudMessage: string | null;
+  createCloudAccount: (email: string, password: string) => Promise<boolean>;
+  signInCloud: (email: string, password: string) => Promise<boolean>;
+  signOutCloud: () => Promise<void>;
+  syncCloudNow: () => Promise<boolean>;
+  restoreCloudLatest: () => Promise<boolean>;
   createNewCareer: (coachName: string, clubId: string) => void;
   startCurrentMatch: () => void;
   advanceCurrentMatch: (minutes?: number) => void;
@@ -102,6 +122,11 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const [saveHealth, setSaveHealth] = useState<SaveHealth>('empty');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [backupCount, setBackupCount] = useState(0);
+  const [cloudSession, setCloudSession] = useState<CloudSession | null>(null);
+  const [cloudProfile, setCloudProfile] = useState<CloudProfile | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<'signed_out' | 'connecting' | 'connected' | 'syncing' | 'error'>('signed_out');
+  const [cloudLastSavedAt, setCloudLastSavedAt] = useState<string | null>(null);
+  const [cloudMessage, setCloudMessage] = useState<string | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const revisionRef = useRef(0);
 
@@ -174,8 +199,144 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       });
 
     await saveQueue.current;
+    if (succeeded && cloudSession) {
+      const session = await refreshCloudSession(cloudSession);
+      if (session) {
+        if (session !== cloudSession) setCloudSession(session);
+        setCloudStatus('syncing');
+        const cloudSaved = await saveCareerToCloud(session, snapshot, identity.installationId, 'manual');
+        if (cloudSaved) {
+          setCloudLastSavedAt(cloudSaved.savedAt);
+          setCloudStatus('connected');
+          setCloudMessage('Save local e nuvem atualizados.');
+        } else {
+          setCloudStatus('error');
+          setCloudMessage('Save local concluído, mas a nuvem não respondeu.');
+        }
+      }
+    }
     return succeeded;
-  }, [career, identity]);
+  }, [career, identity, cloudSession]);
+
+  const ensureFreshCloudSession = useCallback(async () => {
+    if (!cloudSession) return null;
+    const refreshed = await refreshCloudSession(cloudSession);
+    if (!refreshed) {
+      setCloudSession(null);
+      setCloudProfile(null);
+      setCloudStatus('signed_out');
+      setCloudMessage('Sua sessão expirou. Entre novamente para continuar a sincronização.');
+      return null;
+    }
+    if (refreshed !== cloudSession) setCloudSession(refreshed);
+    return refreshed;
+  }, [cloudSession]);
+
+  const hydrateCloudProfile = useCallback(async (session: CloudSession) => {
+    const profile = await fetchCloudProfile(session);
+    if (!profile) return null;
+    setCloudProfile(profile);
+    return profile;
+  }, []);
+
+  const createCloudAccount = useCallback(async (email: string, password: string) => {
+    setCloudStatus('connecting');
+    setCloudMessage(null);
+    const result = await signUpCloudAccount(email, password);
+    setCloudMessage(result.message);
+    if (!result.ok) {
+      setCloudStatus('error');
+      return false;
+    }
+    if (!result.session) {
+      setCloudStatus('signed_out');
+      return true;
+    }
+    setCloudSession(result.session);
+    await hydrateCloudProfile(result.session);
+    setCloudStatus('connected');
+    return true;
+  }, [hydrateCloudProfile]);
+
+  const signInCloud = useCallback(async (email: string, password: string) => {
+    setCloudStatus('connecting');
+    setCloudMessage(null);
+    const result = await signInCloudAccount(email, password);
+    setCloudMessage(result.message);
+    if (!result.ok) {
+      setCloudStatus('error');
+      return false;
+    }
+    setCloudSession(result.session);
+    await hydrateCloudProfile(result.session);
+    setCloudStatus('connected');
+    return true;
+  }, [hydrateCloudProfile]);
+
+  const signOutCloud = useCallback(async () => {
+    if (cloudSession) await signOutCloudAccount(cloudSession);
+    setCloudSession(null);
+    setCloudProfile(null);
+    setCloudLastSavedAt(null);
+    setCloudStatus('signed_out');
+    setCloudMessage('Conta desconectada deste aparelho.');
+  }, [cloudSession]);
+
+  const syncCloudNow = useCallback(async () => {
+    if (!career || !identity) return false;
+    const session = await ensureFreshCloudSession();
+    if (!session) return false;
+
+    setCloudStatus('syncing');
+    const saved = await saveCareerToCloud(session, career, identity.installationId, 'manual');
+    if (!saved) {
+      setCloudStatus('error');
+      setCloudMessage('Não foi possível enviar a carreira para a nuvem.');
+      return false;
+    }
+
+    setCloudLastSavedAt(saved.savedAt);
+    setCloudStatus('connected');
+    setCloudMessage('Carreira sincronizada e protegida na nuvem.');
+    return true;
+  }, [career, identity, ensureFreshCloudSession]);
+
+  const restoreCloudLatest = useCallback(async () => {
+    const session = await ensureFreshCloudSession();
+    if (!session) return false;
+
+    setCloudStatus('syncing');
+    const restored = await restoreLatestCareerFromCloud(session);
+    if (!restored) {
+      setCloudStatus('error');
+      setCloudMessage('Nenhum backup válido foi encontrado na nuvem.');
+      return false;
+    }
+
+    setCareer(restored.career);
+    setCloudLastSavedAt(restored.savedAt);
+    setCloudStatus('connected');
+    setCloudMessage('Backup da nuvem restaurado neste aparelho.');
+    return true;
+  }, [ensureFreshCloudSession]);
+
+  useEffect(() => {
+    if (!career || !identity || !cloudSession || cloudStatus === 'connecting' || cloudStatus === 'syncing') return;
+    const timer = setTimeout(async () => {
+      const session = await ensureFreshCloudSession();
+      if (!session) return;
+      setCloudStatus('syncing');
+      const saved = await saveCareerToCloud(session, career, identity.installationId, 'auto');
+      if (saved) {
+        setCloudLastSavedAt(saved.savedAt);
+        setCloudStatus('connected');
+      } else {
+        setCloudStatus('error');
+        setCloudMessage('A sincronização automática falhou. Seu save local continua protegido.');
+      }
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, [career, identity, cloudSession, cloudStatus, ensureFreshCloudSession]);
 
   const createNewCareer = useCallback((coachName: string, clubId: string) => {
     if (!isReady) return;
@@ -366,11 +527,21 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     career,
     isReady,
     storageWarning,
-    magiaId: identity?.magiaId ?? null,
+    magiaId: cloudProfile?.magiaId ?? identity?.magiaId ?? null,
     saveHealth,
     lastSavedAt,
     backupCount,
     manualSave,
+    cloudEmail: cloudSession?.email ?? null,
+    cloudMagiaId: cloudProfile?.magiaId ?? null,
+    cloudStatus,
+    cloudLastSavedAt,
+    cloudMessage,
+    createCloudAccount,
+    signInCloud,
+    signOutCloud,
+    syncCloudNow,
+    restoreCloudLatest,
     createNewCareer,
     startCurrentMatch,
     advanceCurrentMatch,
@@ -414,6 +585,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
     setTactics, signPlayer, startCurrentMatch, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
+    cloudSession, cloudProfile, cloudStatus, cloudLastSavedAt, cloudMessage,
+    createCloudAccount, signInCloud, signOutCloud, syncCloudNow, restoreCloudLatest,
   ]);
 
   return <CareerContext.Provider value={value}>{children}</CareerContext.Provider>;
