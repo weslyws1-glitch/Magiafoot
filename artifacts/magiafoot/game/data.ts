@@ -46,6 +46,33 @@ export function getDivision(id: string) {
   return getDivisionDefinition(id) ?? getInternationalDivision(id);
 }
 
+export function buildContinentalSeedPool(size = 32): Club[] {
+  const topDivision = CLUBS.filter((club) =>
+    club.selectable !== false
+    && club.confederation === 'CONMEBOL'
+    && club.divisionLevel === 1
+  );
+  const byCountry = new Map<string, Club[]>();
+  for (const club of topDivision) {
+    const list = byCountry.get(club.country) ?? [];
+    list.push(club);
+    byCountry.set(club.country, list);
+  }
+
+  const selected: Club[] = [];
+  for (const clubs of byCountry.values()) {
+    clubs.sort((a, b) => (b.prestige ?? b.rating) - (a.prestige ?? a.rating) || b.rating - a.rating);
+    selected.push(...clubs.slice(0, 2));
+  }
+
+  const used = new Set(selected.map((club) => club.id));
+  const remaining = topDivision
+    .filter((club) => !used.has(club.id))
+    .sort((a, b) => (b.prestige ?? b.rating) - (a.prestige ?? a.rating) || b.rating - a.rating);
+
+  return [...selected, ...remaining].slice(0, size);
+}
+
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
   { name: 'Raul Venturi', position: 'GOL', age: 29, skill: 3 },
   { name: 'Nilo Serafim', position: 'GOL', age: 22, skill: -2 },
