@@ -3,26 +3,26 @@ import type { Club, FormationId, FormationOption, FormationSlot, Player, Positio
 export const LEAGUE_NAME = '3ª Divisão';
 
 export const CLUBS: Club[] = [
-  { id: 'aurora-vale', name: 'Aurora do Vale', country: 'Brasil', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
-  { id: 'lobos-azuis', name: 'Lobos Azuis', country: 'Brasil', city: 'Lago das Brumas', initials: 'LA', rating: 68, color: '#416b77', balance: 1_850_000, stadiumCapacity: 14_200, ticketPrice: 38 },
-  { id: 'mare-prata', name: 'Maré de Prata', country: 'Brasil', city: 'Costa da Lua', initials: 'MP', rating: 71, color: '#397984', balance: 2_100_000, stadiumCapacity: 20_000, ticketPrice: 40 },
-  { id: 'oncas-serra', name: 'Onças da Serra', country: 'Brasil', city: 'Serra do Luar', initials: 'OS', rating: 70, color: '#9d7738', balance: 1_900_000, stadiumCapacity: 15_500, ticketPrice: 36 },
-  { id: 'navegantes-sul', name: 'Navegantes do Sul', country: 'Brasil', city: 'Porto das Nuvens', initials: 'NS', rating: 66, color: '#587f92', balance: 1_550_000, stadiumCapacity: 13_000, ticketPrice: 34 },
-  { id: 'candeia-fc', name: 'Candeia FC', country: 'Brasil', city: 'Vila Candeia', initials: 'CF', rating: 69, color: '#836252', balance: 1_720_000, stadiumCapacity: 16_200, ticketPrice: 35 },
-  { id: 'pedra-alta', name: 'Pedra Alta AC', country: 'Brasil', city: 'Campos de Pedra', initials: 'PA', rating: 64, color: '#78736c', balance: 1_300_000, stadiumCapacity: 11_800, ticketPrice: 30 },
-  { id: 'ventania-esporte', name: 'Ventania Esporte', country: 'Brasil', city: 'Vale dos Ventos', initials: 'VE', rating: 67, color: '#667844', balance: 1_480_000, stadiumCapacity: 12_600, ticketPrice: 32 },
-  { id: 'imperial-rio', name: 'Imperial Rio', country: 'Brasil', city: 'Rio Imperial', initials: 'IR', rating: 72, color: '#7a2f45', balance: 2250000, stadiumCapacity: 19600, ticketPrice: 41 },
-  { id: 'uniao-carioca', name: 'União Carioca', country: 'Brasil', city: 'Santa Marina', initials: 'UC', rating: 70, color: '#315c8c', balance: 1980000, stadiumCapacity: 17800, ticketPrice: 39 },
-  { id: 'ferro-norte', name: 'Ferro Norte', country: 'Brasil', city: 'Vila Ferro', initials: 'FN', rating: 66, color: '#5d5d63', balance: 1520000, stadiumCapacity: 13900, ticketPrice: 33 },
-  { id: 'atletico-cerrado', name: 'Atlético Cerrado', country: 'Brasil', city: 'Campo Dourado', initials: 'AC', rating: 69, color: '#8a6532', balance: 1780000, stadiumCapacity: 16700, ticketPrice: 35 },
-  { id: 'real-pampas', name: 'Real dos Pampas', country: 'Brasil', city: 'Estância Real', initials: 'RP', rating: 71, color: '#4b6d50', balance: 2050000, stadiumCapacity: 18900, ticketPrice: 39 },
-  { id: 'porto-verde', name: 'Porto Verde', country: 'Brasil', city: 'Porto Verde', initials: 'PV', rating: 65, color: '#2f7056', balance: 1420000, stadiumCapacity: 12800, ticketPrice: 32 },
-  { id: 'serra-branca', name: 'Serra Branca', country: 'Brasil', city: 'Alto da Serra', initials: 'SB', rating: 68, color: '#d9d9d1', balance: 1690000, stadiumCapacity: 15100, ticketPrice: 34 },
-  { id: 'guara-central', name: 'Guará Central', country: 'Brasil', city: 'Nova Central', initials: 'GC', rating: 67, color: '#a83f2f', balance: 1610000, stadiumCapacity: 14500, ticketPrice: 34 },
-  { id: 'vila-oeste', name: 'Vila Oeste', country: 'Brasil', city: 'Oeste Novo', initials: 'VO', rating: 64, color: '#704f94', balance: 1260000, stadiumCapacity: 11900, ticketPrice: 30 },
-  { id: 'rio-dourado', name: 'Rio Dourado', country: 'Brasil', city: 'Dourado das Águas', initials: 'RD', rating: 70, color: '#b58c2d', balance: 1920000, stadiumCapacity: 17200, ticketPrice: 37 },
-  { id: 'montanha-fc', name: 'Montanha FC', country: 'Brasil', city: 'Monte Azul', initials: 'MF', rating: 66, color: '#3f5575', balance: 1470000, stadiumCapacity: 13300, ticketPrice: 32 },
-  { id: 'estacao-1912', name: 'Estação 1912', country: 'Brasil', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
+  { id: 'aurora-vale', name: 'Aurora do Vale', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
+  { id: 'lobos-azuis', name: 'Lobos Azuis', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Lago das Brumas', initials: 'LA', rating: 68, color: '#416b77', balance: 1_850_000, stadiumCapacity: 14_200, ticketPrice: 38 },
+  { id: 'mare-prata', name: 'Maré de Prata', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Costa da Lua', initials: 'MP', rating: 71, color: '#397984', balance: 2_100_000, stadiumCapacity: 20_000, ticketPrice: 40 },
+  { id: 'oncas-serra', name: 'Onças da Serra', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Serra do Luar', initials: 'OS', rating: 70, color: '#9d7738', balance: 1_900_000, stadiumCapacity: 15_500, ticketPrice: 36 },
+  { id: 'navegantes-sul', name: 'Navegantes do Sul', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Porto das Nuvens', initials: 'NS', rating: 66, color: '#587f92', balance: 1_550_000, stadiumCapacity: 13_000, ticketPrice: 34 },
+  { id: 'candeia-fc', name: 'Candeia FC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vila Candeia', initials: 'CF', rating: 69, color: '#836252', balance: 1_720_000, stadiumCapacity: 16_200, ticketPrice: 35 },
+  { id: 'pedra-alta', name: 'Pedra Alta AC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Campos de Pedra', initials: 'PA', rating: 64, color: '#78736c', balance: 1_300_000, stadiumCapacity: 11_800, ticketPrice: 30 },
+  { id: 'ventania-esporte', name: 'Ventania Esporte', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vale dos Ventos', initials: 'VE', rating: 67, color: '#667844', balance: 1_480_000, stadiumCapacity: 12_600, ticketPrice: 32 },
+  { id: 'imperial-rio', name: 'Imperial Rio', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Rio Imperial', initials: 'IR', rating: 72, color: '#7a2f45', balance: 2250000, stadiumCapacity: 19600, ticketPrice: 41 },
+  { id: 'uniao-carioca', name: 'União Carioca', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Santa Marina', initials: 'UC', rating: 70, color: '#315c8c', balance: 1980000, stadiumCapacity: 17800, ticketPrice: 39 },
+  { id: 'ferro-norte', name: 'Ferro Norte', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vila Ferro', initials: 'FN', rating: 66, color: '#5d5d63', balance: 1520000, stadiumCapacity: 13900, ticketPrice: 33 },
+  { id: 'atletico-cerrado', name: 'Atlético Cerrado', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Campo Dourado', initials: 'AC', rating: 69, color: '#8a6532', balance: 1780000, stadiumCapacity: 16700, ticketPrice: 35 },
+  { id: 'real-pampas', name: 'Real dos Pampas', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estância Real', initials: 'RP', rating: 71, color: '#4b6d50', balance: 2050000, stadiumCapacity: 18900, ticketPrice: 39 },
+  { id: 'porto-verde', name: 'Porto Verde', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Porto Verde', initials: 'PV', rating: 65, color: '#2f7056', balance: 1420000, stadiumCapacity: 12800, ticketPrice: 32 },
+  { id: 'serra-branca', name: 'Serra Branca', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Alto da Serra', initials: 'SB', rating: 68, color: '#d9d9d1', balance: 1690000, stadiumCapacity: 15100, ticketPrice: 34 },
+  { id: 'guara-central', name: 'Guará Central', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Nova Central', initials: 'GC', rating: 67, color: '#a83f2f', balance: 1610000, stadiumCapacity: 14500, ticketPrice: 34 },
+  { id: 'vila-oeste', name: 'Vila Oeste', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Oeste Novo', initials: 'VO', rating: 64, color: '#704f94', balance: 1260000, stadiumCapacity: 11900, ticketPrice: 30 },
+  { id: 'rio-dourado', name: 'Rio Dourado', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Dourado das Águas', initials: 'RD', rating: 70, color: '#b58c2d', balance: 1920000, stadiumCapacity: 17200, ticketPrice: 37 },
+  { id: 'montanha-fc', name: 'Montanha FC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Monte Azul', initials: 'MF', rating: 66, color: '#3f5575', balance: 1470000, stadiumCapacity: 13300, ticketPrice: 32 },
+  { id: 'estacao-1912', name: 'Estação 1912', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
 ];
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
@@ -169,11 +169,21 @@ function makePlayer(
 }
 
 export function makeRoster(club: Club): Player[] {
-  return ROSTER_SEED.map((player, index) => makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index));
+  return ROSTER_SEED.map((player, index) => ({
+    ...makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index),
+    nationality: club.country,
+    nationalityCode: club.countryCode,
+    currentClubId: club.id,
+  }));
 }
 
 export function makeMarketPlayers(club: Club): Player[] {
-  return MARKET_SEED.map((player, index) => makePlayer(player, `market-${club.id}-${index + 1}`, club.rating - 1, index + 51));
+  return MARKET_SEED.map((player, index) => ({
+    ...makePlayer(player, `market-${club.id}-${index + 1}`, club.rating - 1, index + 51),
+    nationality: club.country,
+    nationalityCode: club.countryCode,
+    currentClubId: null,
+  }));
 }
 
 function positionMatchScore(player: Player, target: Position): number {
