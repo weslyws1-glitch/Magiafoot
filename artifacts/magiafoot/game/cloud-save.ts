@@ -192,20 +192,22 @@ export async function saveCareerToCloud(
   const payload = JSON.parse(payloadText);
   const checksum = sha256(canonicalJson(payload));
 
-  const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/save_career_version', {
+  const response = await fetch(SUPABASE_URL + '/rest/v1/career_save_versions?select=revision,saved_at', {
     method: 'POST',
     headers: {
       apikey: SUPABASE_PUBLISHABLE_KEY,
       Authorization: 'Bearer ' + session.accessToken,
       'Content-Type': 'application/json',
+      Prefer: 'return=representation',
     },
     body: JSON.stringify({
-      p_career_id: career.id,
-      p_payload: payload,
-      p_checksum: checksum,
-      p_schema_version: career.schemaVersion,
-      p_device_id: deviceId,
-      p_reason: reason,
+      user_id: session.userId,
+      career_id: career.id,
+      schema_version: career.schemaVersion,
+      checksum,
+      payload,
+      device_id: deviceId,
+      reason,
     }),
   });
 
