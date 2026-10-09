@@ -1724,8 +1724,65 @@ function addCareerNews(career: Career, title: string, body: string, category: 'c
     category,
     title,
     body,
+    visualKey: category === 'match' ? 'match' as const : category === 'market' ? 'market' as const : category === 'sponsor' ? 'sponsor' as const : 'club' as const,
+    featuredClubId: career.clubId,
   };
   return { ...career, newsFeed: [item, ...(career.newsFeed ?? [])].slice(0, 50) };
+}
+
+function addRoundJournal(career: Career, roundResults: LeagueResult[]): Career {
+  const standings = calculateStandings(career.results, career.leagueClubIds);
+  const leader = standings[0]?.club;
+  const userResult = roundResults.find((result) => result.homeClubId === career.clubId || result.awayClubId === career.clubId);
+  let next = career;
+
+  if (userResult) {
+    const userHome = userResult.homeClubId === career.clubId;
+    const gf = userHome ? userResult.homeGoals : userResult.awayGoals;
+    const ga = userHome ? userResult.awayGoals : userResult.homeGoals;
+    const opponentId = userHome ? userResult.awayClubId : userResult.homeClubId;
+    const opponent = getClub(opponentId);
+    const club = getClub(career.clubId);
+    const position = standings.findIndex((row) => row.club.id === career.clubId) + 1;
+    const title = gf > ga
+      ? (club?.name ?? 'Seu clube') + ' vence e ganha força na tabela'
+      : gf === ga
+        ? (club?.name ?? 'Seu clube') + ' soma ponto em duelo equilibrado'
+        : (club?.name ?? 'Seu clube') + ' tropeça e liga alerta para a sequência';
+    const body = (club?.name ?? 'O clube') + ' fez ' + gf + ' x ' + ga + ' contra ' + (opponent?.name ?? 'o adversário') + ' e aparece em ' + position + 'º lugar após a rodada.';
+    next = addCareerNews(next, title, body, 'match');
+  }
+
+  const highlight = roundResults
+    .filter((result) => result.homeClubId !== career.clubId && result.awayClubId !== career.clubId)
+    .map((result) => ({ result, goals: result.homeGoals + result.awayGoals, diff: Math.abs(result.homeGoals - result.awayGoals) }))
+    .sort((a, b) => b.diff - a.diff || b.goals - a.goals)[0];
+
+  if (highlight && (highlight.diff >= 3 || highlight.goals >= 5)) {
+    const home = getClub(highlight.result.homeClubId);
+    const away = getClub(highlight.result.awayClubId);
+    next = addCareerNews(
+      next,
+      'Rodada tem resultado que chama atenção',
+      (home?.name ?? 'Mandante') + ' ' + highlight.result.homeGoals + ' x ' + highlight.result.awayGoals + ' ' + (away?.name ?? 'Visitante') + ' foi um dos placares de maior destaque da rodada.',
+      'match',
+    );
+  }
+
+  if (leader && career.roundIndex % 3 === 0) {
+    const item = {
+      id: 'news-leader-' + career.season + '-' + career.roundIndex + '-' + leader.id,
+      roundIndex: career.roundIndex,
+      category: 'match' as const,
+      title: leader.name + ' aparece no topo da competição',
+      body: 'A disputa pela liderança esquenta. ' + leader.name + ' fecha a rodada na primeira posição da ' + (getDivision(career.divisionId)?.name ?? 'liga') + '.',
+      visualKey: 'competition' as const,
+      featuredClubId: leader.id,
+    };
+    next = { ...next, newsFeed: [item, ...(next.newsFeed ?? [])].slice(0, 50) };
+  }
+
+  return next;
 }
 
 function recentFormScore(career: Career): number {
@@ -2436,6 +2493,7 @@ export function finalizeMatch(career: Career): Career {
   };
   if (gateIncome > 0) afterMatch = addFinanceEntry(afterMatch, { category: 'matchday', description: 'Bilheteria da rodada ' + (career.roundIndex + 1), amount: gateIncome });
   afterMatch = addFinanceEntry(afterMatch, { category: 'wages', description: 'Folha semanal do elenco', amount: -wageBill });
+  afterMatch = addRoundJournal(afterMatch, newResults);
   const settled = processSquadSocialDynamics(settleSponsorshipsAfterMatch(afterMatch, userWon));
   if (settled.roundIndex >= getLeagueRoundCount(settled)) return advanceToNextSeason(settled);
   return generatePlayerTransferOffers(settled);
