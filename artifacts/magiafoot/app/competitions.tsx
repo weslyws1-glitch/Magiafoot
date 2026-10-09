@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { ClubBadge, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { buildContinentalSeedPool } from '@/game/data';
-import { calculateCareerStandings, getCareerDivision, getLeagueRoundCount } from '@/game/engine';
+import { calculateCareerStandings, getCareerDivision, getLeagueRoundCount, seasonYear } from '@/game/engine';
 import { useColors } from '@/hooks/useColors';
 
 export default function CompetitionsScreen() {
@@ -28,7 +28,7 @@ export default function CompetitionsScreen() {
 
   return (
     <>
-      <GameHeader title="Competições" eyebrow="Temporada 2026" />
+      <GameHeader title="Competições" eyebrow={`Temporada ${seasonYear(career.season)}`} />
       <Screen>
         <Pressable onPress={() => router.push('/league')} style={styles.card}>
           <View style={styles.trophy}><Feather name="award" size={28} color="#79ef91" /></View>
