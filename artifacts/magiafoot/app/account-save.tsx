@@ -21,11 +21,18 @@ export default function AccountSaveScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (busy || !email.trim() || password.length < 8) return;
+    if (mode === 'signup' && password !== confirmPassword) {
+      setFormError('As senhas não coincidem. Digite a mesma senha nos dois campos.');
+      return;
+    }
+    setFormError(null);
     setBusy(true);
     const ok = mode === 'signup'
       ? await createCloudAccount(email, password, remember)
@@ -85,10 +92,10 @@ export default function AccountSaveScreen() {
 
       <View style={styles.authCard}>
         <View style={styles.tabs}>
-          <Pressable onPress={() => setMode('login')} style={[styles.tab, mode === 'login' && styles.tabActive]}>
+          <Pressable onPress={() => { setMode('login'); setConfirmPassword(''); setFormError(null); }} style={[styles.tab, mode === 'login' && styles.tabActive]}>
             <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>ENTRAR</Text>
           </Pressable>
-          <Pressable onPress={() => setMode('signup')} style={[styles.tab, mode === 'signup' && styles.tabActive]}>
+          <Pressable onPress={() => { setMode('signup'); setFormError(null); }} style={[styles.tab, mode === 'signup' && styles.tabActive]}>
             <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>CRIAR CONTA</Text>
           </Pressable>
         </View>
@@ -105,7 +112,10 @@ export default function AccountSaveScreen() {
         />
         <TextInput
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(value) => {
+            setPassword(value);
+            if (formError) setFormError(null);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
@@ -113,6 +123,24 @@ export default function AccountSaveScreen() {
           placeholderTextColor="#63766a"
           style={styles.input}
         />
+
+        {mode === 'signup' ? (
+          <TextInput
+            value={confirmPassword}
+            onChangeText={(value) => {
+              setConfirmPassword(value);
+              if (formError) setFormError(null);
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            placeholder="Confirme sua senha"
+            placeholderTextColor="#63766a"
+            style={[styles.input, confirmPassword.length > 0 && password !== confirmPassword && styles.inputError]}
+          />
+        ) : null}
+
+        {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
         <Pressable onPress={() => setRemember((value) => !value)} style={styles.rememberRow}>
           <View style={[styles.checkbox, remember && styles.checkboxOn]}>
@@ -125,9 +153,22 @@ export default function AccountSaveScreen() {
         </Pressable>
 
         <Pressable
-          disabled={busy || !email.trim() || password.length < 8}
+          disabled={
+            busy ||
+            !email.trim() ||
+            password.length < 8 ||
+            (mode === 'signup' && (confirmPassword.length < 8 || password !== confirmPassword))
+          }
           onPress={submit}
-          style={[styles.primaryButton, (busy || !email.trim() || password.length < 8) && styles.disabled]}
+          style={[
+            styles.primaryButton,
+            (
+              busy ||
+              !email.trim() ||
+              password.length < 8 ||
+              (mode === 'signup' && (confirmPassword.length < 8 || password !== confirmPassword))
+            ) && styles.disabled,
+          ]}
         >
           <Feather name={mode === 'signup' ? 'user-plus' : 'log-in'} size={17} color="#07150d" />
           <Text style={styles.primaryText}>
@@ -161,6 +202,8 @@ const styles = StyleSheet.create({
   tabText: { color: '#83968a', fontSize: 8, fontWeight: '900', letterSpacing: 0.55 },
   tabTextActive: { color: '#79ef91' },
   input: { minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#31513d', backgroundColor: '#07150d', color: '#ffffff', paddingHorizontal: 13, fontSize: 12 },
+  inputError: { borderColor: '#d96b6b' },
+  formError: { color: '#ff9a9a', fontSize: 8, lineHeight: 12, textAlign: 'center', fontWeight: '700' },
   rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#587061', alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: '#79ef91', borderColor: '#79ef91' },
