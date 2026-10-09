@@ -127,6 +127,8 @@ export interface CareerNewsItem {
   category: 'club' | 'match' | 'sponsor' | 'market';
   title: string;
   body: string;
+  visualKey?: 'match' | 'market' | 'club' | 'sponsor' | 'competition';
+  featuredClubId?: string | null;
 }
 
 export interface SponsorshipProposal {
