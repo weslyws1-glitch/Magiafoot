@@ -153,7 +153,7 @@ function TacticalBar({
   );
 }
 
-function EventDiagram({ event }: { event?: MatchEvent }) {
+function EventDiagram({ event, minute = 0, homeColor = '#60a5fa', awayColor = '#ef4444' }: { event?: MatchEvent; minute?: number; homeColor?: string; awayColor?: string }) {
   const showOffside = event?.type === 'offside' || (event?.type === 'var_start' && event.text.toLowerCase().includes('impedimento'));
   const showPenalty = event?.type === 'penalty' || (event?.type === 'var_start' && event.text.toLowerCase().includes('pênalti'));
   const showCorner = event?.type === 'corner' || event?.type === 'keeper_8s';
@@ -162,7 +162,17 @@ function EventDiagram({ event }: { event?: MatchEvent }) {
   return (
     <View style={styles.diagramPitch}>
       <View style={styles.diagramHalfLine} />
+      {Array.from({ length: 22 }, (_, index) => {
+        const isHome = index < 11;
+        const player = index % 11;
+        const column = player === 0 ? 8 : player <= 4 ? 25 : player <= 8 ? 46 : 66;
+        const lane = player === 0 ? 50 : ((player - 1) % 4 + 1) * 20;
+        const drift = Math.sin(minute * 0.29 + index * 1.8) * 5;
+        const progress = isHome ? column + drift : 100 - column - drift;
+        return <View key={'player-' + index} style={{ position: 'absolute', left: `${Math.max(3, Math.min(94, progress))}%` as any, top: `${Math.max(5, Math.min(90, lane + Math.cos(minute * 0.33 + index) * 5))}%` as any, width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: '#fff', backgroundColor: isHome ? homeColor : awayColor, zIndex: 3 }} />;
+      })}
       <View style={styles.diagramCircle} />
+      <View style={{ position: 'absolute', left: `${Math.max(6, Math.min(92, 50 + Math.sin(minute * 0.31) * 34))}%` as any, top: `${Math.max(8, Math.min(90, 50 + Math.cos(minute * 0.41) * 30))}%` as any, width: 7, height: 7, borderRadius: 4, backgroundColor: '#ffffff', zIndex: 5 }} />
       <View style={styles.diagramLeftBox} />
       <View style={styles.diagramRightBox} />
       <View style={styles.diagramLeftGoal} />
@@ -187,13 +197,14 @@ export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
   const {
-    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch,
+    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch, manualSave,
     pauseMatchForTactics, resolveVAR,
   } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
   const [speed, setSpeed] = useState<1 | 2 | 3>(1);
   const [infoTab, setInfoTab] = useState<'timeline' | 'stats'>('timeline');
   const [showRoundLive, setShowRoundLive] = useState(false);
+  const [savingResult, setSavingResult] = useState(false);
   const game = career?.liveMatch ?? null;
 
   useEffect(() => {
@@ -217,7 +228,7 @@ export default function MatchScreen() {
     const away = fixture ? getClub(fixture.awayClubId) : undefined;
     return (
       <>
-        <GameHeader title="Próxima partida" eyebrow={fixture ? '3ª DIVISÃO · RODADA ' + (career.roundIndex + 1) : 'TEMPORADA ENCERRADA'} />
+        <GameHeader title="Próxima partida" eyebrow={fixture ? (getCareerDivision(career)?.name ?? 'DIVISÃO').toUpperCase() + ' · RODADA ' + (career.roundIndex + 1) : 'TEMPORADA ENCERRADA'} />
         <Screen>
           <Panel style={styles.preGame}>
             {fixture && home && away ? (
@@ -298,10 +309,14 @@ export default function MatchScreen() {
     router.push('/tactics');
   };
 
-  const handleMain = () => {
+  const handleMain = async () => {
     if (isFinal) {
+      if (savingResult) return;
+      setSavingResult(true);
       closeCurrentMatch();
-      router.replace('/');
+      // O salvamento automático é acionado pela atualização da carreira.
+      // Mantemos a tela aberta para que o usuário confirme o resultado.
+      setSavingResult(false);
       return;
     }
     advanceCurrentMatch(1);
@@ -366,7 +381,7 @@ export default function MatchScreen() {
     <>
       <GameHeader
         title="Partida"
-        eyebrow={'3ª DIVISÃO · RODADA ' + (game.fixture.roundIndex + 1)}
+        eyebrow={divisionName.toUpperCase() + ' · RODADA ' + (game.fixture.roundIndex + 1)}
         back={false}
         right={<Text style={styles.headerClock}>{clock}</Text>}
       />
@@ -377,6 +392,7 @@ export default function MatchScreen() {
             <Text style={styles.refereeMini}>Árbitro: {game.referee.name}</Text>
           </View>
 
+          <Text style={{ color: '#a8c7b2', fontSize: 10, textAlign: 'center', paddingTop: 5 }}>LOCAL: {home.city} · MANDO: {home.name}</Text>
           <View style={styles.featuredMatch}>
             <View style={styles.featuredTeam}>
               <Text numberOfLines={1} style={styles.featuredTeamName}>{home.name}</Text>
@@ -495,7 +511,7 @@ export default function MatchScreen() {
             </View>
             <Text style={styles.momentMinute}>{clock}</Text>
           </View>
-          <EventDiagram event={latestEvent} />
+          <EventDiagram event={latestEvent} minute={game.minute} homeColor={home.color} awayColor={away.color} />
 
           <View style={styles.tacticalBars}>
             <TacticalBar label="CONTROLE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
@@ -584,7 +600,7 @@ export default function MatchScreen() {
 
         {isFinal ? (
           <>
-            <GameButton label="FIM DE JOGO · SALVAR RESULTADO" icon="flag" onPress={handleMain} />
+            <GameButton label={savingResult ? "SALVANDO RESULTADO..." : "FIM DE JOGO · SALVAR RESULTADO"} icon="flag" onPress={handleMain} />
             <Panel style={styles.finalPanel}>
               <Text style={styles.finalTitle}>Fim de jogo</Text>
               <Text style={styles.finalText}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
