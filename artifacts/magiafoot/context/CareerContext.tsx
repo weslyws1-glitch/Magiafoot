@@ -39,7 +39,7 @@ import {
   upgradeHeadquartersFacility,
   upgradeTrainingCenterFacility,
 } from '@/game/engine';
-import type { AdministrationDepartmentKey, Career, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
+import type { AdministrationDepartmentKey, Career, CurrencyCode, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
 import { getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
 import type { LocalIdentity, SaveHealth } from '@/game/save-protection';
 import {
@@ -84,7 +84,7 @@ interface CareerContextValue {
   chooseEmptyCareerSlot: (slot: 1 | 2 | 3 | 4) => void;
   syncCloudNow: () => Promise<boolean>;
   restoreCloudLatest: () => Promise<boolean>;
-  createNewCareer: (coachName: string, clubId: string) => void;
+  createNewCareer: (coachName: string, clubId: string, currency?: CurrencyCode) => void;
   startCurrentMatch: () => void;
   advanceCurrentMatch: (minutes?: number) => void;
   makeSubstitution: (outgoingId: string, incomingId: string) => boolean;
@@ -425,9 +425,9 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [career, identity, cloudSession, ensureFreshCloudSession, activeCareerSlot]);
 
-  const createNewCareer = useCallback((coachName: string, clubId: string) => {
+  const createNewCareer = useCallback((coachName: string, clubId: string, currency: CurrencyCode = 'BRL') => {
     if (!isReady) return;
-    const next = makeCareer(coachName, clubId);
+    const next = makeCareer(coachName, clubId, currency);
     setCareer(next);
     if (cloudSession && activeCareerSlot) {
       void (async () => {
