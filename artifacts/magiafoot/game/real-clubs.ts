@@ -82,6 +82,7 @@ function makeClubs(seeds: ClubSeed[], divisionId: string, divisionName: string, 
       selectable: true,
       stateCode: seed.state,
       competitionGroup: seed.group ?? null,
+      confederation: 'CONMEBOL',
       prestige: Math.max(35, Math.min(95, rating + (level === 1 ? 8 : level === 2 ? 3 : 0))),
       fanBase: Math.max(25, Math.min(100, rating + ((stableHash(seed.name) % 13) - 4))),
     };
