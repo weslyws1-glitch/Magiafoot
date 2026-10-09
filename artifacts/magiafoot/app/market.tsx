@@ -49,16 +49,29 @@ export default function MarketScreen() {
 
   const submitNegotiation = () => {
     if (!selectedPlayer) return;
-    const result = negotiateMarketPlayer(selectedPlayer.id, transferBid, weeklyWage, signingBonus);
-    if (result === 'completed') {
+    const negotiation = negotiateMarketPlayer(selectedPlayer.id, transferBid, weeklyWage, signingBonus);
+    if (negotiation.result === 'completed') {
       setNegotiationMessage('ACORDO FECHADO! O jogador foi contratado e já está no elenco.');
       setSelectedPlayerId(null);
       return;
     }
-    if (result === 'club_rejected') setNegotiationMessage('O clube vendedor recusou a proposta. Aumente o valor da transferência.');
-    else if (result === 'player_rejected') setNegotiationMessage('O jogador recusou os termos pessoais. Melhore salário ou luvas.');
-    else if (result === 'budget') setNegotiationMessage('A proposta ultrapassa o caixa, orçamento de transferências ou limite salarial.');
-    else if (result === 'squad_full') setNegotiationMessage('O elenco atingiu o limite de 32 jogadores.');
+    if (negotiation.result === 'club_rejected') {
+      if (typeof negotiation.counterOffer === 'number') setTransferBid(negotiation.counterOffer);
+      setNegotiationMessage(
+        typeof negotiation.counterOffer === 'number'
+          ? 'O clube recusou e respondeu com contraproposta de ' + formatCurrency(negotiation.counterOffer, currency) + '.'
+          : 'O clube vendedor recusou a proposta. Aumente o valor da transferência.'
+      );
+    } else if (negotiation.result === 'player_rejected') {
+      if (typeof negotiation.wageDemand === 'number') setWeeklyWage(negotiation.wageDemand);
+      setSigningBonus((value) => Math.max(value, Math.round(selectedPlayer.wage * 3)));
+      setNegotiationMessage(
+        typeof negotiation.wageDemand === 'number'
+          ? 'O jogador quer pelo menos ' + formatCurrency(negotiation.wageDemand, currency) + '/semana. Ajustei a proposta para você avaliar.'
+          : 'O jogador recusou os termos pessoais. Melhore salário ou luvas.'
+      );
+    } else if (negotiation.result === 'budget') setNegotiationMessage('A proposta ultrapassa o caixa, orçamento de transferências ou limite salarial.');
+    else if (negotiation.result === 'squad_full') setNegotiationMessage('O elenco atingiu o limite de 32 jogadores.');
     else setNegotiationMessage('Não foi possível concluir a negociação.');
   };
 
