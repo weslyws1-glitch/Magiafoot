@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { GameHeader, Panel, Screen, formatCurrency } from '@/components/ManagerUI';
@@ -33,10 +33,9 @@ export default function MarketScreen() {
   const selectedPlayer = selectedPlayerId ? career.market.find((player) => player.id === selectedPlayerId) ?? null : null;
   const sellerClub = selectedPlayer?.currentClubId ? getClub(selectedPlayer.currentClubId) : undefined;
 
-  const visibleMarket = useMemo(
-    () => career.market.slice().sort((a, b) => b.strength - a.strength || a.name.localeCompare(b.name, 'pt-BR')),
-    [career.market],
-  );
+  const visibleMarket = career.market
+    .slice()
+    .sort((a, b) => b.strength - a.strength || a.name.localeCompare(b.name, 'pt-BR'));
 
   const openNegotiation = (playerId: string) => {
     const player = career.market.find((item) => item.id === playerId);
