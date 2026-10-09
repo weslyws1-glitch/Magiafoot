@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { LEAGUE_ROUNDS, fixtureDate, formatFixtureDate, getCurrentFixture, seasonYear } from '@/game/engine';
+import { fixtureDate, formatFixtureDate, getCareerDivision, getCurrentFixture, getLeagueRoundCount, seasonYear } from '@/game/engine';
 import type { Fixture, LeagueResult } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -40,6 +40,8 @@ export default function CalendarScreen() {
 
   const current = career ? getCurrentFixture(career) : undefined;
   const year = career ? seasonYear(career.season) : 2026;
+  const leagueRounds = career ? Math.max(1, getLeagueRoundCount(career)) : 1;
+  const division = career ? getCareerDivision(career) : undefined;
 
   useEffect(() => {
     if (!career) return;
@@ -239,9 +241,9 @@ export default function CalendarScreen() {
         <Panel style={styles.seasonProgress}>
           <View>
             <Text style={styles.progressLabel}>TEMPORADA {year}</Text>
-            <Text style={styles.progressValue}>Rodada {Math.min(career.roundIndex + 1, LEAGUE_ROUNDS)} de {LEAGUE_ROUNDS}</Text>
+            <Text style={styles.progressValue}>Rodada {Math.min(career.roundIndex + 1, leagueRounds)} de {leagueRounds}</Text>
           </View>
-          <Text style={styles.progressMeta}>Liga: sábados e domingos · Copas: quartas e quintas</Text>
+          <Text style={styles.progressMeta}>{division?.name ?? 'Liga nacional'} · jogos da fase atual</Text>
         </Panel>
       </Screen>
     </>
