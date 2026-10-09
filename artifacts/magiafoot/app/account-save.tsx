@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { GameHeader, Panel, Screen } from '@/components/ManagerUI';
+import { useRouter } from 'expo-router';
 import { useCareer } from '@/context/CareerContext';
 
 export default function AccountSaveScreen() {
+  const router = useRouter();
   const {
     career, magiaId, saveHealth, lastSavedAt, backupCount, manualSave,
     cloudEmail, cloudMagiaId, cloudStatus, cloudLastSavedAt, cloudMessage,
@@ -49,7 +51,10 @@ export default function AccountSaveScreen() {
     const ok = accountMode === 'signup'
       ? await createCloudAccount(accountEmail, accountPassword)
       : await signInCloud(accountEmail, accountPassword);
-    if (ok) setAccountPassword('');
+    if (ok) {
+      setAccountPassword('');
+      if (accountMode === 'login') router.replace('/');
+    }
     setAccountBusy(false);
   };
 
@@ -115,6 +120,11 @@ export default function AccountSaveScreen() {
 
           {cloudEmail ? (
             <>
+              <Pressable onPress={() => router.replace('/')} style={styles.enterGameButton}>
+                <Feather name="play" size={16} color="#07150d" />
+                <Text style={styles.enterGameButtonText}>ENTRAR NO JOGO</Text>
+              </Pressable>
+
               <View style={styles.cloudIdentity}>
                 <Text style={styles.boxLabel}>CONTA VERIFICADA</Text>
                 <Text style={styles.cloudEmail}>{cloudEmail}</Text>
@@ -254,6 +264,8 @@ const styles = StyleSheet.create({
   cloudStateBadgeOn: { borderColor: '#79ef91', backgroundColor: '#163a25' },
   cloudStateText: { color: '#7d9184', fontSize: 6.2, fontWeight: '900', letterSpacing: 0.5 },
   cloudStateTextOn: { color: '#79ef91' },
+  enterGameButton: { minHeight: 44, borderRadius: 12, backgroundColor: '#79ef91', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  enterGameButtonText: { color: '#07150d', fontSize: 8.5, fontWeight: '900' },
   cloudIdentity: { gap: 5, borderRadius: 11, padding: 11, backgroundColor: '#07150d', borderWidth: 1, borderColor: '#264937' },
   cloudEmail: { color: '#ffffff', fontSize: 10.5, fontWeight: '800', marginBottom: 4 },
   cloudMagiaId: { color: '#79ef91', fontSize: 17, fontWeight: '900', letterSpacing: 1, marginBottom: 2 },
