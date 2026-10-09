@@ -1463,7 +1463,7 @@ export function upgradeTrainingCenterFacility(career: Career, key: TrainingCente
     analysis: 'Análise de desempenho',
   };
 
-  return addCareerNews({
+  let next: Career = {
     ...career,
     balance: career.balance - cost,
     trainingCenterUpgrades: {
@@ -1471,7 +1471,9 @@ export function upgradeTrainingCenterFacility(career: Career, key: TrainingCente
       [key]: current + 1,
     },
     lastNews: names[key] + ' do CT evoluiu para o nível ' + (current + 1) + '.',
-  }, 'Centro de treinamento evolui', names[key] + ' chegou ao nível ' + (current + 1) + ' após investimento de ' + formatCurrency(cost) + '.', 'club');
+  };
+  next = addFinanceEntry(next, { category: 'infrastructure', description: 'Melhoria do CT - ' + names[key], amount: -cost });
+  return addCareerNews(next, 'Centro de treinamento evolui', names[key] + ' chegou ao nível ' + (current + 1) + ' após investimento de ' + formatCurrency(cost, career.currency) + '.', 'club');
 }
 
 export const ADMIN_DEPARTMENT_LABELS: Record<AdministrationDepartmentKey, string> = {
@@ -1972,6 +1974,10 @@ export function renewSponsorshipContract(career: Career, contractId: string): Ca
   let next: Career = {
     ...career,
     balance: career.balance + renewalBonus,
+    finance: {
+      ...career.finance,
+      seasonSponsorshipIncome: (career.finance?.seasonSponsorshipIncome ?? 0) + renewalBonus,
+    },
     boardTrust: clamp(career.boardTrust + (raise >= 1.1 ? 2 : 0), 0, 100),
     fanTrust: clamp(career.fanTrust + (contract.fanImpact > 0 ? 1 : 0), 0, 100),
     sponsorships: {
@@ -1980,7 +1986,8 @@ export function renewSponsorshipContract(career: Career, contractId: string): Ca
       history: [`${contract.sponsorName} renovou por mais ${extension} jogos.`, ...state.history].slice(0, 20),
     },
   };
-  return addCareerNews(next, 'Patrocinador renova contrato', `${contract.sponsorName} renovou por ${extension} jogos com valor por partida de ${formatCurrency(updated.perMatch)}.`);
+  next = addFinanceEntry(next, { category: 'sponsorship', description: 'Bônus de renovação - ' + contract.sponsorName, amount: renewalBonus });
+  return addCareerNews(next, 'Patrocinador renova contrato', `${contract.sponsorName} renovou por ${extension} jogos com valor por partida de ${formatCurrency(updated.perMatch, career.currency)}.`);
 }
 
 function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
@@ -2016,7 +2023,7 @@ function settleSponsorshipsAfterMatch(career: Career, won: boolean): Career {
       else if (position > 0 && position <= 4) finalBonus += contract.qualificationBonus;
       sponsorIncome += finalBonus;
       history.unshift(`Contrato com ${contract.sponsorName} chegou ao fim após ${contract.durationMatches} jogos.`);
-      next = addCareerNews(next, 'Contrato de patrocínio encerrado', `${contract.sponsorName} concluiu seu vínculo. Total acumulado: ${formatCurrency(contract.totalEarned + payment + finalBonus)}.`);
+      next = addCareerNews(next, 'Contrato de patrocínio encerrado', `${contract.sponsorName} concluiu seu vínculo. Total acumulado: ${formatCurrency(contract.totalEarned + payment + finalBonus, career.currency)}.`);
     }
   }
 
