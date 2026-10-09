@@ -1,5 +1,5 @@
 import { buildBestLineup, buildBench, CLUBS, FORMATIONS, getClub, getFormation, makeCareerMarket, makeRoster } from './data.ts';
-import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, PlayerTransferOffer, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
+import type { AdministrationDepartmentKey, AdministrativeProfessional, Career, Club, CurrencyCode, FinanceState, FinanceTransaction, Fixture, FormationId, FormationSlot, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, Intensity, LeagueResult, MatchEvent, MatchSession, MatchStats, Player, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, PlayerTransferOffer, Position, SponsorshipContract, SponsorshipProposal, SponsorshipSlot, StadiumUpgradeKey, StandingRow, TrainingCenterUpgradeKey } from './types.ts';
 
 export const POSITION_LABELS: Record<Position, string> = {
   GOL: 'GOL', ZAG: 'ZAG', LE: 'LAT', LD: 'LAT', VOL: 'VOL',
@@ -14,6 +14,45 @@ export const EMPTY_STATS: MatchStats = {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const DISPLAY_CURRENCY_RATE: Record<CurrencyCode, number> = { BRL: 1, USD: 0.18, EUR: 0.155 };
+
+export function convertCurrency(amountInBRL: number, currency: CurrencyCode = 'BRL'): number {
+  return amountInBRL * DISPLAY_CURRENCY_RATE[currency];
+}
+
+function makeFinanceState(club: Club, players: Player[]): FinanceState {
+  const weeklyWages = players.reduce((sum, player) => sum + player.wage, 0);
+  return {
+    transferBudget: Math.round(club.balance * 0.42),
+    weeklyWageBudget: Math.max(Math.round(weeklyWages * 1.18), weeklyWages + 25_000),
+    debt: 0,
+    seasonTransferSpend: 0,
+    seasonTransferIncome: 0,
+    seasonMatchdayIncome: 0,
+    seasonWagesPaid: 0,
+    seasonSponsorshipIncome: 0,
+    ledger: [],
+  };
+}
+
+function addFinanceEntry(career: Career, entry: Omit<FinanceTransaction, 'id' | 'season' | 'roundIndex' | 'date'>): Career {
+  const finance = career.finance;
+  const row: FinanceTransaction = {
+    id: 'fin-' + career.season + '-' + career.roundIndex + '-' + Date.now() + '-' + (finance?.ledger?.length ?? 0),
+    season: career.season,
+    roundIndex: career.roundIndex,
+    date: new Date().toISOString(),
+    ...entry,
+  };
+  return {
+    ...career,
+    finance: {
+      ...finance,
+      ledger: [row, ...(finance?.ledger ?? [])].slice(0, 80),
+    },
+  };
+}
+
 const newStats = (): MatchStats => ({ ...EMPTY_STATS });
 const hash = (value: string) => [...value].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 29);
 const gameRandom = (game: MatchSession) => {
@@ -345,7 +384,7 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
   };
 }
 
-export function createCareer(coachName: string, clubId: string): Career {
+export function createCareer(coachName: string, clubId: string, currency: CurrencyCode = 'BRL'): Career {
   const club = getClub(clubId);
   if (!club) throw new Error('Escolha um clube disponível.');
   const roster = assignSquadNumbers(makeRoster(club).map((player) => initializePlayerCareerProfile(player, 1, 0)));
@@ -361,6 +400,8 @@ export function createCareer(coachName: string, clubId: string): Career {
     id: `carreira-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     coachName: coachName.trim(),
     clubId,
+    divisionId: club.divisionId,
+    currency,
     season: 1,
     roundIndex: 0,
     players: roster,
@@ -380,6 +421,7 @@ export function createCareer(coachName: string, clubId: string): Career {
     fanTrust: 60,
     legalWorkloadEvents: 0,
     balance: club.balance,
+    finance: makeFinanceState(club, roster),
     stadiumLevel: 0,
     ticketPrice: club.ticketPrice,
     stadiumUpgrades: { stands: 1, pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0, scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0 },
@@ -2556,8 +2598,12 @@ export function parseCareer(saved: string | null): Career | null {
   }
 }
 
-export function formatCurrency(amount: number): string {
-  return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+export function formatCurrency(amount: number, currency: CurrencyCode = 'BRL'): string {
+  return convertCurrency(amount, currency).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  });
 }
 
 export function matchPhaseLabel(phase: MatchSession['phase']): string {
@@ -2588,14 +2634,26 @@ export function getClubName(clubId: string): string {
 
 export function addTransferPlayer(career: Career, playerId: string): Career {
   const player = career.market.find((item) => item.id === playerId);
-  if (!player || career.balance < player.value || career.players.length >= 32) return career;
-  return {
+  const finance = career.finance;
+  const currentWages = career.players.reduce((sum, item) => sum + item.wage, 0);
+  const canAffordTransfer = (finance?.transferBudget ?? career.balance) >= (player?.value ?? Number.POSITIVE_INFINITY);
+  const canAffordWage = player ? currentWages + player.wage <= (finance?.weeklyWageBudget ?? Number.POSITIVE_INFINITY) : false;
+  if (!player || career.balance < player.value || !canAffordTransfer || !canAffordWage || career.players.length >= 32) return career;
+
+  let next: Career = {
     ...career,
     balance: career.balance - player.value,
-    players: [...career.players, initializePlayerCareerProfile({ ...player, status: 'available', fitness: 90, morale: 70 }, career.season, career.roundIndex)],
+    finance: {
+      ...finance,
+      transferBudget: Math.max(0, (finance?.transferBudget ?? career.balance) - player.value),
+      seasonTransferSpend: (finance?.seasonTransferSpend ?? 0) + player.value,
+    },
+    players: [...career.players, initializePlayerCareerProfile({ ...player, status: 'available', fitness: 90, morale: 70, currentClubId: career.clubId }, career.season, career.roundIndex)],
     market: career.market.filter((item) => item.id !== playerId),
-    lastNews: `${player.name} assinou com ${getClubName(career.clubId)}.`,
+    lastNews: `${player.name} assinou com ${getClubName(career.clubId)} por ${formatCurrency(player.value, career.currency)}.`,
   };
+  next = addFinanceEntry(next, { category: 'transfer_out', description: 'Compra de ' + player.name, amount: -player.value });
+  return next;
 }
 
 export function sellPlayer(career: Career, playerId: string): Career {
@@ -2603,12 +2661,20 @@ export function sellPlayer(career: Career, playerId: string): Career {
   const player = career.players.find((item) => item.id === playerId);
   if (!player) return career;
   const saleValue = Math.round(player.value * 0.75);
-  return {
+  const reinvestment = Math.round(saleValue * 0.82);
+  let next: Career = {
     ...career,
     balance: career.balance + saleValue,
+    finance: {
+      ...career.finance,
+      transferBudget: (career.finance?.transferBudget ?? 0) + reinvestment,
+      seasonTransferIncome: (career.finance?.seasonTransferIncome ?? 0) + saleValue,
+    },
     players: career.players.filter((item) => item.id !== playerId),
-    lastNews: `${player.name} foi negociado por ${formatCurrency(saleValue)}.`,
+    lastNews: `${player.name} foi negociado por ${formatCurrency(saleValue, career.currency)}. A diretoria liberou ${formatCurrency(reinvestment, career.currency)} para reinvestimento.`,
   };
+  next = addFinanceEntry(next, { category: 'transfer_in', description: 'Venda de ' + player.name, amount: saleValue });
+  return next;
 }
 
 export function setPlayerMarketStatus(career: Career, playerId: string, status: PlayerMarketStatus): Career {
