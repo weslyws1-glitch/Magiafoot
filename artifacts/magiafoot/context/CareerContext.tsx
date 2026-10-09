@@ -343,18 +343,34 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     const summary = careerSlots.find((item) => item.slot === slot);
     if (!summary) return false;
     setCloudStatus('syncing');
+
     const restored = await restoreCareerFromCloud(session, summary.careerId);
-    if (!restored) {
-      setCloudStatus('error');
-      setCloudMessage('Não foi possível carregar esta carreira.');
-      return false;
+    if (restored) {
+      setCareer(restored.career);
+      setActiveCareerSlot(slot);
+      setCloudLastSavedAt(restored.savedAt);
+      setCloudStatus('connected');
+      setCloudMessage(null);
+      return true;
     }
-    setCareer(restored.career);
-    setActiveCareerSlot(slot);
-    setCloudLastSavedAt(restored.savedAt);
-    setCloudStatus('connected');
-    return true;
-  }, [careerSlots, ensureFreshCloudSession]);
+
+    if (career?.id === summary.careerId) {
+      const repaired = await saveCareerToCloud(session, career, identity?.installationId ?? 'web', 'recovery');
+      if (repaired) {
+        await upsertCareerSlot(session, slot, career);
+        setCareerSlots(await listCareerSlots(session));
+        setActiveCareerSlot(slot);
+        setCloudLastSavedAt(repaired.savedAt);
+        setCloudStatus('connected');
+        setCloudMessage('Carreira recuperada do save deste aparelho e enviada para a nuvem.');
+        return true;
+      }
+    }
+
+    setCloudStatus('error');
+    setCloudMessage('Não foi possível carregar esta carreira.');
+    return false;
+  }, [careerSlots, ensureFreshCloudSession, career, identity]);
 
   const chooseEmptyCareerSlot = useCallback((slot: 1 | 2 | 3 | 4) => {
     setActiveCareerSlot(slot);
