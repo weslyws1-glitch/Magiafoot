@@ -47,6 +47,7 @@ function makeLeagueClubs(league: IntlLeague): Club[] {
       selectable: true,
       stateCode: null,
       competitionGroup: seed.group ?? null,
+      confederation: 'CONMEBOL',
       prestige: Math.max(40, Math.min(95, rating + 7)),
       fanBase: Math.max(35, Math.min(100, rating + ((hashText(seed.name) % 15) - 3))),
       city: seed.city ?? division.country,
