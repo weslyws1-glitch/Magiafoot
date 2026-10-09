@@ -26,6 +26,29 @@ export type PlayerPersonality = 'profissional' | 'lider' | 'ambicioso' | 'tranqu
 export type PlayerSquadRole = 'estrela' | 'titular' | 'rotacao' | 'reserva' | 'jovem';
 export type PlayerMarketStatus = 'inegociavel' | 'disponivel' | 'negociavel' | 'emprestimo';
 export type PlayerTrainingFocus = 'equilibrado' | 'fisico' | 'tecnica' | 'finalizacao' | 'passe' | 'marcacao';
+export type CurrencyCode = 'BRL' | 'USD' | 'EUR';
+
+export interface FinanceTransaction {
+  id: string;
+  season: number;
+  roundIndex: number;
+  date: string;
+  category: 'matchday' | 'wages' | 'transfer_in' | 'transfer_out' | 'sponsorship' | 'infrastructure' | 'staff' | 'commercial' | 'other';
+  description: string;
+  amount: number;
+}
+
+export interface FinanceState {
+  transferBudget: number;
+  weeklyWageBudget: number;
+  debt: number;
+  seasonTransferSpend: number;
+  seasonTransferIncome: number;
+  seasonMatchdayIncome: number;
+  seasonWagesPaid: number;
+  seasonSponsorshipIncome: number;
+  ledger: FinanceTransaction[];
+}
 
 export interface PlayerSeasonStats {
   appearances: number;
@@ -160,6 +183,9 @@ export interface Player {
   suspensionReason?: string | null;
   value: number;
   wage: number;
+  nationality?: string;
+  nationalityCode?: string;
+  currentClubId?: string | null;
   shirtNumber?: number;
   potential?: number;
   skills?: PlayerSkills;
@@ -189,6 +215,12 @@ export interface Club {
   id: string;
   name: string;
   country: string;
+  countryCode: string;
+  divisionId: string;
+  divisionName: string;
+  divisionLevel: number;
+  nativeCurrency: CurrencyCode;
+  badgeUrl?: string | null;
   city: string;
   initials: string;
   rating: number;
@@ -367,6 +399,8 @@ export interface Career {
   id: string;
   coachName: string;
   clubId: string;
+  divisionId: string;
+  currency: CurrencyCode;
   season: number;
   roundIndex: number;
   players: Player[];
@@ -381,6 +415,7 @@ export interface Career {
   fanTrust: number;
   legalWorkloadEvents: number;
   balance: number;
+  finance: FinanceState;
   stadiumLevel: number;
   ticketPrice: number;
   stadiumUpgrades: Record<StadiumUpgradeKey, number>;
