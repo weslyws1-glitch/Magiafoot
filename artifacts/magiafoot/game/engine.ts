@@ -15,8 +15,13 @@ export const EMPTY_STATS: MatchStats = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const DISPLAY_CURRENCY_RATE: Record<CurrencyCode, number> = { BRL: 1, USD: 0.18, EUR: 0.155 };
+let activeDisplayCurrency: CurrencyCode = 'BRL';
 
-export function convertCurrency(amountInBRL: number, currency: CurrencyCode = 'BRL'): number {
+export function setActiveDisplayCurrency(currency: CurrencyCode) {
+  activeDisplayCurrency = currency;
+}
+
+export function convertCurrency(amountInBRL: number, currency: CurrencyCode = activeDisplayCurrency): number {
   return amountInBRL * DISPLAY_CURRENCY_RATE[currency];
 }
 
@@ -385,6 +390,7 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
 }
 
 export function createCareer(coachName: string, clubId: string, currency: CurrencyCode = 'BRL'): Career {
+  activeDisplayCurrency = currency;
   const club = getClub(clubId);
   if (!club) throw new Error('Escolha um clube disponível.');
   const roster = assignSquadNumbers(makeRoster(club).map((player) => initializePlayerCareerProfile(player, 1, 0)));
@@ -2598,10 +2604,12 @@ export function parseCareer(saved: string | null): Career | null {
       pitch: 1, roof: 0, lighting: 1, seats: 1, boxes: 0,
       scoreboard: 0, security: 1, turnstiles: 1, parking: 0, drainage: 0, irrigation: 0,
     };
+    const parsedCurrency: CurrencyCode = (parsed as Career).currency ?? 'BRL';
+    activeDisplayCurrency = parsedCurrency;
     return {
       ...(parsed as Career),
       divisionId: (parsed as Career).divisionId ?? parsedClub.divisionId,
-      currency: (parsed as Career).currency ?? 'BRL',
+      currency: parsedCurrency,
       finance: { ...fallbackFinance, ...((parsed as Career).finance ?? {}), ledger: Array.isArray((parsed as Career).finance?.ledger) ? (parsed as Career).finance.ledger : [] },
       players: assignSquadNumbers((parsed.players ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0))),
       market: ((parsed as Career).market ?? []).map((player) => initializePlayerCareerProfile(player, parsed.season ?? 1, parsed.roundIndex ?? 0)),
@@ -2650,7 +2658,7 @@ export function parseCareer(saved: string | null): Career | null {
   }
 }
 
-export function formatCurrency(amount: number, currency: CurrencyCode = 'BRL'): string {
+export function formatCurrency(amount: number, currency: CurrencyCode = activeDisplayCurrency): string {
   return convertCurrency(amount, currency).toLocaleString('pt-BR', {
     style: 'currency',
     currency,
