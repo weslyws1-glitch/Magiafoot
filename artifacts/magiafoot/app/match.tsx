@@ -197,7 +197,7 @@ export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
   const {
-    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch, manualSave,
+    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch,
     pauseMatchForTactics, resolveVAR,
   } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
