@@ -41,10 +41,11 @@ import {
   upgradeTrainingCenterFacility,
 } from '@/game/engine';
 import type { AdministrationDepartmentKey, Career, CurrencyCode, FormationId, HeadquartersImageKey, HeadquartersInvestmentKey, HeadquartersRevenueKey, HeadquartersUpgradeKey, PlayerMarketStatus, PlayerSquadRole, PlayerTrainingFocus, SponsorshipSlot, StadiumUpgradeKey, Tactics, TrainingCenterUpgradeKey } from '@/game/types';
-import { getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
+import { deleteLocalCareerData, getBackupCount, loadProtectedCareer, persistProtectedCareer } from '@/game/save-protection';
 import type { LocalIdentity, SaveHealth } from '@/game/save-protection';
 import {
   clearRememberedCloudSession,
+  deleteCareerSlotFromCloud,
   fetchCloudProfile,
   listCareerSlots,
   loadRememberedCloudSession,
@@ -83,6 +84,7 @@ interface CareerContextValue {
   refreshCareerSlots: () => Promise<void>;
   chooseCareerSlot: (slot: 1 | 2 | 3 | 4) => Promise<boolean>;
   chooseEmptyCareerSlot: (slot: 1 | 2 | 3 | 4) => void;
+  deleteCareerSlot: (slot: 1 | 2 | 3 | 4, careerId: string) => Promise<boolean>;
   syncCloudNow: () => Promise<boolean>;
   restoreCloudLatest: () => Promise<boolean>;
   createNewCareer: (coachName: string, clubId: string, currency?: CurrencyCode) => void;
@@ -397,6 +399,43 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setCloudStatus('connected');
     setCloudMessage(null);
   }, []);
+
+  const deleteCareerSlot = useCallback(async (slot: 1 | 2 | 3 | 4, careerId: string): Promise<boolean> => {
+    // Não permita que um botão antigo exclua uma carreira que já foi trocada de espaço.
+    if (!careerSlots.some((entry) => entry.slot === slot && entry.careerId === careerId)) return false;
+    const session = await ensureFreshCloudSession();
+    if (!session) return false;
+    setCloudStatus('syncing');
+    try {
+      const deleted = await deleteCareerSlotFromCloud(session, slot, careerId);
+      if (!deleted) {
+        setCloudStatus('error');
+        setCloudMessage('Não foi possível excluir a carreira. Nada foi alterado.');
+        return false;
+      }
+      const stillLinked = careerSlots.some((entry) => entry.slot !== slot && entry.careerId === careerId);
+      if (activeCareerSlot === slot) setActiveCareerSlot(null);
+      if (!stillLinked && career?.id === careerId) {
+        // A exclusão no servidor já foi concluída. Cancela novos autosaves e
+        // aguarda gravações locais antigas antes de remover o save do aparelho.
+        setCareer(null);
+        await saveQueue.current;
+        await deleteLocalCareerData(careerId);
+        setLastSavedAt(null);
+        setBackupCount(await getBackupCount());
+      }
+      setCareerSlots(await listCareerSlots(session));
+      setCloudStatus('connected');
+      setCloudMessage('Carreira excluída. O espaço está disponível para uma nova carreira.');
+      return true;
+    } catch (error) {
+      console.error('[MagiaFoot] Erro ao excluir carreira:', error);
+      setCloudStatus('error');
+      setCloudMessage('A exclusão não pôde ser confirmada. Atualize a lista de carreiras.');
+      try { setCareerSlots(await listCareerSlots(session)); } catch { /* preserve existing list */ }
+      return false;
+    }
+  }, [careerSlots, ensureFreshCloudSession, activeCareerSlot, career]);
 
   const syncCloudNow = useCallback(async () => {
     if (!career || !identity) return false;
@@ -746,6 +785,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     refreshCareerSlots,
     chooseCareerSlot,
     chooseEmptyCareerSlot,
+    deleteCareerSlot,
     syncCloudNow,
     restoreCloudLatest,
     createNewCareer,
@@ -795,7 +835,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
     cloudSession, cloudProfile, cloudStatus, cloudLastSavedAt, cloudMessage,
     careerSlots, activeCareerSlot, authRestoring,
-    createCloudAccount, signInCloud, signOutCloud, refreshCareerSlots, chooseCareerSlot, chooseEmptyCareerSlot, syncCloudNow, restoreCloudLatest,
+    createCloudAccount, signInCloud, signOutCloud, refreshCareerSlots, chooseCareerSlot, chooseEmptyCareerSlot, deleteCareerSlot, syncCloudNow, restoreCloudLatest,
   ]);
 
   return <CareerContext.Provider value={value}>{children}</CareerContext.Provider>;
