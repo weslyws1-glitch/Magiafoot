@@ -401,40 +401,57 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteCareerSlot = useCallback(async (slot: 1 | 2 | 3 | 4, careerId: string): Promise<boolean> => {
-    // Não permita que um botão antigo exclua uma carreira que já foi trocada de espaço.
     if (!careerSlots.some((entry) => entry.slot === slot && entry.careerId === careerId)) return false;
     const session = await ensureFreshCloudSession();
     if (!session) return false;
     setCloudStatus('syncing');
+
+    // O servidor valida usuário, espaço e ID e apaga apenas o save escolhido.
+    let deleted = false;
     try {
-      const deleted = await deleteCareerSlotFromCloud(session, slot, careerId);
-      if (!deleted) {
-        setCloudStatus('error');
-        setCloudMessage('Não foi possível excluir a carreira. Nada foi alterado.');
-        return false;
-      }
-      const stillLinked = careerSlots.some((entry) => entry.slot !== slot && entry.careerId === careerId);
-      if (activeCareerSlot === slot) setActiveCareerSlot(null);
-      if (!stillLinked && career?.id === careerId) {
-        // A exclusão no servidor já foi concluída. Cancela novos autosaves e
-        // aguarda gravações locais antigas antes de remover o save do aparelho.
-        setCareer(null);
-        await saveQueue.current;
-        await deleteLocalCareerData(careerId);
-        setLastSavedAt(null);
-        setBackupCount(await getBackupCount());
-      }
-      setCareerSlots(await listCareerSlots(session));
-      setCloudStatus('connected');
-      setCloudMessage('Carreira excluída. O espaço está disponível para uma nova carreira.');
-      return true;
+      deleted = await deleteCareerSlotFromCloud(session, slot, careerId);
     } catch (error) {
-      console.error('[MagiaFoot] Erro ao excluir carreira:', error);
+      console.error('[MagiaFoot] Falha na exclusão remota:', error);
+    }
+    if (!deleted) {
       setCloudStatus('error');
-      setCloudMessage('A exclusão não pôde ser confirmada. Atualize a lista de carreiras.');
-      try { setCareerSlots(await listCareerSlots(session)); } catch { /* preserve existing list */ }
+      setCloudMessage('A exclusão não foi confirmada. Nenhuma carreira foi apagada.');
       return false;
     }
+
+    const stillLinked = careerSlots.some((entry) => entry.slot !== slot && entry.careerId === careerId);
+    if (activeCareerSlot === slot) setActiveCareerSlot(null);
+    if (!stillLinked && career?.id === careerId) setCareer(null);
+
+    // Atualiza somente o cartão excluído. Um erro temporário ao listar as
+    // carreiras na nuvem não deve fazer as outras desaparecerem da tela.
+    setCareerSlots((existing) =>
+      existing.filter((entry) => !(entry.slot === slot && entry.careerId === careerId))
+    );
+
+    let localCleanupFailed = false;
+    if (!stillLinked) {
+      try {
+        // Nunca apague enquanto uma escrita antiga estiver pendente:
+        // ela poderia restaurar a carreira excluída no mesmo dispositivo.
+        await saveQueue.current;
+        await deleteLocalCareerData(careerId);
+        if (career?.id === careerId) {
+          setLastSavedAt(null);
+          setBackupCount(await getBackupCount());
+        }
+      } catch (error) {
+        console.error('[MagiaFoot] Exclusão remota concluída, mas limpeza local falhou:', error);
+        localCleanupFailed = true;
+        setStorageWarning(true);
+      }
+    }
+
+    setCloudStatus(localCleanupFailed ? 'error' : 'connected');
+    setCloudMessage(localCleanupFailed
+      ? 'Carreira removida da conta. A limpeza do save local não foi concluída neste aparelho.'
+      : 'Carreira excluída. O espaço está disponível para uma nova carreira.');
+    return true;
   }, [careerSlots, ensureFreshCloudSession, activeCareerSlot, career]);
 
   const syncCloudNow = useCallback(async () => {
