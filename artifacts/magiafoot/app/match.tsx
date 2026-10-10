@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
@@ -123,7 +123,66 @@ function TacticalBar({
   );
 }
 
-function EventDiagram({ event, minute = 0, homeColor = '#60a5fa', awayColor = '#ef4444' }: { event?: MatchEvent; minute?: number; homeColor?: string; awayColor?: string }) {
+function DiagramPlayer({ index, minute, durationMs, homeColor, awayColor, userSlot, frozen }: {
+  index: number;
+  minute: number;
+  durationMs: number;
+  homeColor: string;
+  awayColor: string;
+  userSlot?: MatchSession['userLineup'][number];
+  frozen: boolean;
+}) {
+  const isHome = index < 11;
+  const player = index % 11;
+  const coordinates = (atMinute: number) => {
+    const column = player === 0 ? 8 : player <= 4 ? 25 : player <= 8 ? 46 : 66;
+    const lane = player === 0 ? 50 : ((player - 1) % 4 + 1) * 20;
+    // Quando possível, os círculos respeitam a formação real escolhida.
+    const baseLeft = userSlot ? (isHome ? 100 - userSlot.y : userSlot.y) : (isHome ? column : 100 - column);
+    const baseTop = userSlot ? userSlot.x : lane;
+    const drift = Math.sin(atMinute * 0.29 + index * 1.8) * (player === 0 ? 2 : 5);
+    const sway = Math.cos(atMinute * 0.33 + index) * (player === 0 ? 2 : 5);
+    return {
+      left: Math.max(3, Math.min(94, baseLeft + (isHome ? drift : -drift))),
+      top: Math.max(5, Math.min(90, baseTop + sway)),
+    };
+  };
+  const initial = coordinates(minute);
+  const x = useRef(new Animated.Value(initial.left)).current;
+  const y = useRef(new Animated.Value(initial.top)).current;
+
+  useEffect(() => {
+    const target = coordinates(minute);
+    if (frozen) {
+      x.stopAnimation();
+      y.stopAnimation();
+      return;
+    }
+    const movement = Animated.parallel([
+      Animated.timing(x, { toValue: target.left, duration: durationMs, easing: Easing.linear, useNativeDriver: false }),
+      Animated.timing(y, { toValue: target.top, duration: durationMs, easing: Easing.linear, useNativeDriver: false }),
+    ]);
+    movement.start();
+    return () => movement.stop();
+  }, [minute, durationMs, frozen, userSlot?.x, userSlot?.y, x, y]);
+
+  return (
+    <Animated.View style={{
+      position: 'absolute',
+      left: x.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
+      top: y.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
+      width: 11, height: 11, borderRadius: 6, borderWidth: 1.5, borderColor: '#fff',
+      backgroundColor: isHome ? homeColor : awayColor, zIndex: 3,
+    }} />
+  );
+}
+
+function EventDiagram({ event, minute = 0, homeColor = '#60a5fa', awayColor = '#ef4444',
+  userLineup, userIsHome, durationMs = 850, frozen = false,
+}: {
+  event?: MatchEvent; minute?: number; homeColor?: string; awayColor?: string;
+  userLineup?: MatchSession['userLineup']; userIsHome?: boolean; durationMs?: number; frozen?: boolean;
+}) {
   const showOffside = event?.type === 'offside' || (event?.type === 'var_start' && event.text.toLowerCase().includes('impedimento'));
   const showPenalty = event?.type === 'penalty' || (event?.type === 'var_start' && event.text.toLowerCase().includes('pênalti'));
   const showCorner = event?.type === 'corner' || event?.type === 'keeper_8s';
@@ -134,12 +193,19 @@ function EventDiagram({ event, minute = 0, homeColor = '#60a5fa', awayColor = '#
       <View style={styles.diagramHalfLine} />
       {Array.from({ length: 22 }, (_, index) => {
         const isHome = index < 11;
-        const player = index % 11;
-        const column = player === 0 ? 8 : player <= 4 ? 25 : player <= 8 ? 46 : 66;
-        const lane = player === 0 ? 50 : ((player - 1) % 4 + 1) * 20;
-        const drift = Math.sin(minute * 0.29 + index * 1.8) * 5;
-        const progress = isHome ? column + drift : 100 - column - drift;
-        return <View key={'player-' + index} style={{ position: 'absolute', left: `${Math.max(3, Math.min(94, progress))}%` as any, top: `${Math.max(5, Math.min(90, lane + Math.cos(minute * 0.33 + index) * 5))}%` as any, width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: '#fff', backgroundColor: isHome ? homeColor : awayColor, zIndex: 3 }} />;
+        const userSlot = isHome === userIsHome ? userLineup?.[index % 11] : undefined;
+        return (
+          <DiagramPlayer
+            key={'player-' + index}
+            index={index}
+            minute={minute}
+            durationMs={durationMs}
+            homeColor={homeColor}
+            awayColor={awayColor}
+            userSlot={userSlot?.sentOff ? undefined : userSlot}
+            frozen={frozen || Boolean(userSlot?.sentOff)}
+          />
+        );
       })}
       <View style={styles.diagramCircle} />
       <View style={{ position: 'absolute', left: `${Math.max(6, Math.min(92, 50 + Math.sin(minute * 0.31) * 34))}%` as any, top: `${Math.max(8, Math.min(90, 50 + Math.cos(minute * 0.41) * 30))}%` as any, width: 7, height: 7, borderRadius: 4, backgroundColor: '#ffffff', zIndex: 5 }} />
@@ -498,7 +564,7 @@ export default function MatchScreen() {
             </View>
             <Text style={styles.momentMinute}>{clock}</Text>
           </View>
-          <EventDiagram event={latestEvent} minute={game.minute} homeColor={home.color} awayColor={away.color} />
+          <EventDiagram event={latestEvent} minute={game.minute} homeColor={home.color} awayColor={away.color} userLineup={game.userLineup} userIsHome={career.clubId === game.fixture.homeClubId} durationMs={speed === 1 ? 850 : speed === 2 ? 220 : 60} frozen={isFinal || !autoRunning || game.pausedForTactics || game.pausedForVar} />
 
           <View style={styles.tacticalBars}>
             <TacticalBar label="CONTROLE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
