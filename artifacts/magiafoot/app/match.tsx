@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { formatCurrency, getCareerDivision, getCurrentFixture, LEAGUE_FIXTURES } from '@/game/engine';
+import { formatCareerDate, formatCurrency, getCareerDivision, getCurrentFixture, getDaysUntilNextMatch, LEAGUE_FIXTURES } from '@/game/engine';
 import type { MatchEvent, MatchSession } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -279,7 +279,15 @@ export default function MatchScreen() {
                 <Text style={styles.preGameVs}>×</Text>
                 <Text style={styles.preGameTitle}>{away.name}</Text>
                 <Text style={styles.preGameMeta}>Escalação {career.formationId} · arbitragem, VAR e regras completas</Text>
-                <GameButton label="ENTRAR EM CAMPO" icon="play" onPress={startCurrentMatch} />
+                <Text style={styles.preGameMeta}>{formatCareerDate(career)}</Text>
+                {getDaysUntilNextMatch(career) > 0 ? (
+                  <>
+                    <Text style={styles.preGameMeta}>Faltam {getDaysUntilNextMatch(career)} dia(s) para a partida. Avance o calendário e recupere o físico da equipe.</Text>
+                    <GameButton label="IR PARA O CALENDÁRIO" icon="calendar" onPress={() => router.push('/calendar')} />
+                  </>
+                ) : (
+                  <GameButton label="ENTRAR EM CAMPO" icon="play" onPress={startCurrentMatch} />
+                )}
               </>
             ) : (
               <>
