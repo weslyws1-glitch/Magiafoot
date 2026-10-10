@@ -98,7 +98,7 @@ interface CareerContextValue {
   movePlayer: (slotId: string, playerId: string) => void;
   chooseCaptain: (playerId: string) => void;
   setTactics: (tactics: Tactics) => void;
-  closeCurrentMatch: () => void;
+  closeCurrentMatch: () => boolean;
   signPlayer: (playerId: string) => boolean;
   negotiateMarketPlayer: (
     playerId: string,
@@ -514,7 +514,20 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const movePlayer = useCallback((slotId: string, playerId: string) => update((current) => assignPlayerToSlot(current, slotId, playerId)), [update]);
   const chooseCaptain = useCallback((playerId: string) => update((current) => setCaptain(current, playerId)), [update]);
   const setTactics = useCallback((tactics: Tactics) => update((current) => updateTactics(current, tactics)), [update]);
-  const closeCurrentMatch = useCallback(() => update(finalizeMatch), [update]);
+  const closeCurrentMatch = useCallback((): boolean => {
+    // Finalizar fora do updater do React evita que um erro do motor derrube
+    // a árvore inteira de componentes e a carreira em andamento.
+    if (!career || career.liveMatch?.phase !== 'finished') return false;
+    try {
+      const finishedCareer = finalizeMatch(career);
+      if (finishedCareer === career || finishedCareer.liveMatch) return false;
+      setCareer(finishedCareer);
+      return true;
+    } catch (error) {
+      console.error('[MagiaFoot] Falha ao encerrar partida, resultado preservado:', error);
+      return false;
+    }
+  }, [career]);
   const signPlayer = useCallback((playerId: string) => {
     if (!career) return false;
     const next = addTransferPlayer(career, playerId);
