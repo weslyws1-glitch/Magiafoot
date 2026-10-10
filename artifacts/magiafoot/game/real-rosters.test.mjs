@@ -3,7 +3,7 @@ import test from 'node:test';
 import { CLUBS, getClub, makeRoster, makeMarketPlayers } from './data.ts';
 import { REAL_ROSTERS_2026 } from './real-rosters-2026.ts';
 import {
-  advanceMatch, createCareer, finalizeMatch, parseCareer,
+  advanceMatch, advanceCareerToNextMatch, createCareer, finalizeMatch, parseCareer,
   recalibrate2026CareerRoster, serializeCareer, startMatch,
 } from './engine.ts';
 
@@ -65,7 +65,7 @@ test('old careers can opt into safer ratings without losing contracts and result
 
 test('league match can kick off and result remains saved', () => {
   for (const clubId of ['flamengo', 'volta-redonda', 'brusque', 'anapolis']) {
-    let career = startMatch(createCareer('Teste', clubId));
+    let career = startMatch(advanceCareerToNextMatch(createCareer('Teste', clubId)));
     assert.ok(career.liveMatch, clubId);
     career = advanceMatch(career, 1);
     assert.equal(career.liveMatch?.phase, 'first_half', clubId);
