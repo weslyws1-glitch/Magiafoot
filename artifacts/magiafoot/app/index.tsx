@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ClubBadge, Screen, formatCurrency } from '@/components/ManagerUI';
+import { DailyAdvancePanel } from '@/components/DailyAdvancePanel';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
 import {
@@ -21,6 +22,7 @@ import {
   formatFixtureDate,
   getCareerDivision,
   getCurrentFixture,
+  getDaysUntilNextMatch,
   getLeagueRoundCount,
   seasonYear,
 } from '@/game/engine';
@@ -175,8 +177,9 @@ export default function HomeScreen() {
     (career.finance?.seasonWagesPaid ?? 0)
     + (career.finance?.seasonTransferSpend ?? 0);
 
+  const daysUntilMatch = getDaysUntilNextMatch(career);
   const openMatch = () => {
-    if (!dashboard.fixture) return;
+    if (!dashboard.fixture || (!career.liveMatch && daysUntilMatch > 0)) return;
     if (!career.liveMatch) startCurrentMatch();
     router.push('/match');
   };
@@ -224,6 +227,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <DailyAdvancePanel compact />
+
         <View style={styles.heroRow}>
           <Pressable onPress={() => router.push('/news')} style={styles.heroStory}>
             <ImageBackground source={{ uri: newsImage(mainStory) }} resizeMode="cover" style={styles.heroImage} imageStyle={styles.heroImageRadius}>
@@ -266,8 +271,13 @@ export default function HomeScreen() {
                     </View>
                   </View>
                   <Text style={styles.nextDate}>{formatFixtureDate(dashboard.fixture, career.season)}</Text>
-                  <Pressable onPress={openMatch} style={styles.playMatchButton}>
-                    <Text style={styles.playMatchText}>{career.liveMatch ? 'CONTINUAR' : 'JOGAR PARTIDA'}</Text>
+                  <Pressable
+                    onPress={openMatch}
+                    disabled={!career.liveMatch && daysUntilMatch > 0}
+                    style={[styles.playMatchButton, !career.liveMatch && daysUntilMatch > 0 && { backgroundColor: '#254737' }]}>
+                    <Text style={[styles.playMatchText, !career.liveMatch && daysUntilMatch > 0 && { color: '#a9beaE' }]}>
+                      {career.liveMatch ? 'CONTINUAR' : daysUntilMatch > 0 ? 'EM ' + daysUntilMatch + (daysUntilMatch === 1 ? ' DIA' : ' DIAS') : 'JOGAR PARTIDA'}
+                    </Text>
                   </Pressable>
                 </>
               ) : (
