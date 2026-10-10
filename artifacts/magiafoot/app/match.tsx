@@ -33,7 +33,7 @@ function momentTitle(event?: MatchEvent) {
   const labels: Partial<Record<MatchEvent['type'], string>> = {
     goal: 'GOL!',
     penalty: 'PÊNALTI',
-    save: 'DEFESAÇA',
+    save: 'DEFESA',
     post: 'NA TRAVE',
     offside: 'IMPEDIMENTO',
     corner: 'ESCANTEIO',
@@ -100,36 +100,6 @@ function tacticalShare(left: number, right: number, fallback = 50) {
   const total = Math.max(0, left) + Math.max(0, right);
   if (total <= 0.0001) return fallback;
   return Math.max(8, Math.min(92, Math.round((left / total) * 100)));
-}
-
-function broadcastReading(
-  homeName: string,
-  awayName: string,
-  homePossession: number,
-  awayPossession: number,
-  homeXg: number,
-  awayXg: number,
-  homeShotsOnTarget: number,
-  awayShotsOnTarget: number,
-) {
-  const possessionDiff = homePossession - awayPossession;
-  const xgDiff = homeXg - awayXg;
-  const targetDiff = homeShotsOnTarget - awayShotsOnTarget;
-
-  if (Math.abs(xgDiff) >= 0.55) {
-    const leader = xgDiff > 0 ? homeName : awayName;
-    const trailer = xgDiff > 0 ? awayName : homeName;
-    return `${leader} criou as chances mais perigosas. ${trailer} precisa proteger melhor a área e reduzir os espaços entre as linhas.`;
-  }
-  if (Math.abs(possessionDiff) >= 16 && Math.abs(xgDiff) < 0.30) {
-    const leader = possessionDiff > 0 ? homeName : awayName;
-    return `${leader} controla mais a bola, mas ainda transforma pouco essa posse em chances claras. É uma posse mais territorial do que agressiva.`;
-  }
-  if (Math.abs(targetDiff) >= 3) {
-    const leader = targetDiff > 0 ? homeName : awayName;
-    return `${leader} chega com mais frequência ao gol e obriga o adversário a defender mais baixo. O volume ofensivo está fazendo diferença.`;
-  }
-  return 'Jogo equilibrado: nenhuma equipe conseguiu impor domínio claro. A próxima sequência de pressão pode mudar o roteiro da partida.';
 }
 
 function TacticalBar({
@@ -282,12 +252,6 @@ export default function MatchScreen() {
   const xgShare = tacticalShare(game.homeStats.xg, game.awayStats.xg);
   const targetShare = tacticalShare(game.homeStats.shotsOnTarget + game.homeStats.bigChances * 0.7, game.awayStats.shotsOnTarget + game.awayStats.bigChances * 0.7);
   const pressureShare = Math.max(12, Math.min(88, 50 + (game.homeStats.shotsOnTarget - game.awayStats.shotsOnTarget) * 7 + (game.homeStats.corners - game.awayStats.corners) * 2));
-  const broadcastText = broadcastReading(
-    home.name, away.name, homePossession, awayPossession,
-    game.homeStats.xg, game.awayStats.xg,
-    game.homeStats.shotsOnTarget, game.awayStats.shotsOnTarget,
-  );
-
   const injuredRequired = game.requiredSubstitutionPlayerId
     ? career.players.find((player) => player.id === game.requiredSubstitutionPlayerId)
     : undefined;
@@ -352,12 +316,11 @@ export default function MatchScreen() {
           <Panel style={styles.halftimeHero}>
             <Text style={styles.halftimeKicker}>INTERVALO</Text>
             <Text style={styles.halftimeScore}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
-            <Text style={styles.halftimeText}>Resumo do primeiro tempo e leitura tática da transmissão</Text>
+            <Text style={styles.halftimeText}>Resumo e estatísticas do primeiro tempo</Text>
           </Panel>
 
           <Panel style={styles.matchIntelligence}>
-            <Text style={styles.panelKicker}>LEITURA DO 1º TEMPO</Text>
-            <Text style={styles.broadcastLead}>{broadcastText}</Text>
+            <Text style={styles.panelKicker}>RESUMO DO 1º TEMPO</Text>
             <View style={styles.tacticalBars}>
               <TacticalBar label="POSSE" leftLabel={homePossession + '%'} rightLabel={awayPossession + '%'} leftShare={homePossession} />
               <TacticalBar label="PERIGO (xG)" leftLabel={game.homeStats.xg.toFixed(2)} rightLabel={game.awayStats.xg.toFixed(2)} leftShare={xgShare} />
