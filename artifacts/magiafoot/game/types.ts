@@ -404,6 +404,7 @@ export interface MatchSession {
 
 export interface Career {
   schemaVersion: 1;
+  rosterRebalanced2026?: boolean;
   id: string;
   coachName: string;
   clubId: string;
