@@ -1,10 +1,14 @@
 {
   "source": "ESPN Soccer",
   "season": 2026,
-  "generatedAt": "2026-10-10T01:20:56.727Z",
+  "generatedAt": "2026-10-10T22:27:12.415Z",
+  "duplicateAthletesDetected": 148,
+  "wrongClubEntriesRemoved": 150,
+  "duplicateAthletesVerifiedWithCurrentClub": 142,
+  "strengthScale": "game-estimated from club level, appearances, starts, goals, assists and age",
   "clubsTotal": 314,
   "clubsWithRealData": 278,
-  "realPlayers": 9787,
+  "realPlayers": 9632,
   "byDivision": {
     "br-a": {
       "total": 20,
@@ -214,12 +218,12 @@
       "total": 0
     },
     {
-      "id": "floresta",
+      "id": "parnahyba",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
     {
-      "id": "parnahyba",
+      "id": "floresta",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
@@ -229,12 +233,12 @@
       "total": 0
     },
     {
-      "id": "vitoria-es",
+      "id": "real-noroeste",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
     {
-      "id": "real-noroeste",
+      "id": "vitoria-es",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
