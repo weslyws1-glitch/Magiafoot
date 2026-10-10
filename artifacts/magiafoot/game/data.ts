@@ -1,6 +1,7 @@
 import type { Club, FormationId, FormationOption, FormationSlot, Player, Position } from './types.ts';
 import { REAL_BRAZIL_CLUBS, getDivisionDefinition } from './real-clubs.ts';
 import { SOUTH_AMERICA_CLUBS, getInternationalDivision } from './international-clubs.ts';
+import { REAL_ROSTERS_2026 } from './real-rosters-2026.ts';
 
 export const LEAGUE_NAME = '3ª Divisão';
 
@@ -216,13 +217,68 @@ function makePlayer(
   };
 }
 
+const REAL_POSITION_ROTATION: Record<'G' | 'D' | 'M' | 'F', Position[]> = {
+  G: ['GOL'],
+  D: ['ZAG','ZAG','LE','LD','ZAG','LE','LD'],
+  M: ['VOL','MC','MEI','MC','VOL','MEI','MC'],
+  F: ['ATA','PE','PD','ATA','PE','PD'],
+};
+
+const COUNTRY_BY_ISO: Record<string, string> = {
+  BR:'Brasil',AR:'Argentina',UY:'Uruguai',CL:'Chile',CO:'Colômbia',
+  PY:'Paraguai',PE:'Peru',EC:'Equador',BO:'Bolívia',VE:'Venezuela',
+  PT:'Portugal',ES:'Espanha',FR:'França',GB:'Inglaterra',DE:'Alemanha',
+  IT:'Itália',JP:'Japão',US:'Estados Unidos',
+};
+
 export function makeRoster(club: Club): Player[] {
-  return ROSTER_SEED.map((player, index) => ({
-    ...makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index),
-    nationality: club.country,
-    nationalityCode: club.countryCode,
-    currentClubId: club.id,
-  }));
+  const verified = REAL_ROSTERS_2026[club.id];
+  if (!verified?.length) {
+    // Fonte indisponível: manter o elenco fictício clássico, sem
+    // apresentar esses nomes como jogadores reais.
+    return ROSTER_SEED.map((player, index) => ({
+      ...makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index),
+      nationality: club.country,
+      nationalityCode: club.countryCode,
+      currentClubId: club.id,
+    }));
+  }
+  const counters = { G:0, D:0, M:0, F:0 };
+  const real = verified.map(([name, role, age, shirt, nationalityCode], index) => {
+    const list = REAL_POSITION_ROTATION[role];
+    const position = list[counters[role]++ % list.length]!;
+    const variation = (hash(club.id + ':' + name) % 7) - 3;
+    const player = makePlayer(
+      { name, age, position, skill: variation },
+      `${club.id}-real-${index + 1}`,
+      club.rating, index,
+    );
+    return {
+      ...player,
+      nationality: COUNTRY_BY_ISO[nationalityCode] ?? club.country,
+      nationalityCode,
+      currentClubId: club.id,
+      ...(shirt > 0 ? { shirtNumber: shirt } : {}),
+    };
+  });
+
+  // Alguns clubes menores só têm parte da escalação publicada. A base
+  // completa os lugares faltantes, identificados como atletas da base.
+  const missing = Math.max(0, 26 - real.length);
+  const academy = Array.from({ length: missing }, (_, index) => {
+    const source = ROSTER_SEED[index % ROSTER_SEED.length]!;
+    const seed = {
+      ...source,
+      name: 'Atleta da base ' + club.initials + ' ' + String(index + 1).padStart(2, '0'),
+    };
+    return {
+      ...makePlayer(seed, `${club.id}-academy-${index + 1}`, club.rating - 5, real.length + index),
+      nationality: club.country,
+      nationalityCode: club.countryCode,
+      currentClubId: club.id,
+    };
+  });
+  return [...real, ...academy];
 }
 
 export function makeMarketPlayers(club: Club): Player[] {
