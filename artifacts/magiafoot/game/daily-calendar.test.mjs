@@ -97,6 +97,8 @@ test('no magic recovery upon kickoff; match lowers fitness; future daily rest im
     assert.deepEqual(career.players.map((p) => p.fitness), before, clubId);
     career = advanceMatch(career, 1);
     assert.equal(career.liveMatch?.phase, 'first_half');
+    // O primeiro clique dá o apito inicial; o segundo simula o minuto 1.
+    career = advanceMatch(career, 1);
     const kickoffPlayerId = career.liveMatch.userLineup[0].playerId;
     const duringPlayer = career.players.find((p) => p.id === kickoffPlayerId);
     assert.ok(duringPlayer.fitness < before[career.players.findIndex((p) => p.id === kickoffPlayerId)], clubId);
