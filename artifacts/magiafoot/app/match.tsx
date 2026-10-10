@@ -208,7 +208,9 @@ export default function MatchScreen() {
   const [resultSaved, setResultSaved] = useState(false);
   // Mantém o placar final visível mesmo após encerrar e salvar a rodada.
   const [finalSnapshot, setFinalSnapshot] = useState<MatchSession | null>(null);
-  const game = career?.liveMatch ?? ((savingResult || resultSaved) ? finalSnapshot : null);
+  const [finalDivisionName, setFinalDivisionName] = useState<string | null>(null);
+  // Mesmo se o save falhar, a tela mantém o resultado para uma nova tentativa.
+  const game = career?.liveMatch ?? finalSnapshot;
 
   useEffect(() => {
     if (!savingResult || !career || career.liveMatch) return;
@@ -269,7 +271,7 @@ export default function MatchScreen() {
   const away = getClub(game.fixture.awayClubId);
   if (!home || !away) return null;
 
-  const divisionName = getCareerDivision(career)?.name ?? 'DIVISÃO';
+  const divisionName = (!career.liveMatch && finalSnapshot ? finalDivisionName : null) ?? getCareerDivision(career)?.name ?? 'DIVISÃO';
   const clock = clockLabel(game);
   const isFinal = game.phase === 'finished';
   const latestEvent = game.events.length ? game.events[game.events.length - 1] : undefined;
@@ -328,6 +330,7 @@ export default function MatchScreen() {
       if (savingResult) return;
       if (resultSaved) { router.replace('/'); return; }
       setFinalSnapshot(game);
+      setFinalDivisionName(divisionName);
       setSavingResult(true);
       closeCurrentMatch();
       // A tela só retorna à carreira depois da confirmação do salvamento.
