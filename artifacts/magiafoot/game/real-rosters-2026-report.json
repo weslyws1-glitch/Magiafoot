@@ -1,7 +1,7 @@
 {
   "source": "ESPN Soccer",
   "season": 2026,
-  "generatedAt": "2026-10-10T01:17:38.226Z",
+  "generatedAt": "2026-10-10T01:20:37.211Z",
   "clubsTotal": 314,
   "clubsWithRealData": 263,
   "realPlayers": 9368,
@@ -254,12 +254,12 @@
       "total": 0
     },
     {
-      "id": "capital-df",
+      "id": "guapore",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
     {
-      "id": "guapore",
+      "id": "capital-df",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
     },
