@@ -1,0 +1,272 @@
+{
+  "source": "ESPN Soccer",
+  "season": 2026,
+  "generatedAt": "2026-10-10T01:17:38.226Z",
+  "clubsTotal": 314,
+  "clubsWithRealData": 263,
+  "realPlayers": 9368,
+  "byDivision": {
+    "br-a": {
+      "total": 20,
+      "covered": 20
+    },
+    "br-b": {
+      "total": 20,
+      "covered": 20
+    },
+    "br-c": {
+      "total": 20,
+      "covered": 15
+    },
+    "br-d": {
+      "total": 96,
+      "covered": 53
+    },
+    "ar-1": {
+      "total": 30,
+      "covered": 30
+    },
+    "uy-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "cl-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "co-1": {
+      "total": 20,
+      "covered": 20
+    },
+    "ec-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "py-1": {
+      "total": 12,
+      "covered": 12
+    },
+    "pe-1": {
+      "total": 18,
+      "covered": 17
+    },
+    "bo-1": {
+      "total": 16,
+      "covered": 15
+    },
+    "ve-1": {
+      "total": 14,
+      "covered": 13
+    }
+  },
+  "omitted": [
+    {
+      "id": "brusque",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "floresta",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "inter-limeira",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "ituano",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "gas-rr",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "sao-raimundo-rr",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "humaita",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "brasiliense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "luverdense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "inhumas",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "aparecidense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "uniao-mt",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "goiatuba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "moto-club",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "iguatu",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "parnahyba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "ferroviario-ce",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "atletico-ce",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "central-pe",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "decisao",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "treze",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "sergipe",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "cse",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "atletico-ba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "crac",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "abecat",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "porto-ba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "real-noroeste",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "democrata-gv",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "agua-santa",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "pouso-alegre",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "marica",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "xv-piracicaba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "noroeste",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "fc-cascavel",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "blumenau",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "marcilio-dias",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "sao-joseense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "sao-jose-rs",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "brasil-pelotas",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "bo-gualberto-villarroel",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "ve-universidad-central",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "vitoria-es",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "america-rj",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "operario-mt",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "sampaio-correa-ma",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "pe-utc-cajamarca",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "ferroviaria",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "capital-df",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "guapore",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "laguna-rn",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    }
+  ]
+}
