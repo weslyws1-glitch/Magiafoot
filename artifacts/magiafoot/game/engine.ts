@@ -2351,11 +2351,12 @@ export function finalizeMatch(career: Career): Career {
     if (!home || !away) throw new Error('Partida da liga sem clube válido.');
     const seed = hash(`${fixture.id}-${career.season}`);
     if (isUserMatch) {
-      const userHome = career.clubId === fixture.homeClubId;
+      // O placar da simulação já segue mandante/visitante,
+      // independentemente de o clube do usuário jogar em casa ou fora.
       return {
         ...fixture,
-        homeGoals: userHome ? game.homeGoals : game.awayGoals,
-        awayGoals: userHome ? game.awayGoals : game.homeGoals,
+        homeGoals: game.homeGoals,
+        awayGoals: game.awayGoals,
         attendance: Math.round((home.stadiumCapacity + Math.max(0, (career.stadiumUpgrades?.stands ?? career.stadiumLevel + 1) - 1) * 4_000) * Math.min(0.92, Math.min(0.78, 0.49 + (career.stadiumUpgrades?.seats ?? 1) * 0.025 + (career.stadiumUpgrades?.roof ?? 0) * 0.02) * ticketDemandMultiplier(career.ticketPrice ?? home.ticketPrice, home.ticketPrice))),
       };
     }
