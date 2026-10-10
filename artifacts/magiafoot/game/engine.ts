@@ -467,6 +467,8 @@ export function createCareer(coachName: string, clubId: string, currency: Curren
   return {
     schemaVersion: 1,
     rosterRebalanced2026: true,
+    currentDate: isoDate(new Date(seasonRoundDate(1, 0).getTime() - 6 * 86400000)),
+    trainingIntensity: 'normal',
     id: `carreira-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     coachName: coachName.trim(),
     clubId,
@@ -652,6 +654,98 @@ export function setCaptain(career: Career, playerId: string): Career {
   return career.lineup.some((slot) => slot.playerId === playerId) ? { ...career, captainId: playerId } : career;
 }
 
+/** Data da carreira em UTC, sem dependência do fuso ou do relógio do celular. */
+export function getCareerDate(career: Career): string {
+  const stored = career.currentDate;
+  if (typeof stored === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(stored)
+    && !Number.isNaN(new Date(stored + 'T12:00:00Z').getTime())) return stored;
+  const fixture = getCurrentFixture(career);
+  // Migração conservadora: saves antigos retomam poucos dias antes da rodada;
+  // partidas já em andamento permanecem intactas.
+  const gameDay = fixture ? fixtureDate(fixture, career.season) : seasonRoundDate(career.season, career.roundIndex);
+  const fallback = new Date(gameDay);
+  fallback.setUTCDate(fallback.getUTCDate() - (career.roundIndex === 0 && !career.results.length ? 6 : 3));
+  return isoDate(fallback);
+}
+
+export function formatCareerDate(career: Career): string {
+  return new Date(getCareerDate(career) + 'T12:00:00Z').toLocaleDateString('pt-BR', {
+    timeZone: 'UTC', weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  });
+}
+
+export function getDaysUntilNextMatch(career: Career): number {
+  if (career.liveMatch) return 0;
+  const fixture = getCurrentFixture(career);
+  if (!fixture) return 0;
+  const current = Date.parse(getCareerDate(career) + 'T12:00:00Z');
+  const gameDay = fixtureDate(fixture, career.season).getTime();
+  return Math.max(0, Math.round((gameDay - current) / 86400000));
+}
+
+export function setCareerTrainingIntensity(
+  career: Career, intensity: NonNullable<Career['trainingIntensity']>,
+): Career {
+  if (career.liveMatch || !['rest','light','normal','intense'].includes(intensity)) return career;
+  return career.trainingIntensity === intensity ? career : { ...career, trainingIntensity: intensity };
+}
+
+/** Avança exatamente UM dia. Uma rodada só é concluída jogando a partida,
+ * portanto não pule escalações, resultados nem decisões do treinador.
+ * Retorna o mesmo save quando já chegou ao dia de jogo.
+ */
+export function advanceCareerDay(career: Career): Career {
+  if (career.liveMatch || getDaysUntilNextMatch(career) <= 0) return career;
+  const date = new Date(getCareerDate(career) + 'T12:00:00Z');
+  date.setUTCDate(date.getUTCDate() + 1);
+  const nextDate = isoDate(date);
+  const training = career.trainingIntensity ?? 'normal';
+  const physio = Math.max(1, career.trainingCenterUpgrades?.physio ?? 1);
+  const gym = Math.max(1, career.trainingCenterUpgrades?.gym ?? 1);
+  const fieldCapacity = trainingFieldCapacity(career.trainingCenterUpgrades?.field ?? 1);
+  // Lotações grandes reduzem discretamente a qualidade do treino;
+  // nunca tirem dezenas de pontos de físico no início de um jogo.
+  const crowding = Math.min(1.5, Math.max(0, career.players.length - fieldCapacity) * 0.055);
+  const base = training === 'rest' ? 10.5 : training === 'light' ? 7.5
+    : training === 'intense' ? 1.5 : 5.5;
+  const recovery = Math.max(0.5, base + (physio - 1) * 0.7 + (gym - 1) * 0.25 - crowding);
+  const players = career.players.map((player) => {
+    const injured = player.status === 'injured';
+    // O tempo de lesão passa em DIAS, mesmo sem jogos. Em saves legados,
+    // derive uma estimativa a partir da rodada de retorno.
+    const injuryDays = injured
+      ? (player.injuryDaysRemaining && player.injuryDaysRemaining > 0
+        ? player.injuryDaysRemaining
+        : Math.max(1, ((player.injuryUntilRound ?? career.roundIndex) - career.roundIndex + 1) * 7))
+      : 0;
+    const remaining = injured ? Math.max(0, injuryDays - 1) : 0;
+    const healed = injured && remaining === 0;
+    // Lesionados fazem fisioterapia em vez de treino competitivo.
+    const gained = injured ? (training === 'rest' ? 7 : 5) + (physio - 1) * 0.8
+      : recovery + (player.fitness < 55 ? 1.5 : player.fitness < 75 ? 0.7 : 0);
+    return {
+      ...player,
+      fitness: clamp(Math.round((player.fitness + gained) * 10) / 10, 5, 100),
+      ...(injured ? {
+        injuryDaysRemaining: remaining,
+        ...(healed ? { status: 'available' as const, injuryUntilRound: null, injuryName: null } : {}),
+      } : {}),
+    };
+  });
+  return { ...career, currentDate: nextDate, trainingIntensity: training, players };
+}
+
+/** Avanço sem atalhos: executa a mesma lógica diária até a próxima partida.
+ * A tela usa passos visuais individuais; esta função apoia testes e ações futuras.
+ */
+export function advanceCareerToNextMatch(career: Career): Career {
+  if (career.liveMatch) return career;
+  let next = career;
+  const remaining = Math.min(365, getDaysUntilNextMatch(next));
+  for (let step = 0; step < remaining; step++) next = advanceCareerDay(next);
+  return next;
+}
+
 export function getCurrentFixture(career: Career): Fixture | undefined {
   const schedule = Array.isArray(career.leagueFixtures) && career.leagueFixtures.length
     ? career.leagueFixtures
@@ -678,26 +772,18 @@ function currentGamePlayers(career: Career, game: MatchSession) {
     .filter((item): item is { slot: FormationSlot; player: Player } => Boolean(item.player && item.player.status === 'available'));
 }
 
-function recoverBetweenRounds(players: Player[], currentRound: number, physioLevel = 1, gymLevel = 1): Player[] {
+function recoverBetweenRounds(players: Player[], currentRound: number): Player[] {
+  // A condição física e os dias de lesão mudam SOMENTE no calendário diário.
+  // Não dar +20 pontos mágicos ao clicar em "JOGAR PARTIDA".
   return players.map((player) => {
-    const expiredInjury = player.status === 'injured'
-      && player.injuryUntilRound !== null
-      && currentRound > player.injuryUntilRound;
     const expiredSuspension = player.status === 'suspended'
       && player.suspendedUntilRound !== null
       && currentRound > player.suspendedUntilRound;
     const expiredLoan = player.status === 'loaned'
       && typeof player.loanedOutUntilRound === 'number'
       && currentRound > player.loanedOutUntilRound;
-    const recovery = 18 + physioLevel * 2 + Math.floor(gymLevel / 2);
-    const injuryDaysRemaining = player.status === 'injured' && !expiredInjury
-      ? Math.max(1, (player.injuryDaysRemaining ?? 7) - 7)
-      : 0;
     return {
       ...player,
-      fitness: clamp(player.fitness + recovery, 15, 100),
-      injuryDaysRemaining,
-      ...(expiredInjury ? { status: 'available' as const, injuryUntilRound: null, injuryName: null, injuryDaysRemaining: 0 } : {}),
       ...(expiredSuspension ? { status: 'available' as const, suspendedUntilRound: null, suspensionReason: null } : {}),
       ...(expiredLoan ? { status: 'available' as const, loanedOutUntilRound: null, loanClubName: null } : {}),
     };
@@ -705,13 +791,13 @@ function recoverBetweenRounds(players: Player[], currentRound: number, physioLev
 }
 
 export function startMatch(career: Career): Career {
-  if (career.liveMatch) return career;
+  if (career.liveMatch || getDaysUntilNextMatch(career) > 0) return career;
   const fixture = getCurrentFixture(career);
   if (!fixture) return career;
   const club = getClub(career.clubId);
   if (!club) return career;
 
-  const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex, career.trainingCenterUpgrades?.physio ?? 1, career.trainingCenterUpgrades?.gym ?? 1);
+  const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex);
   const eligiblePlayers = recoveredPlayers.filter((player) => player.status === 'available');
   const eligibleIds = new Set(eligiblePlayers.map((player) => player.id));
   // Não bloqueie o apito inicial por um atleta machucado/suspenso que ficou
@@ -758,12 +844,7 @@ export function startMatch(career: Career): Career {
     randomSeed: (hash(`${career.clubId}-${career.roundIndex}-${career.season}`) + 19) >>> 0,
   };
   game.referee = makeMatchReferee(game);
-  const fieldCapacity = trainingFieldCapacity(career.trainingCenterUpgrades?.field ?? 1);
-  const overcrowding = Math.max(0, recoveredPlayers.length - fieldCapacity);
-  const adjustedPlayers = overcrowding > 0
-    ? recoveredPlayers.map((player) => ({ ...player, fitness: clamp(player.fitness - overcrowding * 2, 10, 100) }))
-    : recoveredPlayers;
-  return { ...career, players: adjustedPlayers, lineup, benchIds, liveMatch: game };
+  return { ...career, players: recoveredPlayers, lineup, benchIds, liveMatch: game };
 }
 
 function statLine(game: MatchSession, clubId: string): MatchStats {
@@ -2384,6 +2465,7 @@ function advanceToNextSeason(career: Career): Career {
     divisionId: nextDivisionId,
     leagueClubIds: nextLeagueClubIds,
     season: completedSeason + 1,
+    currentDate: isoDate(new Date(seasonRoundDate(completedSeason + 1, 0).getTime() - 6 * 86400000)),
     roundIndex: 0,
     players,
     market: club ? makeCareerMarket(club).map((player) => initializePlayerCareerProfile(player, completedSeason + 1, 0)) : career.market,
