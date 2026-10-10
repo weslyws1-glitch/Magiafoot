@@ -246,16 +246,19 @@ const REAL_ROLE_OVERRIDES: Record<string, Record<string, Position>> = {
     'Jefté':'LE','Joaquín Piquerez':'LE','Gustavo Gómez':'ZAG',
     'Khellven':'LD','Raphael Veiga':'MEI','Maurício':'MEI',
     'José Manuel López':'ATA','Vitor Roque':'ATA','Paulinho':'PE',
-    'Andreas Pereira':'MC',
+    'Andreas Pereira':'MC','Jhon Arias':'PD',
+    'Marlon Freitas':'VOL',
   },
   corinthians: {
     'Memphis Depay':'ATA','Yuri Alberto':'ATA',
     'Rodrigo Garro':'MEI','André Carrillo':'MC',
     'Fabrizio Angileri':'LE','Gustavo Henrique':'ZAG',
+    'Mateuzinho':'LD','Matheus Bidu':'LE',
   },
   'botafogo-rj': {
     'Alexander Barboza':'ZAG','Vitinho':'LD','Alex Telles':'LE',
     'Marlon Freitas':'VOL','Savarino':'PD',
+    'Arthur Cabral':'ATA','Danilo Santos':'VOL',
   },
   vasco: {
     'Lucas Piton':'LE','Léo Jardim':'GOL','Robert Renan':'ZAG',
@@ -303,6 +306,10 @@ export function makeRoster(club: Club): Player[] {
     }));
   }
   const counters = { G:0, D:0, M:0, F:0 };
+  const activeStatsCount = verified.filter((record) => typeof record[5] === 'number' && record[5]! > 0).length;
+  // Copa do Brasil e divisões menores nem sempre publicam todos os jogos.
+  // Zero estatísticas no provedor NÃO significa que todo titular seja fraco.
+  const statsReliable = activeStatsCount >= Math.max(5, Math.ceil(verified.length * 0.24));
   const real = verified.map(([name, role, age, shirt, nationalityCode, appearances, starts, goals, assists, espnId], index) => {
     const list = REAL_POSITION_ROTATION[role];
     const position = REAL_ROLE_OVERRIDES[club.id]?.[name] ?? list[counters[role]++ % list.length]!;
@@ -313,9 +320,14 @@ export function makeRoster(club: Club): Player[] {
     );
     // O antigo motor dava 88 a um goleiro reserva de 17 anos só porque
     // ele estava inscrito no Flamengo. Separar desempenho de reputação.
-    const strength = typeof appearances === 'number'
+    const strength = statsReliable && typeof appearances === 'number'
       ? verifiedPlayerStrength(club.rating, age, role, name, appearances, starts ?? 0, goals ?? 0, assists ?? 0)
-      : clamp(club.rating - 9 + ((hash(name) % 7) - 3), 43, 82);
+      : clamp(
+          club.rating - 4 + ((hash(name) % 9) - 4) +
+          (age <= 19 ? -5 : age <= 21 ? -2 : age >= 25 && age <= 33 ? 1 : 0) +
+          (typeof appearances === 'number' && appearances >= 3 ? 2 : 0),
+          43, 86,
+        );
     const ageCurve = Math.max(0.45, 1 - Math.abs(age - 25) * 0.025);
     return {
       ...player,
@@ -329,22 +341,38 @@ export function makeRoster(club: Club): Player[] {
     };
   });
 
-  // Alguns clubes menores só têm parte da escalação publicada. A base
-  // completa os lugares faltantes, identificados como atletas da base.
+  // Os clubes com cadastro incompleto recebem só as posições faltantes
+  // para viabilizar uma escalação. A base deve ser inferior aos profissionais.
+  const targetPositions: Record<Position, number> = {
+    GOL: 3, ZAG: 4, LE: 2, LD: 2, VOL: 2,
+    MC: 3, MEI: 2, PE: 2, PD: 2, ATA: 4,
+  };
   const missing = Math.max(0, 26 - real.length);
-  const academy = Array.from({ length: missing }, (_, index) => {
-    const source = ROSTER_SEED[index % ROSTER_SEED.length]!;
+  const positionCounts = new Map<Position, number>();
+  for (const player of real) positionCounts.set(player.position, (positionCounts.get(player.position) ?? 0) + 1);
+  const academy: Player[] = [];
+  for (let index = 0; index < missing; index++) {
+    const needed = (Object.entries(targetPositions) as [Position, number][])
+      .map(([position, target]) => ({ position, shortage: target - (positionCounts.get(position) ?? 0) }))
+      .sort((a, b) => b.shortage - a.shortage);
+    const position = needed[0]?.position ?? 'MC';
+    positionCounts.set(position, (positionCounts.get(position) ?? 0) + 1);
+    const source = ROSTER_SEED.find((entry) => entry.position === position) ?? ROSTER_SEED[0]!;
     const seed = {
-      ...source,
+      ...source, position,
       name: 'Atleta da base ' + club.initials + ' ' + String(index + 1).padStart(2, '0'),
+      age: 18 + index % 4,
+      skill: -5,
     };
-    return {
-      ...makePlayer(seed, `${club.id}-academy-${index + 1}`, club.rating - 5, real.length + index),
+    const player = makePlayer(seed, `${club.id}-academy-${index + 1}`, club.rating - 13, real.length + index);
+    academy.push({
+      ...player,
+      strength: clamp(player.strength, 43, Math.max(48, club.rating - 11)),
       nationality: club.country,
       nationalityCode: club.countryCode,
       currentClubId: club.id,
-    };
-  });
+    });
+  }
   return [...real, ...academy];
 }
 
