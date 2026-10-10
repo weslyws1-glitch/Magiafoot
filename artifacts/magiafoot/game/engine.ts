@@ -2861,7 +2861,7 @@ export function negotiateTransferPurchase(
 ): { career: Career; result: TransferNegotiationResult; counterOffer?: number; wageDemand?: number } {
   const player = career.market.find((item) => item.id === playerId);
   if (!player) return { career, result: 'not_found' };
-  if (career.players.length >= 32) return { career, result: 'squad_full' };
+  if (career.players.length >= 65) return { career, result: 'squad_full' };
 
   const seller = player.currentClubId ? getClub(player.currentClubId) : undefined;
   const seed = hash('negotiation-' + career.id + '-' + player.id + '-' + career.roundIndex);
@@ -2944,7 +2944,7 @@ export function addTransferPlayer(career: Career, playerId: string): Career {
   const currentWages = career.players.reduce((sum, item) => sum + item.wage, 0);
   const canAffordTransfer = (finance?.transferBudget ?? career.balance) >= (player?.value ?? Number.POSITIVE_INFINITY);
   const canAffordWage = player ? currentWages + player.wage <= (finance?.weeklyWageBudget ?? Number.POSITIVE_INFINITY) : false;
-  if (!player || career.balance < player.value || !canAffordTransfer || !canAffordWage || career.players.length >= 32) return career;
+  if (!player || career.balance < player.value || !canAffordTransfer || !canAffordWage || career.players.length >= 65) return career;
 
   let next: Career = {
     ...career,
