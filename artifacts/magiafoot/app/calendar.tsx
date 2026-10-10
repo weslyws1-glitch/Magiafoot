@@ -46,11 +46,12 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     if (!career) return;
-    const activeFixture = current ?? clubFixtures.find((fixture) => fixture.roundIndex >= career.roundIndex) ?? clubFixtures[0];
-    const month = activeFixture ? fixtureDate(activeFixture, career.season).getUTCMonth() : 2;
+    // O calendário acompanha o dia efetivamente simulado, mesmo quando
+    // o modo automático atravessa o fim de um mês.
+    const month = new Date(getCareerDate(career) + 'T12:00:00Z').getUTCMonth();
     setVisibleMonth(month);
     if (current) setSelectedFixtureId(current.id);
-  }, [career?.season, career?.roundIndex, current?.id]);
+  }, [career?.season, career?.roundIndex, career?.currentDate, current?.id]);
 
   const monthFixtures = useMemo(() => {
     if (!career) return new Map<number, Fixture>();
