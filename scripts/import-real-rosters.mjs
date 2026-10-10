@@ -106,6 +106,42 @@ for(const duplicates of Object.values(seen)){
   omitted.push({id:item.id,reason:'Clube homônimo de outro estado'});
  }
 }
+// Busca adicional da ESPN para clubes das Séries C/D que não participaram
+// da Copa do Brasil, ou cujo nome mudou. Exige associação inequívoca.
+const searchCandidates=CLUBS.filter(club=>club.countryCode==='BR'&&!matches[club.id]);
+const usedTeamIds=new Set(Object.values(matches).map(team=>String(team.teamId)));
+let searchCursor=0;
+async function searchWorker(){
+ while(searchCursor<searchCandidates.length){
+  const club=searchCandidates[searchCursor++];
+  try{
+   const data=await json('https://site.api.espn.com/apis/search/v2?query='+
+     encodeURIComponent(club.name)+'&sport=soccer&limit=50');
+   const candidates=(data.results||[]).filter(group=>group.type==='team')
+     .flatMap(group=>group.contents||[])
+     .filter(team=>team.uid?.startsWith('s:600~t:'))
+     .filter(team=>!/\\b(u17|u20|s20|u-17|u-20|junior)\\b/i.test(team.displayName||''))
+     .map(team=>({
+       teamId:team.uid.match(/t:(\\d+)/)?.[1],
+       name:team.displayName,
+       league:'bra.copa_do_brazil',
+       similarity:Math.max(score(club.name,team.displayName),score(club.id,team.displayName)),
+       subtitle:team.subtitle||'',
+     }))
+     .filter(team=>team.teamId&&!usedTeamIds.has(team.teamId))
+     .sort((a,b)=>b.similarity-a.similarity);
+   const best=candidates[0],second=candidates[1];
+   if(best?.similarity>=.83 &&
+      (!second||best.similarity-second.similarity>=.06||best.similarity===1)){
+     matches[club.id]=best;
+     usedTeamIds.add(best.teamId);
+   }
+  }catch(error){
+   console.warn('[Elencos ESPN] Busca indisponível:',club.id,error.message);
+  }
+ }
+}
+await Promise.all(Array.from({length:8},()=>searchWorker()));
 const countries={Brazil:'BR',Argentina:'AR',Uruguay:'UY',Chile:'CL',
  Colombia:'CO',Paraguay:'PY',Peru:'PE',Ecuador:'EC',Bolivia:'BO',
  Venezuela:'VE',Portugal:'PT',Spain:'ES',France:'FR',England:'GB',
