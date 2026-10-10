@@ -1,10 +1,10 @@
 {
   "source": "ESPN Soccer",
   "season": 2026,
-  "generatedAt": "2026-10-10T01:20:37.211Z",
+  "generatedAt": "2026-10-10T01:20:56.727Z",
   "clubsTotal": 314,
-  "clubsWithRealData": 263,
-  "realPlayers": 9368,
+  "clubsWithRealData": 278,
+  "realPlayers": 9787,
   "byDivision": {
     "br-a": {
       "total": 20,
@@ -16,11 +16,11 @@
     },
     "br-c": {
       "total": 20,
-      "covered": 15
+      "covered": 18
     },
     "br-d": {
       "total": 96,
-      "covered": 53
+      "covered": 65
     },
     "ar-1": {
       "total": 30,
@@ -61,19 +61,7 @@
   },
   "omitted": [
     {
-      "id": "brusque",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
       "id": "floresta",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "inter-limeira",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "ituano",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
@@ -81,15 +69,7 @@
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
-      "id": "sao-raimundo-rr",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
       "id": "humaita",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "brasiliense",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
@@ -101,23 +81,11 @@
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
-      "id": "aparecidense",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
       "id": "uniao-mt",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
       "id": "goiatuba",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "moto-club",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "iguatu",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
@@ -138,14 +106,6 @@
     },
     {
       "id": "decisao",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "treze",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "sergipe",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
@@ -173,18 +133,6 @@
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
-      "id": "democrata-gv",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "agua-santa",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "pouso-alegre",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
       "id": "marica",
       "reason": "Clube não identificado com confiança na ESPN"
     },
@@ -205,15 +153,7 @@
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
-      "id": "marcilio-dias",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
       "id": "sao-joseense",
-      "reason": "Clube não identificado com confiança na ESPN"
-    },
-    {
-      "id": "sao-jose-rs",
       "reason": "Clube não identificado com confiança na ESPN"
     },
     {
@@ -267,6 +207,49 @@
       "id": "laguna-rn",
       "reason": "Elenco 2026 com menos de 5 atletas confirmados",
       "total": 0
+    },
+    {
+      "id": "humaita",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "floresta",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "parnahyba",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "cse",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "vitoria-es",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "real-noroeste",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "marica",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "ferroviario-ce",
+      "reason": "Consulta indisponível: HTTP 404"
+    },
+    {
+      "id": "noroeste",
+      "reason": "Consulta indisponível: HTTP 404"
     }
   ]
 }
