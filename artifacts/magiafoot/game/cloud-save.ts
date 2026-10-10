@@ -338,6 +338,35 @@ export async function upsertCareerSlot(session: CloudSession, slot: 1 | 2 | 3 | 
   return response.ok;
 }
 
+/** Exclui somente o espaço e os saves da carreira selecionada, após confirmação na UI.
+ * A função no banco confere auth.uid(), slot e careerId em uma única transação.
+ */
+export async function deleteCareerSlotFromCloud(
+  session: CloudSession,
+  slot: 1 | 2 | 3 | 4,
+  careerId: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/delete_career_slot', {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: 'Bearer ' + session.accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_slot: slot, p_career_id: careerId }),
+    });
+    if (!response.ok) {
+      console.error('[MagiaFoot] Não foi possível excluir o espaço:', response.status);
+      return false;
+    }
+    return (await readJson(response)) === true;
+  } catch (error) {
+    console.error('[MagiaFoot] Falha de rede durante a exclusão da carreira:', error);
+    return false;
+  }
+}
+
 export async function restoreCareerFromCloud(session: CloudSession, careerId: string): Promise<CloudRestoreResult | null> {
   const response = await fetch(
     SUPABASE_URL + '/rest/v1/career_save_versions?select=career_id,revision,schema_version,checksum,payload,saved_at&career_id=eq.' +
