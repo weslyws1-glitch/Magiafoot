@@ -206,7 +206,9 @@ export default function MatchScreen() {
   const [showRoundLive, setShowRoundLive] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [resultSaved, setResultSaved] = useState(false);
-  const game = career?.liveMatch ?? null;
+  // Mantém o placar final visível mesmo após encerrar e salvar a rodada.
+  const [finalSnapshot, setFinalSnapshot] = useState<MatchSession | null>(null);
+  const game = career?.liveMatch ?? ((savingResult || resultSaved) ? finalSnapshot : null);
 
   useEffect(() => {
     if (!savingResult || !career || career.liveMatch) return;
@@ -325,6 +327,7 @@ export default function MatchScreen() {
     if (isFinal) {
       if (savingResult) return;
       if (resultSaved) { router.replace('/'); return; }
+      setFinalSnapshot(game);
       setSavingResult(true);
       closeCurrentMatch();
       // A tela só retorna à carreira depois da confirmação do salvamento.
@@ -391,7 +394,7 @@ export default function MatchScreen() {
   return (
     <>
       <GameHeader
-        title="Partida"
+        title={isFinal ? 'FIM DE JOGO' : 'Partida'}
         eyebrow={divisionName.toUpperCase() + ' · RODADA ' + (game.fixture.roundIndex + 1)}
         back={false}
         right={<Text style={styles.headerClock}>{clock}</Text>}
@@ -431,6 +434,11 @@ export default function MatchScreen() {
           </View>
         </View>
 
+        {isFinal ? (
+          <View style={{ marginBottom: 12 }}>
+            <GameButton label={savingResult ? 'SALVANDO RESULTADO...' : resultSaved ? 'VOLTAR À CARREIRA' : 'FIM DE JOGO · SALVAR RESULTADO'} icon="flag" onPress={handleMain} />
+          </View>
+        ) : (
         <View style={styles.liveControls}>
           <Pressable
             disabled={game.phase === 'pregame' || game.pausedForVar || Boolean(game.requiredSubstitutionPlayerId)}
@@ -458,6 +466,8 @@ export default function MatchScreen() {
             <Text style={styles.controlDarkText}>TÁTICA</Text>
           </Pressable>
         </View>
+
+        )}
 
         {showRoundLive ? (
           <Panel style={styles.roundLivePanel}>
@@ -611,7 +621,6 @@ export default function MatchScreen() {
 
         {isFinal ? (
           <>
-            <GameButton label={savingResult ? "SALVANDO RESULTADO..." : resultSaved ? "VOLTAR À CARREIRA" : "FIM DE JOGO · SALVAR RESULTADO"} icon="flag" onPress={handleMain} />
             <Panel style={styles.finalPanel}>
               <Text style={styles.finalTitle}>Fim de jogo</Text>
               <Text style={styles.finalText}>{home.name} {game.homeGoals} × {game.awayGoals} {away.name}</Text>
