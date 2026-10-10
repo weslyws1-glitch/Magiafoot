@@ -120,9 +120,9 @@ async function searchWorker(){
    const candidates=(data.results||[]).filter(group=>group.type==='team')
      .flatMap(group=>group.contents||[])
      .filter(team=>team.uid?.startsWith('s:600~t:'))
-     .filter(team=>!/\\b(u17|u20|s20|u-17|u-20|junior)\\b/i.test(team.displayName||''))
+     .filter(team=>!/\b(u17|u20|s20|u-17|u-20|junior)\b/i.test(team.displayName||''))
      .map(team=>({
-       teamId:team.uid.match(/t:(\\d+)/)?.[1],
+       teamId:team.uid.match(/t:(\d+)/)?.[1],
        name:team.displayName,
        league:'bra.copa_do_brazil',
        similarity:Math.max(score(club.name,team.displayName),score(club.id,team.displayName)),
@@ -192,7 +192,7 @@ const report={
  byDivision:Object.fromEntries([...new Set(CLUBS.map(c=>c.divisionId))].map(div=>[
  div,{total:CLUBS.filter(c=>c.divisionId===div).length,
  covered:CLUBS.filter(c=>c.divisionId===div&&rosters[c.id]).length}])),
- omitted,
+ omitted:omitted.filter(item=>!rosters[item.id]),
 };
 await fs.writeFile(new URL('real-rosters-2026.ts',ROOT),output);
 await fs.writeFile(new URL('real-rosters-2026-report.json',ROOT),JSON.stringify(report,null,2));
