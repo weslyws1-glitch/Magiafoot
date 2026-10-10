@@ -2286,8 +2286,43 @@ function advanceToNextSeason(career: Career): Career {
   };
 
   const club = getClub(career.clubId);
+  // A divisão da carreira acompanha o acesso ou rebaixamento ao fim da temporada.
+  // A Série D usa grupos regionais: apenas o líder do grupo sobe nesta simulação.
+  const brazilianTiers = ['br-a', 'br-b', 'br-c', 'br-d'] as const;
+  const tierIndex = brazilianTiers.indexOf(career.divisionId as typeof brazilianTiers[number]);
+  const division = getDivision(career.divisionId);
+  const promotedSlots = career.divisionId === 'br-d' ? 1 : (division?.promotionPlaces ?? 0);
+  const relegatedSlots = division?.relegationPlaces ?? 0;
+  const position = historyEntry.finalPosition;
+  const totalClubs = standings.length;
+  let nextDivisionId = career.divisionId;
+  if (tierIndex > 0 && promotedSlots > 0 && position <= promotedSlots) {
+    nextDivisionId = brazilianTiers[tierIndex - 1]!;
+  } else if (tierIndex >= 0 && tierIndex < brazilianTiers.length - 1 && relegatedSlots > 0 && position > totalClubs - relegatedSlots) {
+    nextDivisionId = brazilianTiers[tierIndex + 1]!;
+  }
+
+  let nextLeagueClubIds = career.leagueClubIds;
+  if (nextDivisionId !== career.divisionId) {
+    const candidates = clubsForDivision(nextDivisionId).filter((candidate) => candidate.id !== career.clubId);
+    // Para a Série D, o time entra em um grupo regional com clubes próximos.
+    const regionalGroup = nextDivisionId === 'br-d'
+      ? (candidates.find((candidate) => candidate.stateCode === club?.stateCode)?.competitionGroup ?? candidates[0]?.competitionGroup)
+      : null;
+    const rivals = regionalGroup
+      ? candidates.filter((candidate) => candidate.competitionGroup === regionalGroup)
+      : candidates;
+    const participants = nextDivisionId === 'br-d' ? 6 : 20;
+    nextLeagueClubIds = [career.clubId, ...rivals.slice(0, participants - 1).map((candidate) => candidate.id)];
+  }
+  const divisionChange = nextDivisionId !== career.divisionId
+    ? (tierIndex > brazilianTiers.indexOf(nextDivisionId as typeof brazilianTiers[number]) ? 'Acesso' : 'Rebaixamento') + ' para ' + (getDivision(nextDivisionId)?.name ?? nextDivisionId)
+    : null;
+
   let next: Career = {
     ...career,
+    divisionId: nextDivisionId,
+    leagueClubIds: nextLeagueClubIds,
     season: completedSeason + 1,
     roundIndex: 0,
     players,
@@ -2297,7 +2332,7 @@ function advanceToNextSeason(career: Career): Career {
     captainId: nextCaptain,
     results: [],
     leagueFixtures: balanceClubVenueSequence(
-      makeLeagueSchedule(completedSeason + 1, career.divisionId, career.clubId, career.leagueClubIds),
+      makeLeagueSchedule(completedSeason + 1, nextDivisionId, career.clubId, nextLeagueClubIds),
       career.clubId,
     ),
     seasonHistory: [...(career.seasonHistory ?? []), historyEntry],
@@ -2325,6 +2360,9 @@ function advanceToNextSeason(career: Career): Career {
     lastNews: 'A temporada ' + completedYear + ' terminou. A temporada ' + (completedYear + 1) + ' começou com um novo calendário de ' + seasonRounds + ' rodadas.',
   };
 
+  if (divisionChange) {
+    next = addCareerNews(next, 'Mudança de divisão', divisionChange + '! A próxima temporada será disputada em uma nova divisão.', 'club');
+  }
   next = addCareerNews(
     next,
     'Nova temporada iniciada',
