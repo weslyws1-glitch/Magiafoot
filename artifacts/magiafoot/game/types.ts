@@ -405,6 +405,10 @@ export interface MatchSession {
 export interface Career {
   schemaVersion: 1;
   rosterRebalanced2026?: boolean;
+  /** Dia do calendário da carreira (YYYY-MM-DD), independentemente do relógio real. */
+  currentDate?: string;
+  /** Carga coletiva de treino para os dias sem partida. */
+  trainingIntensity?: 'rest' | 'light' | 'normal' | 'intense';
   id: string;
   coachName: string;
   clubId: string;
