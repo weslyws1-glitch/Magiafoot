@@ -233,7 +233,7 @@ export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
   const {
-    career, startCurrentMatch, advanceCurrentMatch, closeCurrentMatch, manualSave,
+    career, startCurrentMatch, advanceCurrentMatch, finishAndSaveCurrentMatch,
     pauseMatchForTactics, resolveVAR,
   } = useCareer();
   const [autoRunning, setAutoRunning] = useState(true);
@@ -248,27 +248,6 @@ export default function MatchScreen() {
   const [finalDivisionName, setFinalDivisionName] = useState<string | null>(null);
   // Mesmo se o save falhar, a tela mantém o resultado para uma nova tentativa.
   const game = career?.liveMatch ?? finalSnapshot;
-
-  useEffect(() => {
-    if (!savingResult || !career || career.liveMatch) return;
-    let active = true;
-    manualSave().then((saved) => {
-      if (!active) return;
-      if (saved) {
-        setResultSaved(true);
-        setFinishError(null);
-      } else {
-        setFinishError('Não foi possível confirmar o salvamento. Tente novamente: o resultado continua nesta tela.');
-      }
-      setSavingResult(false);
-    }).catch((error) => {
-      if (!active) return;
-      console.error('[MagiaFoot] Falha ao salvar o resultado:', error);
-      setFinishError('Erro ao salvar a carreira. Tente novamente sem fechar o jogo.');
-      setSavingResult(false);
-    });
-    return () => { active = false; };
-  }, [savingResult, career, manualSave, router]);
 
   useEffect(() => {
     if (!game || !autoRunning || game.pausedForTactics || game.pausedForVar || game.requiredSubstitutionPlayerId) return;
@@ -366,6 +345,13 @@ export default function MatchScreen() {
     router.push('/tactics');
   };
 
+  const kickOff = () => {
+    // O apito começa pelo mesmo botão, mesmo que a partida esteja pausada.
+    if (game.phase !== 'pregame') return;
+    setAutoRunning(true);
+    advanceCurrentMatch(1);
+  };
+
   const handleMain = async () => {
     if (isFinal) {
       if (savingResult) return;
@@ -374,15 +360,23 @@ export default function MatchScreen() {
       setFinalDivisionName(divisionName);
       setFinishError(null);
       setSavingResult(true);
-      // Caso a rodada já tenha sido encerrada, apenas tente salvar outra vez.
-      if (!career.liveMatch) return;
-      if (!closeCurrentMatch()) {
+      try {
+        const saved = await finishAndSaveCurrentMatch();
+        if (saved) {
+          setResultSaved(true);
+        } else {
+          setFinishError('Não foi possível salvar o resultado. Toque em tentar novamente: seu placar continua nesta tela.');
+        }
+      } catch (error) {
+        console.error('[MagiaFoot] Erro ao concluir a partida:', error);
+        setFinishError('Falha ao salvar o resultado. Tente novamente, sem fechar o jogo.');
+      } finally {
         setSavingResult(false);
-        setFinishError('O resultado não pôde ser processado. Confira a partida e toque em salvar novamente.');
       }
       return;
     }
-    advanceCurrentMatch(1);
+    if (game.phase === 'pregame') kickOff();
+    else advanceCurrentMatch(1);
   };
 
   if (game.phase === 'halftime') {
@@ -481,6 +475,12 @@ export default function MatchScreen() {
             </Pressable>
           </View>
         </View>
+
+        {game.phase === 'pregame' && unavailableStarters.length === 0 ? (
+          <View style={{ marginBottom: 12 }}>
+            <GameButton label="APITO INICIAL" icon="play" onPress={kickOff} />
+          </View>
+        ) : null}
 
         {isFinal ? (
           <View style={{ marginBottom: 12, gap: 8 }}>
@@ -664,10 +664,6 @@ export default function MatchScreen() {
 
 
 
-
-        {game.phase === 'pregame' && unavailableStarters.length === 0 && unavailableBench.length === 0 ? (
-          <GameButton label="APITO INICIAL" icon="play" onPress={() => advanceCurrentMatch(1)} />
-        ) : null}
 
         {isFinal ? (
           <>
