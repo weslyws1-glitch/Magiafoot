@@ -1,0 +1,40 @@
+name: Atualizar elencos reais 2026
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - restore-manager-ui
+    paths:
+      - scripts/import-real-rosters.mjs
+      - .github/workflows/real-rosters-2026.yml
+  schedule:
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  importar-elencos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: restore-manager-ui
+          persist-credentials: true
+      - name: Instalar Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Importar elencos e conferir cobertura
+        run: node --experimental-strip-types scripts/import-real-rosters.mjs
+      - name: Publicar snapshot verificado
+        run: |
+          git config user.name "magiafoot-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/magiafoot/game/real-rosters-2026.ts artifacts/magiafoot/game/real-rosters-2026-report.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Atualizar elencos reais 2026 verificados"
+            git push origin HEAD:restore-manager-ui
+          fi

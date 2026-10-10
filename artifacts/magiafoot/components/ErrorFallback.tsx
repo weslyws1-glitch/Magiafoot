@@ -75,6 +75,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         <Text style={[styles.message, { color: colors.mutedForeground }]}>
           Recarregue o aplicativo para continuar.
         </Text>
+        {error.message ? (
+          <Text selectable style={[styles.message, { color: colors.mutedForeground, fontSize: 12, lineHeight: 19 }]}>
+            Detalhe técnico: {error.message.slice(0, 260)}
+          </Text>
+        ) : null}
 
         <Pressable
           onPress={handleRestart}

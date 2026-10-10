@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,7 @@ export function GameHeader({ title, eyebrow, back = true, right }: {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 7) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 16 : 7) }]}>
       <View style={styles.headerLine}>
         {back ? (
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Voltar" style={[styles.iconButton, { backgroundColor: colors.secondary }]}>
@@ -94,6 +94,13 @@ export function SectionLabel({ title, action }: { title: string; action?: React.
 export function ClubBadge({ clubId, size = 48 }: { clubId: string; size?: number }) {
   const colors = useColors();
   const club = getClub(clubId);
+  if (club?.badgeUrl) {
+    return (
+      <View style={[styles.clubBadgeImageWrap, { width: size, height: size }]}>
+        <Image source={{ uri: club.badgeUrl }} resizeMode="contain" style={{ width: size, height: size }} />
+      </View>
+    );
+  }
   return (
     <View style={[styles.clubBadge, { width: size, height: size, borderRadius: size * 0.29, backgroundColor: club?.color ?? colors.primary }]}>
       <View style={[styles.badgeInner, { borderColor: 'rgba(255,255,255,0.42)' }]}>
@@ -158,27 +165,28 @@ export function LoadingState() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 18, paddingBottom: 15, backgroundColor: 'transparent' },
+  header: { paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#07150d', borderBottomWidth: 1, borderBottomColor: '#234334' },
   headerLine: { minHeight: 47, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  iconButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  headerBadge: { width: 40, height: 40, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  headerBadge: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   headerText: { flex: 1 },
-  headerEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.3, marginBottom: 2 },
-  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
-  screenContent: { paddingHorizontal: 18, paddingTop: 3, gap: 14 },
-  panel: { borderRadius: 21, borderWidth: 1, padding: 15 },
-  gameButton: { minHeight: 54, borderWidth: 1, borderRadius: 17, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  headerEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginBottom: 3 },
+  headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.6 },
+  screenContent: { paddingHorizontal: 20, paddingTop: 16, gap: 16 },
+  panel: { borderRadius: 18, borderWidth: 1, padding: 16 },
+  gameButton: { minHeight: 54, borderWidth: 1, borderRadius: 16, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   gameButtonCompact: { minHeight: 43, paddingHorizontal: 13, borderRadius: 15 },
   gameButtonText: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   gameButtonTextCompact: { fontSize: 13 },
   sectionLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1, marginTop: 3 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  sectionTitle: { fontSize: 16, fontWeight: '900', letterSpacing: 0.2 },
   clubBadge: { padding: 3, alignItems: 'center', justifyContent: 'center' },
+  clubBadgeImageWrap: { alignItems: 'center', justifyContent: 'center' },
   badgeInner: { width: '100%', height: '100%', borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontWeight: '900', letterSpacing: -0.4 },
   ratingPill: { minWidth: 38, height: 37, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   ratingText: { fontSize: 14, fontWeight: '900' },
-  playerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 65, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
+  playerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 58, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
   playerInfo: { flex: 1 },
   playerName: { fontSize: 13, fontWeight: '700' },
   playerMeta: { fontSize: 10, marginTop: 4 },

@@ -1,17 +1,78 @@
 import type { Club, FormationId, FormationOption, FormationSlot, Player, Position } from './types.ts';
+import { REAL_BRAZIL_CLUBS, getDivisionDefinition } from './real-clubs.ts';
+import { SOUTH_AMERICA_CLUBS, getInternationalDivision } from './international-clubs.ts';
+import { REAL_ROSTERS_2026 } from './real-rosters-2026.ts';
 
-export const LEAGUE_NAME = 'Liga Prisma';
+export const LEAGUE_NAME = '3ª Divisão';
 
-export const CLUBS: Club[] = [
-  { id: 'aurora-vale', name: 'Aurora do Vale', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
-  { id: 'lobos-azuis', name: 'Lobos Azuis', city: 'Lago das Brumas', initials: 'LA', rating: 68, color: '#416b77', balance: 1_850_000, stadiumCapacity: 14_200, ticketPrice: 38 },
-  { id: 'mare-prata', name: 'Maré de Prata', city: 'Costa da Lua', initials: 'MP', rating: 71, color: '#397984', balance: 2_100_000, stadiumCapacity: 20_000, ticketPrice: 40 },
-  { id: 'oncas-serra', name: 'Onças da Serra', city: 'Serra do Luar', initials: 'OS', rating: 70, color: '#9d7738', balance: 1_900_000, stadiumCapacity: 15_500, ticketPrice: 36 },
-  { id: 'navegantes-sul', name: 'Navegantes do Sul', city: 'Porto das Nuvens', initials: 'NS', rating: 66, color: '#587f92', balance: 1_550_000, stadiumCapacity: 13_000, ticketPrice: 34 },
-  { id: 'candeia-fc', name: 'Candeia FC', city: 'Vila Candeia', initials: 'CF', rating: 69, color: '#836252', balance: 1_720_000, stadiumCapacity: 16_200, ticketPrice: 35 },
-  { id: 'pedra-alta', name: 'Pedra Alta AC', city: 'Campos de Pedra', initials: 'PA', rating: 64, color: '#78736c', balance: 1_300_000, stadiumCapacity: 11_800, ticketPrice: 30 },
-  { id: 'ventania-esporte', name: 'Ventania Esporte', city: 'Vale dos Ventos', initials: 'VE', rating: 67, color: '#667844', balance: 1_480_000, stadiumCapacity: 12_600, ticketPrice: 32 },
-];
+const LEGACY_CLUBS: Club[] = [
+  { id: 'aurora-vale', name: 'Aurora do Vale', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vale Sereno', initials: 'AV', rating: 73, color: '#286649', balance: 2_400_000, stadiumCapacity: 18_400, ticketPrice: 42 },
+  { id: 'lobos-azuis', name: 'Lobos Azuis', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Lago das Brumas', initials: 'LA', rating: 68, color: '#416b77', balance: 1_850_000, stadiumCapacity: 14_200, ticketPrice: 38 },
+  { id: 'mare-prata', name: 'Maré de Prata', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Costa da Lua', initials: 'MP', rating: 71, color: '#397984', balance: 2_100_000, stadiumCapacity: 20_000, ticketPrice: 40 },
+  { id: 'oncas-serra', name: 'Onças da Serra', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Serra do Luar', initials: 'OS', rating: 70, color: '#9d7738', balance: 1_900_000, stadiumCapacity: 15_500, ticketPrice: 36 },
+  { id: 'navegantes-sul', name: 'Navegantes do Sul', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Porto das Nuvens', initials: 'NS', rating: 66, color: '#587f92', balance: 1_550_000, stadiumCapacity: 13_000, ticketPrice: 34 },
+  { id: 'candeia-fc', name: 'Candeia FC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vila Candeia', initials: 'CF', rating: 69, color: '#836252', balance: 1_720_000, stadiumCapacity: 16_200, ticketPrice: 35 },
+  { id: 'pedra-alta', name: 'Pedra Alta AC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Campos de Pedra', initials: 'PA', rating: 64, color: '#78736c', balance: 1_300_000, stadiumCapacity: 11_800, ticketPrice: 30 },
+  { id: 'ventania-esporte', name: 'Ventania Esporte', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vale dos Ventos', initials: 'VE', rating: 67, color: '#667844', balance: 1_480_000, stadiumCapacity: 12_600, ticketPrice: 32 },
+  { id: 'imperial-rio', name: 'Imperial Rio', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Rio Imperial', initials: 'IR', rating: 72, color: '#7a2f45', balance: 2250000, stadiumCapacity: 19600, ticketPrice: 41 },
+  { id: 'uniao-carioca', name: 'União Carioca', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Santa Marina', initials: 'UC', rating: 70, color: '#315c8c', balance: 1980000, stadiumCapacity: 17800, ticketPrice: 39 },
+  { id: 'ferro-norte', name: 'Ferro Norte', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Vila Ferro', initials: 'FN', rating: 66, color: '#5d5d63', balance: 1520000, stadiumCapacity: 13900, ticketPrice: 33 },
+  { id: 'atletico-cerrado', name: 'Atlético Cerrado', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Campo Dourado', initials: 'AC', rating: 69, color: '#8a6532', balance: 1780000, stadiumCapacity: 16700, ticketPrice: 35 },
+  { id: 'real-pampas', name: 'Real dos Pampas', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estância Real', initials: 'RP', rating: 71, color: '#4b6d50', balance: 2050000, stadiumCapacity: 18900, ticketPrice: 39 },
+  { id: 'porto-verde', name: 'Porto Verde', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Porto Verde', initials: 'PV', rating: 65, color: '#2f7056', balance: 1420000, stadiumCapacity: 12800, ticketPrice: 32 },
+  { id: 'serra-branca', name: 'Serra Branca', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Alto da Serra', initials: 'SB', rating: 68, color: '#d9d9d1', balance: 1690000, stadiumCapacity: 15100, ticketPrice: 34 },
+  { id: 'guara-central', name: 'Guará Central', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Nova Central', initials: 'GC', rating: 67, color: '#a83f2f', balance: 1610000, stadiumCapacity: 14500, ticketPrice: 34 },
+  { id: 'vila-oeste', name: 'Vila Oeste', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Oeste Novo', initials: 'VO', rating: 64, color: '#704f94', balance: 1260000, stadiumCapacity: 11900, ticketPrice: 30 },
+  { id: 'rio-dourado', name: 'Rio Dourado', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Dourado das Águas', initials: 'RD', rating: 70, color: '#b58c2d', balance: 1920000, stadiumCapacity: 17200, ticketPrice: 37 },
+  { id: 'montanha-fc', name: 'Montanha FC', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Monte Azul', initials: 'MF', rating: 66, color: '#3f5575', balance: 1470000, stadiumCapacity: 13300, ticketPrice: 32 },
+  { id: 'estacao-1912', name: 'Estação 1912', country: 'Brasil', countryCode: 'BR', divisionId: 'br-3', divisionName: '3ª Divisão', divisionLevel: 3, nativeCurrency: 'BRL', city: 'Estação Velha', initials: 'E12', rating: 68, color: '#7d4632', balance: 1730000, stadiumCapacity: 15800, ticketPrice: 35 },
+].map((club) => ({ ...club, selectable: false, stateCode: null, competitionGroup: null, prestige: 55, fanBase: 50 }));
+
+export const CLUBS: Club[] = [...REAL_BRAZIL_CLUBS, ...SOUTH_AMERICA_CLUBS, ...LEGACY_CLUBS];
+
+export function selectableClubs(): Club[] {
+  return CLUBS.filter((club) => club.selectable !== false);
+}
+
+export function clubsForDivision(divisionId: string, userClubId?: string): Club[] {
+  const divisionClubs = CLUBS.filter((club) => club.divisionId === divisionId);
+  const division = getDivisionDefinition(divisionId) ?? getInternationalDivision(divisionId);
+  if (division?.format !== 'regional_groups' || !userClubId) return divisionClubs;
+  const userClub = CLUBS.find((club) => club.id === userClubId);
+  if (!userClub?.competitionGroup) return divisionClubs;
+  return divisionClubs.filter((club) => club.competitionGroup === userClub.competitionGroup);
+}
+
+export function getDivision(id: string) {
+  return getDivisionDefinition(id) ?? getInternationalDivision(id);
+}
+
+export function buildContinentalSeedPool(size = 32): Club[] {
+  const topDivision = CLUBS.filter((club) =>
+    club.selectable !== false
+    && club.confederation === 'CONMEBOL'
+    && club.divisionLevel === 1
+  );
+  const byCountry = new Map<string, Club[]>();
+  for (const club of topDivision) {
+    const list = byCountry.get(club.country) ?? [];
+    list.push(club);
+    byCountry.set(club.country, list);
+  }
+
+  const selected: Club[] = [];
+  for (const clubs of byCountry.values()) {
+    clubs.sort((a, b) => (b.prestige ?? b.rating) - (a.prestige ?? a.rating) || b.rating - a.rating);
+    selected.push(...clubs.slice(0, 2));
+  }
+
+  const used = new Set(selected.map((club) => club.id));
+  const remaining = topDivision
+    .filter((club) => !used.has(club.id))
+    .sort((a, b) => (b.prestige ?? b.rating) - (a.prestige ?? a.rating) || b.rating - a.rating);
+
+  return [...selected, ...remaining].slice(0, size);
+}
 
 const ROSTER_SEED: { name: string; position: Position; age: number; skill: number }[] = [
   { name: 'Raul Venturi', position: 'GOL', age: 29, skill: 3 },
@@ -156,12 +217,206 @@ function makePlayer(
   };
 }
 
+const REAL_POSITION_ROTATION: Record<'G' | 'D' | 'M' | 'F', Position[]> = {
+  G: ['GOL'],
+  D: ['ZAG','ZAG','LE','LD','ZAG','LE','LD'],
+  M: ['VOL','MC','MEI','MC','VOL','MEI','MC'],
+  F: ['ATA','PE','PD','ATA','PE','PD'],
+};
+
+const COUNTRY_BY_ISO: Record<string, string> = {
+  BR:'Brasil',AR:'Argentina',UY:'Uruguai',CL:'Chile',CO:'Colômbia',
+  PY:'Paraguai',PE:'Peru',EC:'Equador',BO:'Bolívia',VE:'Venezuela',
+  PT:'Portugal',ES:'Espanha',FR:'França',GB:'Inglaterra',DE:'Alemanha',
+  IT:'Itália',JP:'Japão',US:'Estados Unidos',
+};
+
+/** Ajustes específicos para posições que a ESPN fornece apenas como D/M/F.
+ * A fonte publica categorias amplas, enquanto o MagiaFoot simula laterais,
+ * volantes, meias e pontas separadamente.
+ */
+const REAL_ROLE_OVERRIDES: Record<string, Record<string, Position>> = {
+  flamengo: {
+    'Alex Sandro':'LE','Guillermo Varela':'LD','Emerson Royal':'LD',
+    'Léo Ortiz':'ZAG','Danilo':'ZAG','Jorginho':'VOL',
+    'Giorgian de Arrascaeta':'MEI','Samuel Lino':'PE',
+    'Bruno Henrique':'PE','Pedro':'ATA','Everton':'PE',
+  },
+  palmeiras: {
+    'Jefté':'LE','Joaquín Piquerez':'LE','Gustavo Gómez':'ZAG',
+    'Khellven':'LD','Raphael Veiga':'MEI','Maurício':'MEI',
+    'José Manuel López':'ATA','Vitor Roque':'ATA','Paulinho':'PE',
+    'Andreas Pereira':'MC','Jhon Arias':'PD',
+    'Marlon Freitas':'VOL',
+  },
+  corinthians: {
+    'Memphis Depay':'ATA','Yuri Alberto':'ATA',
+    'Rodrigo Garro':'MEI','André Carrillo':'MC',
+    'Fabrizio Angileri':'LE','Gustavo Henrique':'ZAG',
+    'Mateuzinho':'LD','Matheus Bidu':'LE',
+  },
+  'botafogo-rj': {
+    'Alexander Barboza':'ZAG','Vitinho':'LD','Alex Telles':'LE',
+    'Marlon Freitas':'VOL','Savarino':'PD',
+    'Arthur Cabral':'ATA','Danilo Santos':'VOL',
+  },
+  vasco: {
+    'Lucas Piton':'LE','Léo Jardim':'GOL','Robert Renan':'ZAG',
+    'Tchê Tchê':'VOL','Facundo Colidio':'ATA',
+  },
+  fluminense: {
+    'Fábio':'GOL','Thiago Silva':'ZAG','Samuel Xavier':'LD',
+    'Ganso':'MEI','Martinelli':'VOL',
+  },
+};
+
+function verifiedPlayerStrength(
+  clubRating: number,
+  age: number,
+  role: 'G' | 'D' | 'M' | 'F',
+  name: string,
+  appearances: number,
+  starts: number,
+  goals: number,
+  assists: number,
+): number {
+  // Notas estimadas para o simulador, não ratings oficiais.
+  // Participação comprovada importa mais que o rating do escudo.
+  const minutesProxy = Math.min(35, Math.max(0, appearances));
+  const regularity = 19 * Math.sqrt(minutesProxy / 28);
+  const starterShare = appearances > 0 ? Math.max(0, Math.min(1, starts / appearances)) : 0;
+  const titularity = appearances >= 8 ? (starterShare - 0.42) * 4 : 0;
+  const production = Math.min(4.5, ((Math.max(0, goals) * 1.4 + Math.max(0, assists)) / Math.max(12, appearances)) * (role === 'G' || role === 'D' ? 3.2 : 5));
+  const youthPenalty = age <= 18 && appearances < 8 ? 6 : age <= 20 && appearances < 5 ? 4 : age <= 22 && appearances < 4 ? 2 : 0;
+  const roleExperience = role === 'G' && age >= 32 && appearances >= 15 ? 1 : 0;
+  const stableVariation = (hash(name) % 5) - 2;
+  return clamp(Math.round(clubRating - 21 + regularity + titularity + production + roleExperience - youthPenalty + stableVariation), 43, 91);
+}
+
 export function makeRoster(club: Club): Player[] {
-  return ROSTER_SEED.map((player, index) => makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index));
+  const verified = REAL_ROSTERS_2026[club.id];
+  if (!verified?.length) {
+    // Fonte indisponível: manter o elenco fictício clássico, sem
+    // apresentar esses nomes como jogadores reais.
+    return ROSTER_SEED.map((player, index) => ({
+      ...makePlayer(player, `${club.id}-p${index + 1}`, club.rating, index),
+      nationality: club.country,
+      nationalityCode: club.countryCode,
+      currentClubId: club.id,
+    }));
+  }
+  const counters = { G:0, D:0, M:0, F:0 };
+  const activeStatsCount = verified.filter((record) => typeof record[5] === 'number' && record[5]! > 0).length;
+  // Copa do Brasil e divisões menores nem sempre publicam todos os jogos.
+  // Zero estatísticas no provedor NÃO significa que todo titular seja fraco.
+  const statsReliable = activeStatsCount >= Math.max(5, Math.ceil(verified.length * 0.24));
+  const real = verified.map(([name, role, age, shirt, nationalityCode, appearances, starts, goals, assists, espnId], index) => {
+    const list = REAL_POSITION_ROTATION[role];
+    const position = REAL_ROLE_OVERRIDES[club.id]?.[name] ?? list[counters[role]++ % list.length]!;
+    const player = makePlayer(
+      { name, age, position, skill: 0 },
+      `${club.id}-real-${espnId || index + 1}`,
+      club.rating, index,
+    );
+    // O antigo motor dava 88 a um goleiro reserva de 17 anos só porque
+    // ele estava inscrito no Flamengo. Separar desempenho de reputação.
+    const strength = statsReliable && typeof appearances === 'number'
+      ? verifiedPlayerStrength(club.rating, age, role, name, appearances, starts ?? 0, goals ?? 0, assists ?? 0)
+      : clamp(
+          club.rating - 4 + ((hash(name) % 9) - 4) +
+          (age <= 19 ? -5 : age <= 21 ? -2 : age >= 25 && age <= 33 ? 1 : 0) +
+          (typeof appearances === 'number' && appearances >= 3 ? 2 : 0),
+          43, 86,
+        );
+    const ageCurve = Math.max(0.45, 1 - Math.abs(age - 25) * 0.025);
+    return {
+      ...player,
+      strength,
+      value: Math.round(strength * strength * 220 * ageCurve / 10_000) * 10_000,
+      wage: Math.round((strength * 130 + Math.max(0, age - 29) * 300) / 100) * 100,
+      nationality: COUNTRY_BY_ISO[nationalityCode] ?? club.country,
+      nationalityCode,
+      currentClubId: club.id,
+      ...(shirt > 0 ? { shirtNumber: shirt } : {}),
+    };
+  });
+
+  // Os clubes com cadastro incompleto recebem só as posições faltantes
+  // para viabilizar uma escalação. A base deve ser inferior aos profissionais.
+  const targetPositions: Record<Position, number> = {
+    GOL: 3, ZAG: 4, LE: 2, LD: 2, VOL: 2,
+    MC: 3, MEI: 2, PE: 2, PD: 2, ATA: 4,
+  };
+  const missing = Math.max(0, 26 - real.length);
+  const positionCounts = new Map<Position, number>();
+  for (const player of real) positionCounts.set(player.position, (positionCounts.get(player.position) ?? 0) + 1);
+  const academy: Player[] = [];
+  for (let index = 0; index < missing; index++) {
+    const needed = (Object.entries(targetPositions) as [Position, number][])
+      .map(([position, target]) => ({ position, shortage: target - (positionCounts.get(position) ?? 0) }))
+      .sort((a, b) => b.shortage - a.shortage);
+    const position = needed[0]?.position ?? 'MC';
+    positionCounts.set(position, (positionCounts.get(position) ?? 0) + 1);
+    const source = ROSTER_SEED.find((entry) => entry.position === position) ?? ROSTER_SEED[0]!;
+    const seed = {
+      ...source, position,
+      name: 'Atleta da base ' + club.initials + ' ' + String(index + 1).padStart(2, '0'),
+      age: 18 + index % 4,
+      skill: -5,
+    };
+    const player = makePlayer(seed, `${club.id}-academy-${index + 1}`, club.rating - 13, real.length + index);
+    academy.push({
+      ...player,
+      strength: clamp(player.strength, 43, Math.max(48, club.rating - 11)),
+      nationality: club.country,
+      nationalityCode: club.countryCode,
+      currentClubId: club.id,
+    });
+  }
+  return [...real, ...academy];
 }
 
 export function makeMarketPlayers(club: Club): Player[] {
-  return MARKET_SEED.map((player, index) => makePlayer(player, `market-${club.id}-${index + 1}`, club.rating - 1, index + 51));
+  const sourceClubs = CLUBS
+    .filter((candidate) => candidate.selectable !== false && candidate.id !== club.id && REAL_ROSTERS_2026[candidate.id]?.length)
+    .sort((a, b) => {
+      const da = Math.abs(a.rating - club.rating);
+      const db = Math.abs(b.rating - club.rating);
+      return da - db || a.name.localeCompare(b.name, 'pt-BR');
+    })
+    .slice(0, 28);
+
+  const pool = Array.from({ length: 28 }, (_, index) => {
+    const seed = MARKET_SEED[index % MARKET_SEED.length]!;
+    const source = sourceClubs[index % Math.max(1, sourceClubs.length)] ?? club;
+    // Jogadores listados no mercado devem realmente pertencer ao clube de
+    // origem (onde o ESPN confirma elenco). Não inventar superestrelas.
+    const realCandidates = REAL_ROSTERS_2026[source.id]
+      ? makeRoster(source).filter((p) => p.id.includes('-real-') && p.age >= 18 && p.age <= 36)
+      : [];
+    const sourcePlayer = realCandidates.length
+      ? realCandidates[(hash(club.id + ':' + source.id + ':' + index) >>> 0) % realCandidates.length]
+      : undefined;
+    const strengthShift = Math.round((source.rating - club.rating) * 0.35);
+    const player = sourcePlayer
+      ? { ...sourcePlayer, id: `market-${club.id}-${source.id}-${sourcePlayer.id}` }
+      : makePlayer(
+          { ...seed, name: seed.name + (index >= MARKET_SEED.length ? ' ' + (Math.floor(index / MARKET_SEED.length) + 1) : ''), skill: seed.skill + strengthShift },
+          `market-${club.id}-${source.id}-${index + 1}`,
+          source.rating,
+          index + 51,
+        );
+    return {
+      ...player,
+      nationality: source.country,
+      nationalityCode: source.countryCode,
+      currentClubId: source.id,
+      value: Math.round(player.value * (1.08 + Math.max(0, source.divisionLevel - club.divisionLevel) * -0.03)),
+      wage: Math.round(player.wage * (1 + Math.max(0, club.divisionLevel - source.divisionLevel) * 0.08)),
+    };
+  });
+
+  return pool;
 }
 
 function positionMatchScore(player: Player, target: Position): number {

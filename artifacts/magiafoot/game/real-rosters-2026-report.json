@@ -1,0 +1,259 @@
+{
+  "source": "ESPN Soccer",
+  "season": 2026,
+  "generatedAt": "2026-10-10T22:27:12.415Z",
+  "duplicateAthletesDetected": 148,
+  "wrongClubEntriesRemoved": 150,
+  "duplicateAthletesVerifiedWithCurrentClub": 142,
+  "strengthScale": "game-estimated from club level, appearances, starts, goals, assists and age",
+  "clubsTotal": 314,
+  "clubsWithRealData": 278,
+  "realPlayers": 9632,
+  "byDivision": {
+    "br-a": {
+      "total": 20,
+      "covered": 20
+    },
+    "br-b": {
+      "total": 20,
+      "covered": 20
+    },
+    "br-c": {
+      "total": 20,
+      "covered": 18
+    },
+    "br-d": {
+      "total": 96,
+      "covered": 65
+    },
+    "ar-1": {
+      "total": 30,
+      "covered": 30
+    },
+    "uy-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "cl-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "co-1": {
+      "total": 20,
+      "covered": 20
+    },
+    "ec-1": {
+      "total": 16,
+      "covered": 16
+    },
+    "py-1": {
+      "total": 12,
+      "covered": 12
+    },
+    "pe-1": {
+      "total": 18,
+      "covered": 17
+    },
+    "bo-1": {
+      "total": 16,
+      "covered": 15
+    },
+    "ve-1": {
+      "total": 14,
+      "covered": 13
+    }
+  },
+  "omitted": [
+    {
+      "id": "floresta",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "gas-rr",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "humaita",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "luverdense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "inhumas",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "uniao-mt",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "goiatuba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "parnahyba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "ferroviario-ce",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "atletico-ce",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "central-pe",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "decisao",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "cse",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "atletico-ba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "crac",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "abecat",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "porto-ba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "real-noroeste",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "marica",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "xv-piracicaba",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "noroeste",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "fc-cascavel",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "blumenau",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "sao-joseense",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "brasil-pelotas",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "bo-gualberto-villarroel",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "ve-universidad-central",
+      "reason": "Clube não identificado com confiança na ESPN"
+    },
+    {
+      "id": "vitoria-es",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "america-rj",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "operario-mt",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "sampaio-correa-ma",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "pe-utc-cajamarca",
+      "reason": "Clube homônimo de outro estado"
+    },
+    {
+      "id": "ferroviaria",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "guapore",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "capital-df",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "laguna-rn",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "humaita",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "parnahyba",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "floresta",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "cse",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "real-noroeste",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "vitoria-es",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "marica",
+      "reason": "Elenco 2026 com menos de 5 atletas confirmados",
+      "total": 0
+    },
+    {
+      "id": "ferroviario-ce",
+      "reason": "Consulta indisponível: HTTP 404"
+    },
+    {
+      "id": "noroeste",
+      "reason": "Consulta indisponível: HTTP 404"
+    }
+  ]
+}
