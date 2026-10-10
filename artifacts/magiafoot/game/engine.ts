@@ -1347,17 +1347,27 @@ export function advanceMatch(career: Career, minutes = 5): Career {
   let next: Career = { ...career, liveMatch: game };
 
   if (game.phase === 'pregame') {
-    const selectedIds = [
-      ...game.userLineup.map((slot) => slot.playerId),
-      ...game.userBenchIds,
-    ];
-    const unavailable = selectedIds
-      .map((id) => career.players.find((player) => player.id === id))
-      .filter((player) => !player || player.status !== 'available');
-    if (unavailable.length) return next;
+    // Salves anteriores podem carregar reservas indisponíveis. Refaça apenas
+    // as posições inválidas, para que o apito não fique preso em zero minutos.
+    const eligiblePlayers = career.players.filter((player) => player.status === 'available');
+    const eligibleIds = new Set(eligiblePlayers.map((player) => player.id));
+    const starters = game.userLineup.map((slot) => slot.playerId);
+    const validStarters = game.userLineup.length === 11
+      && new Set(starters).size === 11
+      && starters.every((id) => eligibleIds.has(id));
+    if (!validStarters) {
+      const repaired = buildBestLineup(eligiblePlayers, career.formationId);
+      if (repaired.length !== 11 || new Set(repaired.map((slot) => slot.playerId)).size !== 11) return career;
+      game.userLineup = repaired;
+    }
+    const activeIds = new Set(game.userLineup.map((slot) => slot.playerId));
+    game.userBenchIds = [
+      ...game.userBenchIds.filter((id) => eligibleIds.has(id) && !activeIds.has(id)),
+      ...buildBench(eligiblePlayers, game.userLineup).filter((id) => !activeIds.has(id)),
+    ].filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 7);
     game.phase = 'first_half';
     addEvent(game, 'kickoff', `Bola rolando! ${game.referee.name} autoriza o início da partida.`, career.clubId);
-    return next;
+    return { ...next, lineup: game.userLineup.map((slot) => ({ ...slot })), benchIds: [...game.userBenchIds] };
   }
 
   if (game.phase === 'halftime') {
