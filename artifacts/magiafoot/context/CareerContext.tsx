@@ -13,6 +13,8 @@ import {
   declinePlayerTransferOffer,
   acceptPlayerTransferOffer,
   advanceMatch,
+  advanceCareerDay,
+  setCareerTrainingIntensity,
   assignPlayerToSlot,
   changeFormation,
   createCareer as makeCareer,
@@ -90,6 +92,8 @@ interface CareerContextValue {
   restoreCloudLatest: () => Promise<boolean>;
   createNewCareer: (coachName: string, clubId: string, currency?: CurrencyCode) => void;
   startCurrentMatch: () => void;
+  advanceOneDay: () => void;
+  changeDailyTraining: (level: 'rest' | 'light' | 'normal' | 'intense') => void;
   advanceCurrentMatch: (minutes?: number) => void;
   makeSubstitution: (outgoingId: string, incomingId: string) => boolean;
   swapBenchPlayer: (outgoingBenchId: string, incomingId: string) => boolean;
@@ -540,6 +544,9 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startCurrentMatch = useCallback(() => update(startMatch), [update]);
+  const advanceOneDay = useCallback(() => update(advanceCareerDay), [update]);
+  const changeDailyTraining = useCallback((level: 'rest' | 'light' | 'normal' | 'intense') =>
+    update((current) => setCareerTrainingIntensity(current, level)), [update]);
   const advanceCurrentMatch = useCallback((minutes = 5) => update((current) => advanceMatch(current, minutes)), [update]);
   const makeSubstitution = useCallback((outgoingId: string, incomingId: string) => {
     if (!career) return false;
@@ -810,6 +817,8 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     restoreCloudLatest,
     createNewCareer,
     startCurrentMatch,
+    advanceOneDay,
+    changeDailyTraining,
     advanceCurrentMatch,
     makeSubstitution,
     swapBenchPlayer,
@@ -852,7 +861,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   }), [
     advanceCurrentMatch, career, chooseCaptain, recalibrateRoster, closeCurrentMatch, finishAndSaveCurrentMatch, createNewCareer,
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
-    setTactics, signPlayer, negotiateMarketPlayer, startCurrentMatch, storageWarning, transferPlayer,
+    setTactics, signPlayer, negotiateMarketPlayer, startCurrentMatch, advanceOneDay, changeDailyTraining, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
     cloudSession, cloudProfile, cloudStatus, cloudLastSavedAt, cloudMessage,
     careerSlots, activeCareerSlot, authRestoring,
