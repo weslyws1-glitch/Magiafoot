@@ -417,6 +417,40 @@ function initializePlayerCareerProfile(player: Player, season = 1, roundIndex = 
   };
 }
 
+/** Ajuste opt-in para saves antigos. Não substitui jogadores nem altera
+ * contratações, contratos, partidas, transferências, moral ou finanças.
+ * Só recalibra a posição, força, habilidades-base e valor dos atletas reais
+ * ainda identificáveis no clube escolhido no começo da carreira.
+ */
+export function recalibrate2026CareerRoster(career: Career): Career {
+  if (career.rosterRebalanced2026 || career.liveMatch) return career;
+  const originalClub = getClub(career.clubId);
+  if (!originalClub) return career;
+  const currentRoster = makeRoster(originalClub)
+    .filter((player) => player.id.startsWith(originalClub.id + '-real-'));
+  const byName = new Map(currentRoster.map((player) => [player.name.toLocaleLowerCase('pt-BR'), player]));
+  let updated = 0;
+  const players = career.players.map((player) => {
+    if (!player.id.startsWith(career.clubId + '-real-')) return player;
+    const reference = byName.get(player.name.toLocaleLowerCase('pt-BR'));
+    if (!reference) return player;
+    updated++;
+    const changed = { ...player, position: reference.position, strength: reference.strength };
+    return {
+      ...changed,
+      value: reference.value,
+      skills: defaultPlayerSkills(changed),
+    };
+  });
+  if (updated === 0) return career;
+  return {
+    ...career,
+    players,
+    rosterRebalanced2026: true,
+    lastNews: 'As notas do elenco real foram recalibradas usando os dados de 2026, sem apagar o progresso da carreira.',
+  };
+}
+
 export function createCareer(coachName: string, clubId: string, currency: CurrencyCode = 'BRL'): Career {
   activeDisplayCurrency = currency;
   const club = getClub(clubId);
@@ -432,6 +466,7 @@ export function createCareer(coachName: string, clubId: string, currency: Curren
   const leagueClubIds = clubsForDivision(club.divisionId, club.id).map((item) => item.id);
   return {
     schemaVersion: 1,
+    rosterRebalanced2026: true,
     id: `carreira-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     coachName: coachName.trim(),
     clubId,
