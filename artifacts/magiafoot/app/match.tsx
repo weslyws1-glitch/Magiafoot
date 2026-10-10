@@ -242,6 +242,7 @@ export default function MatchScreen() {
   const [showRoundLive, setShowRoundLive] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [resultSaved, setResultSaved] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
   // Mantém o placar final visível mesmo após encerrar e salvar a rodada.
   const [finalSnapshot, setFinalSnapshot] = useState<MatchSession | null>(null);
   const [finalDivisionName, setFinalDivisionName] = useState<string | null>(null);
@@ -253,9 +254,19 @@ export default function MatchScreen() {
     let active = true;
     manualSave().then((saved) => {
       if (!active) return;
-      if (saved) { setResultSaved(true); setSavingResult(false); }
-      else setSavingResult(false);
-    }).catch(() => { if (active) setSavingResult(false); });
+      if (saved) {
+        setResultSaved(true);
+        setFinishError(null);
+      } else {
+        setFinishError('Não foi possível confirmar o salvamento. Tente novamente: o resultado continua nesta tela.');
+      }
+      setSavingResult(false);
+    }).catch((error) => {
+      if (!active) return;
+      console.error('[MagiaFoot] Falha ao salvar o resultado:', error);
+      setFinishError('Erro ao salvar a carreira. Tente novamente sem fechar o jogo.');
+      setSavingResult(false);
+    });
     return () => { active = false; };
   }, [savingResult, career, manualSave, router]);
 
@@ -361,9 +372,14 @@ export default function MatchScreen() {
       if (resultSaved) { router.replace('/'); return; }
       setFinalSnapshot(game);
       setFinalDivisionName(divisionName);
+      setFinishError(null);
       setSavingResult(true);
-      closeCurrentMatch();
-      // A tela só retorna à carreira depois da confirmação do salvamento.
+      // Caso a rodada já tenha sido encerrada, apenas tente salvar outra vez.
+      if (!career.liveMatch) return;
+      if (!closeCurrentMatch()) {
+        setSavingResult(false);
+        setFinishError('O resultado não pôde ser processado. Confira a partida e toque em salvar novamente.');
+      }
       return;
     }
     advanceCurrentMatch(1);
@@ -467,8 +483,10 @@ export default function MatchScreen() {
         </View>
 
         {isFinal ? (
-          <View style={{ marginBottom: 12 }}>
-            <GameButton label={savingResult ? 'SALVANDO RESULTADO...' : resultSaved ? 'VOLTAR À CARREIRA' : 'FIM DE JOGO · SALVAR RESULTADO'} icon="flag" onPress={handleMain} />
+          <View style={{ marginBottom: 12, gap: 8 }}>
+            {finishError ? <Text style={{ color: '#ffb4a2', fontSize: 13, textAlign: 'center' }}>{finishError}</Text> : null}
+            {resultSaved ? <Text style={{ color: '#79ef91', textAlign: 'center' }}>RESULTADO SALVO COM SUCESSO</Text> : null}
+            <GameButton label={savingResult ? 'SALVANDO RESULTADO...' : resultSaved ? 'VOLTAR À CARREIRA' : finishError ? 'TENTAR SALVAR NOVAMENTE' : 'FIM DE JOGO · SALVAR RESULTADO'} icon="flag" onPress={handleMain} />
           </View>
         ) : (
         <View style={styles.liveControls}>
