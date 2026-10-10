@@ -9,6 +9,7 @@ import {
   serializeCareer,
   startMatch,
   substitutePlayer,
+  setMatchTacticsPaused,
 } from './engine.ts';
 
 function assertResultSaved(career, expectedHomeGoals, expectedAwayGoals) {
@@ -47,6 +48,8 @@ test('seven consecutive Volta Redonda games retain results and advance the leagu
       const game = career.liveMatch;
       if (game.pausedForVar) {
         career = resolveVarReview(career);
+      } else if (game.pausedForTactics && !game.requiredSubstitutionPlayerId) {
+        career = setMatchTacticsPaused(career, false);
       } else if (game.requiredSubstitutionPlayerId) {
         const available = game.userBenchIds.find((id) =>
           career.players.some((player) => player.id === id && player.status === 'available')
