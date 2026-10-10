@@ -389,13 +389,23 @@ export function makeMarketPlayers(club: Club): Player[] {
   const pool = Array.from({ length: 28 }, (_, index) => {
     const seed = MARKET_SEED[index % MARKET_SEED.length]!;
     const source = sourceClubs[index % Math.max(1, sourceClubs.length)] ?? club;
+    // Jogadores listados no mercado devem realmente pertencer ao clube de
+    // origem (onde o ESPN confirma elenco). Não inventar superestrelas.
+    const realCandidates = REAL_ROSTERS_2026[source.id]
+      ? makeRoster(source).filter((p) => p.id.includes('-real-') && p.age >= 18 && p.age <= 36)
+      : [];
+    const sourcePlayer = realCandidates.length
+      ? realCandidates[(hash(club.id + ':' + source.id + ':' + index) >>> 0) % realCandidates.length]
+      : undefined;
     const strengthShift = Math.round((source.rating - club.rating) * 0.35);
-    const player = makePlayer(
-      { ...seed, name: seed.name + (index >= MARKET_SEED.length ? ' ' + (Math.floor(index / MARKET_SEED.length) + 1) : ''), skill: seed.skill + strengthShift },
-      `market-${club.id}-${source.id}-${index + 1}`,
-      source.rating,
-      index + 51,
-    );
+    const player = sourcePlayer
+      ? { ...sourcePlayer, id: `market-${club.id}-${source.id}-${sourcePlayer.id}` }
+      : makePlayer(
+          { ...seed, name: seed.name + (index >= MARKET_SEED.length ? ' ' + (Math.floor(index / MARKET_SEED.length) + 1) : ''), skill: seed.skill + strengthShift },
+          `market-${club.id}-${source.id}-${index + 1}`,
+          source.rating,
+          index + 51,
+        );
     return {
       ...player,
       nationality: source.country,
