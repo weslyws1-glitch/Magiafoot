@@ -3,9 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GameButton, GameHeader, Panel, Screen } from '@/components/ManagerUI';
+import { DailyAdvancePanel } from '@/components/DailyAdvancePanel';
 import { useCareer } from '@/context/CareerContext';
 import { getClub } from '@/game/data';
-import { fixtureDate, formatFixtureDate, getCareerDivision, getCurrentFixture, getLeagueRoundCount, seasonYear } from '@/game/engine';
+import { fixtureDate, formatFixtureDate, getCareerDate, getCareerDivision, getCurrentFixture, getLeagueRoundCount, seasonYear } from '@/game/engine';
 import type { Fixture, LeagueResult } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -100,6 +101,7 @@ export default function CalendarScreen() {
     <>
       <GameHeader title="Calendário" eyebrow={'TEMPORADA ' + year} />
       <Screen>
+        <DailyAdvancePanel />
         <Panel style={styles.calendarPanel}>
           <View style={styles.monthHeader}>
             <Pressable
@@ -140,6 +142,7 @@ export default function CalendarScreen() {
                   const isHome = fixture?.homeClubId === career.clubId;
                   const opponent = fixture ? getClub(isHome ? fixture.awayClubId : fixture.homeClubId) : undefined;
                   const isCurrent = fixture?.roundIndex === career.roundIndex;
+                  const isToday = getCareerDate(career) === year + '-' + String(visibleMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
                   const isSelected = fixture?.id === selectedFixtureId;
                   const outcome = result ? resultForUser(result, career.clubId) : undefined;
                   const backgroundColor = fixture ? (isHome ? HOME_COLOR : AWAY_COLOR) : EMPTY_COLOR;
@@ -155,6 +158,7 @@ export default function CalendarScreen() {
                         { backgroundColor },
                         fixture && styles.dayCellGame,
                         isCurrent && styles.dayCellCurrent,
+                        isToday && styles.dayCellToday,
                         isSelected && styles.dayCellSelected,
                       ]}
                     >
@@ -267,6 +271,7 @@ const styles = StyleSheet.create({
   dayCellBlank: { opacity: 0.22, backgroundColor: '#08140D', borderColor: '#14271B' },
   dayCellGame: { borderColor: 'rgba(255,255,255,0.28)' },
   dayCellCurrent: { borderWidth: 2, borderColor: '#FFFFFF' },
+  dayCellToday: { borderWidth: 2, borderColor: '#79ef91' },
   dayCellSelected: { transform: [{ scale: 0.97 }] },
   dayNumber: { color: '#D7E2DA', fontSize: 8.5, fontWeight: '900' },
   fixtureCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 26 },
