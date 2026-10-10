@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ClubBadge, GameButton, GameHeader, LoadingState, Panel, Screen } from '@/components/ManagerUI';
 import { useCareer } from '@/context/CareerContext';
 import { selectableClubs } from '@/game/data';
+import { REAL_ROSTERS_2026 } from '@/game/real-rosters-2026';
 import type { CurrencyCode } from '@/game/types';
 import { useColors } from '@/hooks/useColors';
 
@@ -218,6 +219,7 @@ export default function NewCareerScreen() {
               <Text style={styles.selectorLabel}>CLUBE</Text>
               <Text style={[styles.selectorValue, { color: colors.foreground }]}>{selectedClub?.name ?? 'Escolher clube'}</Text>
               {selectedClub ? <Text style={styles.selectorSub}>{selectedClub.city}</Text> : null}
+              {selectedClub ? <Text style={[styles.selectorSub, { color: REAL_ROSTERS_2026[selectedClub.id] ? '#79ef91' : '#e4b873' }]}>{REAL_ROSTERS_2026[selectedClub.id] ? REAL_ROSTERS_2026[selectedClub.id]!.length + ' JOGADORES REAIS · 2026' : 'ELENCO EM ATUALIZAÇÃO'}</Text> : null}
             </View>
             <Feather name={openSelector === 'club' ? 'chevron-up' : 'chevron-down'} size={20} color="#79ef91" />
           </Pressable>
@@ -238,6 +240,7 @@ export default function NewCareerScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.clubName, { color: colors.foreground }]}>{club.name}</Text>
                     <Text style={styles.clubMeta}>{club.city}</Text>
+                    <Text style={[styles.clubMeta, { color: REAL_ROSTERS_2026[club.id] ? '#79ef91' : '#e4b873' }]}>{REAL_ROSTERS_2026[club.id] ? REAL_ROSTERS_2026[club.id]!.length + ' atletas reais · 2026' : 'Elenco em atualização'}</Text>
                   </View>
                   {club.id === clubId ? <Feather name="check" size={17} color="#79ef91" /> : null}
                 </Pressable>
@@ -287,6 +290,12 @@ export default function NewCareerScreen() {
         ) : null}
 
         {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+
+        {selectedClub && REAL_ROSTERS_2026[selectedClub.id] ? (
+          <Text style={[styles.description, { color: colors.mutedForeground }]}>
+            Fonte: ESPN, temporada 2026. Posições específicas e notas são adaptadas ao jogo. Sua carreira já existente não será modificada.
+          </Text>
+        ) : null}
 
         <GameButton
           label={selectedClub ? `Começar no ${selectedClub.name}` : 'Criar carreira'}
