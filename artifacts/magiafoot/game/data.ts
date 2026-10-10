@@ -378,7 +378,7 @@ export function makeRoster(club: Club): Player[] {
 
 export function makeMarketPlayers(club: Club): Player[] {
   const sourceClubs = CLUBS
-    .filter((candidate) => candidate.selectable !== false && candidate.id !== club.id)
+    .filter((candidate) => candidate.selectable !== false && candidate.id !== club.id && REAL_ROSTERS_2026[candidate.id]?.length)
     .sort((a, b) => {
       const da = Math.abs(a.rating - club.rating);
       const db = Math.abs(b.rating - club.rating);
