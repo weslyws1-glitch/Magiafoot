@@ -311,6 +311,7 @@ export default function MatchScreen() {
   const injuredRequired = game.requiredSubstitutionPlayerId
     ? career.players.find((player) => player.id === game.requiredSubstitutionPlayerId)
     : undefined;
+  const eligibleCount = career.players.filter((player) => player.status === 'available').length;
   const unavailableStarters = game.phase === 'pregame'
     ? game.userLineup
         .map((slot) => career.players.find((player) => player.id === slot.playerId))
@@ -476,9 +477,15 @@ export default function MatchScreen() {
           </View>
         </View>
 
-        {game.phase === 'pregame' && unavailableStarters.length === 0 ? (
-          <View style={{ marginBottom: 12 }}>
-            <GameButton label="APITO INICIAL" icon="play" onPress={kickOff} />
+        {game.phase === 'pregame' ? (
+          <View style={{ marginBottom: 12, gap: 7 }}>
+            <GameButton
+              label={unavailableStarters.length ? 'APITO INICIAL · AJUSTAR TIME' : 'APITO INICIAL'}
+              icon="play"
+              onPress={kickOff}
+              disabled={eligibleCount < 11}
+            />
+            {eligibleCount < 11 ? <Text style={{ color: '#ffb4a2', textAlign: 'center' }}>São necessários 11 jogadores disponíveis para começar.</Text> : null}
           </View>
         ) : null}
 
@@ -569,6 +576,7 @@ export default function MatchScreen() {
               </Text>
             ))}
             {unavailableBench.length ? <Text style={styles.warningNote}>Há também {unavailableBench.length} jogador(es) indisponível(is) no banco.</Text> : null}
+            <Text style={styles.warningNote}>O Apito Inicial poderá substituir automaticamente os indisponíveis, sem apagar sua carreira.</Text>
             <GameButton label="IR PARA TÁTICAS" icon="layout" onPress={openTactics} />
           </Panel>
         ) : null}
