@@ -327,7 +327,7 @@ function assignSquadNumbers(players: Player[]): Player[] {
 
 function defaultPlayerSkills(player: Player) {
   const seed = hash('skills-' + player.id);
-  const jitter = (shift: number) => ((seed >> shift) % 9) - 4;
+  const jitter = (shift: number) => ((seed >>> shift) % 9) - 4;
   const base = player.strength;
   const clampSkill = (value: number) => clamp(Math.round(value), 20, 99);
   const goalkeeper = player.position === 'GOL';
@@ -765,8 +765,8 @@ function makeMatchReferee(game: MatchSession) {
   return {
     name: names[seed % names.length]!,
     strictness: 42 + (seed % 36),
-    advantage: 35 + ((seed >> 5) % 46),
-    varSensitivity: 45 + ((seed >> 9) % 41),
+    advantage: 35 + ((seed >>> 5) % 46),
+    varSensitivity: 45 + ((seed >>> 9) % 41),
   };
 }
 
@@ -1652,7 +1652,7 @@ function administrativeCandidate(career: Career, department: AdministrationDepar
   const seed = hash(`staff-${career.id}-${department}-${current}-${career.roundIndex}`);
   const quality = clamp(52 + (seed % 37), 50, 88);
   const salary = Math.round((18_000 + quality * 720) / 1000) * 1000;
-  const contractRounds = 8 + ((seed >> 3) % 13);
+  const contractRounds = 8 + ((seed >>> 3) % 13);
   const hireCost = Math.round((salary * (1.4 + quality / 115)) / 1000) * 1000;
   const fireCost = Math.round((salary * (0.7 + contractRounds / 30)) / 1000) * 1000;
   const roles = ADMIN_ROLES[department];
@@ -1660,7 +1660,7 @@ function administrativeCandidate(career: Career, department: AdministrationDepar
     id: `staff-${department}-${career.roundIndex}-${current}-${seed}`,
     name: ADMIN_NAMES[seed % ADMIN_NAMES.length]!,
     department,
-    role: roles[(seed >> 4) % roles.length]!,
+    role: roles[(seed >>> 4) % roles.length]!,
     quality,
     salary,
     hireCost,
@@ -1883,7 +1883,7 @@ export function refreshSponsorshipMarket(career: Career, force = false): Career 
     const strength = 0.72 + score / 100;
     const base = Math.round((80_000 + brand.prestige * 4_900) * slotFactor * strength);
     const durationMatches = score >= 75 ? 10 + ((seed + i) % 7) : 6 + ((seed + i) % 6);
-    const signingBonus = Math.round(base * (0.72 + ((seed >> (i + 1)) % 28) / 100));
+    const signingBonus = Math.round(base * (0.72 + ((seed >>> (i + 1)) % 28) / 100));
     const perMatch = Math.round(base * 0.17);
     const winBonus = Math.round(base * 0.065);
     const qualificationBonus = Math.round(base * 0.42);
@@ -2869,7 +2869,7 @@ export function negotiateTransferPurchase(
     ? 0.94 + Math.min(0.16, Math.max(0, seller.rating - (getClub(career.clubId)?.rating ?? 65)) * 0.008) + (seed % 7) / 100
     : 0.90 + (seed % 8) / 100;
   const minimumFee = Math.round(player.value * sellerPremium);
-  const wageFactor = 0.97 + ((seed >> 5) % 12) / 100;
+  const wageFactor = 0.97 + ((seed >>> 5) % 12) / 100;
   const minimumWage = Math.round(player.wage * wageFactor / 100) * 100;
   const minimumBonus = Math.max(player.wage * 2, Math.round((player.signingBonus ?? player.wage * 3) * 0.75));
 
@@ -3092,11 +3092,12 @@ function generatePlayerTransferOffers(career: Career): Career {
     const prefersLoan = player.marketStatus === 'emprestimo' || (player.age <= 22 && (seed % 3 === 0));
     const type: PlayerTransferOffer['type'] = prefersLoan ? 'loan' : 'sale';
     const interested = transferInterestClubs(career);
-    const clubName = interested.length ? interested[(seed >> 5) % interested.length]!.name : 'Clube interessado';
+    // Hash é um unsigned uint32: deslocamento aritmético (>>) cria índices negativos.
+    const clubName = interested.length ? interested[(seed >>> 5) % interested.length]!.name : 'Clube interessado';
     const amount = type === 'sale'
-      ? Math.round(player.value * (0.72 + ((seed >> 7) % 41) / 100))
-      : Math.round(player.value * (0.05 + ((seed >> 7) % 8) / 100));
-    const durationRounds = type === 'loan' ? 8 + ((seed >> 11) % 11) : 0;
+      ? Math.round(player.value * (0.72 + ((seed >>> 7) % 41) / 100))
+      : Math.round(player.value * (0.05 + ((seed >>> 7) % 8) / 100));
+    const durationRounds = type === 'loan' ? 8 + ((seed >>> 11) % 11) : 0;
 
     generated.push({
       id: 'offer-' + player.id + '-' + career.season + '-' + career.roundIndex,
