@@ -124,12 +124,13 @@ function PlayerRow({ player, careerRound, onPress }: { player: Player; careerRou
 export default function SquadScreen() {
   const router = useRouter();
   const {
-    career, chooseCaptain, transferPlayer, renewPlayer, updatePlayerMarketStatus,
+    career, chooseCaptain, recalibrateRoster, transferPlayer, renewPlayer, updatePlayerMarketStatus,
     updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes,
     acceptPlayerOffer, declinePlayerOffer,
   } = useCareer();
   const [tab, setTab] = useState<TabKey>('plantel');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showRatingConfirm, setShowRatingConfirm] = useState(false);
 
   if (!career) {
     return <><GameHeader title="Elenco" /><Screen><GameButton label="Criar carreira" onPress={() => router.push('/new-career')} /></Screen></>;
@@ -191,6 +192,16 @@ export default function SquadScreen() {
 
         {tab === 'plantel' ? (
           <>
+            {!career.rosterRebalanced2026 && !career.liveMatch
+              && career.players.some((p) => p.id.startsWith(career.clubId + '-real-')) ? (
+              <Panel style={{ gap: 8 }}>
+                <Text style={styles.kicker}>ELENCO REAL · TEMPORADA 2026</Text>
+                <Text style={{ color: '#d4e5d8', fontSize: 12, lineHeight: 18 }}>
+                  Recalibre forças e posições dos atletas reais já presentes na sua carreira, sem perder resultados, contratações, contratos e evolução de infraestrutura.
+                </Text>
+                <GameButton label="ATUALIZAR FORÇAS DESTA CARREIRA" icon="refresh-cw" onPress={() => setShowRatingConfirm(true)} />
+              </Panel>
+            ) : null}
             <View style={styles.summary}>
               <Panel style={styles.summaryMetric}><Text style={styles.metricLabel}>TITULARES</Text><Text style={styles.bigValue}>{groups.starters.length}</Text></Panel>
               <Panel style={styles.summaryMetric}><Text style={styles.metricLabel}>RESERVAS</Text><Text style={styles.bigValue}>{groups.bench.length + groups.reserves.length}</Text></Panel>
@@ -202,6 +213,31 @@ export default function SquadScreen() {
             </Panel>
           </>
         ) : null}
+
+        <Modal visible={showRatingConfirm} transparent animationType="fade" onRequestClose={() => setShowRatingConfirm(false)}>
+          <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', padding: 20 }}>
+            <Panel style={{ gap: 14 }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>Recalibrar atletas reais?</Text>
+              <Text style={{ color: '#c7d9c9', lineHeight: 20 }}>
+                A atualização será aplicada uma única vez aos atletas reais identificados desta carreira.
+                Suas contratações, vendas, resultados e contratos não serão apagados.
+                As notas são estimativas do MagiaFoot com base nas estatísticas de 2026.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  onPress={() => setShowRatingConfirm(false)}
+                  style={{ flex: 1, padding: 13, borderWidth: 1, borderColor: '#47614c', borderRadius: 10, alignItems: 'center' }}>
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>CANCELAR</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { recalibrateRoster(); setShowRatingConfirm(false); }}
+                  style={{ flex: 1, padding: 13, backgroundColor: '#247b4a', borderRadius: 10, alignItems: 'center' }}>
+                  <Text style={{ color: '#fff', fontWeight: '900' }}>CONFIRMAR</Text>
+                </Pressable>
+              </View>
+            </Panel>
+          </View>
+        </Modal>
 
         {tab === 'contratos' ? <SectionLabel title="Contratos que exigem atenção" /> : null}
         {tab === 'desempenho' ? <SectionLabel title="Desempenho na temporada" /> : null}
