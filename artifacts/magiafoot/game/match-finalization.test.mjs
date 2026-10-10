@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   advanceMatch,
+  advanceCareerToNextMatch,
   createCareer,
   finalizeMatch,
   parseCareer,
@@ -28,7 +29,7 @@ function assertResultSaved(career, expectedHomeGoals, expectedAwayGoals) {
 }
 
 test('Volta Redonda x Anápolis 0-0 ends and saves without transfer-market crash', () => {
-  let career = startMatch(createCareer('QA', 'volta-redonda'));
+  let career = startMatch(advanceCareerToNextMatch(createCareer('QA', 'volta-redonda')));
   assert.equal(career.liveMatch?.fixture.homeClubId, 'volta-redonda');
   assert.equal(career.liveMatch?.fixture.awayClubId, 'anapolis');
   career = {
@@ -42,7 +43,7 @@ test('Volta Redonda x Anápolis 0-0 ends and saves without transfer-market crash
 test('seven consecutive Volta Redonda games retain results and advance the league', () => {
   let career = createCareer('QA', 'volta-redonda');
   for (let round = 0; round < 7; round += 1) {
-    career = startMatch(career);
+    career = startMatch(advanceCareerToNextMatch(career));
     let attempts = 0;
     while (career.liveMatch?.phase !== 'finished' && attempts++ < 500) {
       const game = career.liveMatch;
