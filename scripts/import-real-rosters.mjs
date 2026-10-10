@@ -162,10 +162,19 @@ async function worker(){
     if(!id||!name||!['G','D','M','F'].includes(role)||unique.has(id))continue;
     unique.add(id);
     const age=Number(athlete.age),shirt=Number(athlete.jersey);
+    // Estatísticas da temporada real, em vez de atribuir nota alta a todos
+    // os atletas apenas pela reputação do clube.
+    const stats=Object.fromEntries((athlete.statistics?.splits?.categories||[])
+      .flatMap(category=>category.stats||[]).map(stat=>[stat.name,Number(stat.value)||0]));
+    const appearances=Math.max(0,Math.min(60,Math.round(stats.appearances||0)));
+    const starts=Math.max(0,Math.min(appearances,appearances-Math.max(0,stats.subIns||0)));
+    const goals=Math.max(0,Math.min(50,Math.round(stats.totalGoals||0)));
+    const assists=Math.max(0,Math.min(50,Math.round(stats.goalAssists||0)));
     players.push([name,role,
       Number.isFinite(age)&&age>=15&&age<=45?age:23,
       Number.isInteger(shirt)&&shirt>=1&&shirt<=99?shirt:0,
-      countries[athlete.citizenship]||clubById[clubId].countryCode]);
+      countries[athlete.citizenship]||clubById[clubId].countryCode,
+      appearances,starts,goals,assists,id]);
    }
    if(data.season?.year===2026&&players.length>=5)rosters[clubId]=players.slice(0,60);
    else omitted.push({id:clubId,reason:'Elenco 2026 com menos de 5 atletas confirmados',total:players.length});
@@ -173,6 +182,48 @@ async function worker(){
  }
 }
 await Promise.all(Array.from({length:12},()=>worker()));
+
+// Um mesmo atleta não pode pertencer a dois clubes simultaneamente. A ESPN
+// pode reter seu nome em dois elencos após uma transferência.
+const membership=new Map();
+for(const [clubId,players] of Object.entries(rosters)){
+ for(const player of players){
+  const id=String(player[9]);
+  if(!membership.has(id))membership.set(id,[]);
+  membership.get(id).push({clubId,player});
+ }
+}
+let duplicatedAthletes=0,removedWrongAssignments=0,verifiedTransfers=0;
+const conflicting=[...membership.entries()].filter(([,entries])=>entries.length>1);
+let collisionCursor=0;
+async function verifyCollision(){
+ while(collisionCursor<conflicting.length){
+  const [athleteId,entries]=conflicting[collisionCursor++];
+  duplicatedAthletes++;
+  let currentTeam=null;
+  try{
+   const league=matches[entries[0].clubId]?.league||'bra.1';
+   const details=await json('https://site.api.espn.com/apis/common/v3/sports/soccer/'+league+'/athletes/'+athleteId);
+   currentTeam=String(details.athlete?.team?.id||'');
+  }catch(error){ /* preserve the best-supported option below */ }
+  let selected=entries.find(e=>String(matches[e.clubId]?.teamId)===currentTeam);
+  if(selected)verifiedTransfers++;
+  else selected=[...entries].sort((a,b)=>
+    (b.player[6]||0)-(a.player[6]||0) ||
+    (b.player[5]||0)-(a.player[5]||0))[0];
+  for(const entry of entries){
+   if(entry===selected)continue;
+   rosters[entry.clubId]=rosters[entry.clubId].filter(p=>p[9]!==athleteId);
+   removedWrongAssignments++;
+  }
+ }
+}
+await Promise.all(Array.from({length:10},()=>verifyCollision()));
+// Remover a credencial do atleta de produção não é necessário; o ID ESPN
+// público é usado apenas para eliminar inscrições duplicadas.
+for(const [clubId,players] of Object.entries(rosters)){
+ if(players.length<5)delete rosters[clubId];
+}
 const ids=Object.keys(rosters).sort();
 if(ids.length<200)throw Error('Dados insuficientes: somente '+ids.length+' clubes. Snapshot antigo mantido.');
 const sorted=Object.fromEntries(ids.map(id=>[id,rosters[id]]));
@@ -180,13 +231,17 @@ const today=new Date().toISOString().slice(0,10);
 const output=[
  '// Arquivo gerado automaticamente em '+today+'.',
  '// Fonte: ESPN Soccer, temporada 2026. Posições G/D/M/F adaptadas pelo MagiaFoot.',
+ '// Campo adicional: jogos, titularidades, gols, assistências e ID ESPN para conciliar transferências.',
  '// Apenas nomes de jogadores retornados pela fonte, não há atletas inventados nesta base.',
- "export type RealRosterRecord = [name: string, role: 'G' | 'D' | 'M' | 'F', age: number, shirt: number, countryCode: string];",
+ "export type RealRosterRecord = [name: string, role: 'G' | 'D' | 'M' | 'F', age: number, shirt: number, countryCode: string, appearances?: number, starts?: number, goals?: number, assists?: number, espnId?: string];",
  'export const REAL_ROSTERS_2026: Record<string, RealRosterRecord[]> = '+JSON.stringify(sorted)+';',
  '',
 ].join('\n');
 const report={
  source:'ESPN Soccer',season:2026,generatedAt:new Date().toISOString(),
+ duplicateAthletesDetected:duplicatedAthletes,wrongClubEntriesRemoved:removedWrongAssignments,
+ duplicateAthletesVerifiedWithCurrentClub:verifiedTransfers,
+ strengthScale:'game-estimated from club level, appearances, starts, goals, assists and age',
  clubsTotal:CLUBS.length,clubsWithRealData:ids.length,
  realPlayers:ids.reduce((sum,id)=>sum+sorted[id].length,0),
  byDivision:Object.fromEntries([...new Set(CLUBS.map(c=>c.divisionId))].map(div=>[
