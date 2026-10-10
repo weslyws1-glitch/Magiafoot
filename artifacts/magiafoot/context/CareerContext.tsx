@@ -17,6 +17,7 @@ import {
   changeFormation,
   createCareer as makeCareer,
   finalizeMatch,
+  recalibrate2026CareerRoster,
   setCaptain,
   sellPlayer,
   setPlayerTrainingFocus,
@@ -99,6 +100,7 @@ interface CareerContextValue {
   setFormation: (formationId: FormationId) => void;
   movePlayer: (slotId: string, playerId: string) => void;
   chooseCaptain: (playerId: string) => void;
+  recalibrateRoster: () => void;
   setTactics: (tactics: Tactics) => void;
   closeCurrentMatch: () => boolean;
   finishAndSaveCurrentMatch: () => Promise<boolean>;
@@ -573,6 +575,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
   const setFormation = useCallback((formationId: FormationId) => update((current) => changeFormation(current, formationId)), [update]);
   const movePlayer = useCallback((slotId: string, playerId: string) => update((current) => assignPlayerToSlot(current, slotId, playerId)), [update]);
   const chooseCaptain = useCallback((playerId: string) => update((current) => setCaptain(current, playerId)), [update]);
+  const recalibrateRoster = useCallback(() => update(recalibrate2026CareerRoster), [update]);
   const setTactics = useCallback((tactics: Tactics) => update((current) => updateTactics(current, tactics)), [update]);
   const closeCurrentMatch = useCallback((): boolean => {
     // Finalizar fora do updater do React evita que um erro do motor derrube
@@ -817,6 +820,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     setFormation,
     movePlayer,
     chooseCaptain,
+    recalibrateRoster,
     setTactics,
     closeCurrentMatch,
     finishAndSaveCurrentMatch,
@@ -846,7 +850,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     acceptPlayerOffer,
     declinePlayerOffer,
   }), [
-    advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, finishAndSaveCurrentMatch, createNewCareer,
+    advanceCurrentMatch, career, chooseCaptain, recalibrateRoster, closeCurrentMatch, finishAndSaveCurrentMatch, createNewCareer,
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
     setTactics, signPlayer, negotiateMarketPlayer, startCurrentMatch, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
