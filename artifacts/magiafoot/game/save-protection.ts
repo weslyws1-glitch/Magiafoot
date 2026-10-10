@@ -308,6 +308,25 @@ export async function loadProtectedCareer(): Promise<ProtectedLoadResult> {
   };
 }
 
+/** Limpa apenas a carreira excluída deste aparelho; preserva contas, identidade e outros saves. */
+export async function deleteLocalCareerData(careerId: string): Promise<void> {
+  const raw = await AsyncStorage.getItem(PRIMARY_KEY);
+  if (parseEnvelope(raw)?.careerId === careerId) {
+    await AsyncStorage.removeItem(PRIMARY_KEY);
+  }
+  const backups = await readBackups();
+  const remaining = backups.filter((item) => item.careerId !== careerId);
+  if (remaining.length !== backups.length) {
+    if (remaining.length) await AsyncStorage.setItem(BACKUPS_KEY, JSON.stringify(remaining));
+    else await AsyncStorage.removeItem(BACKUPS_KEY);
+  }
+  const legacy = await AsyncStorage.getItem(LEGACY_KEY);
+  const legacyCareer = legacy ? parseCareer(legacy) : null;
+  if (legacyCareer?.id === careerId) {
+    await AsyncStorage.removeItem(LEGACY_KEY);
+  }
+}
+
 export async function getBackupCount() {
   return (await readBackups()).length;
 }
