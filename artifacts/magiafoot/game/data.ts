@@ -231,6 +231,65 @@ const COUNTRY_BY_ISO: Record<string, string> = {
   IT:'Itália',JP:'Japão',US:'Estados Unidos',
 };
 
+/** Ajustes específicos para posições que a ESPN fornece apenas como D/M/F.
+ * A fonte publica categorias amplas, enquanto o MagiaFoot simula laterais,
+ * volantes, meias e pontas separadamente.
+ */
+const REAL_ROLE_OVERRIDES: Record<string, Record<string, Position>> = {
+  flamengo: {
+    'Alex Sandro':'LE','Guillermo Varela':'LD','Emerson Royal':'LD',
+    'Léo Ortiz':'ZAG','Danilo':'ZAG','Jorginho':'VOL',
+    'Giorgian de Arrascaeta':'MEI','Samuel Lino':'PE',
+    'Bruno Henrique':'PE','Pedro':'ATA','Everton':'PE',
+  },
+  palmeiras: {
+    'Jefté':'LE','Joaquín Piquerez':'LE','Gustavo Gómez':'ZAG',
+    'Khellven':'LD','Raphael Veiga':'MEI','Maurício':'MEI',
+    'José Manuel López':'ATA','Vitor Roque':'ATA','Paulinho':'PE',
+    'Andreas Pereira':'MC',
+  },
+  corinthians: {
+    'Memphis Depay':'ATA','Yuri Alberto':'ATA',
+    'Rodrigo Garro':'MEI','André Carrillo':'MC',
+    'Fabrizio Angileri':'LE','Gustavo Henrique':'ZAG',
+  },
+  'botafogo-rj': {
+    'Alexander Barboza':'ZAG','Vitinho':'LD','Alex Telles':'LE',
+    'Marlon Freitas':'VOL','Savarino':'PD',
+  },
+  vasco: {
+    'Lucas Piton':'LE','Léo Jardim':'GOL','Robert Renan':'ZAG',
+    'Tchê Tchê':'VOL','Facundo Colidio':'ATA',
+  },
+  fluminense: {
+    'Fábio':'GOL','Thiago Silva':'ZAG','Samuel Xavier':'LD',
+    'Ganso':'MEI','Martinelli':'VOL',
+  },
+};
+
+function verifiedPlayerStrength(
+  clubRating: number,
+  age: number,
+  role: 'G' | 'D' | 'M' | 'F',
+  name: string,
+  appearances: number,
+  starts: number,
+  goals: number,
+  assists: number,
+): number {
+  // Notas estimadas para o simulador, não ratings oficiais.
+  // Participação comprovada importa mais que o rating do escudo.
+  const minutesProxy = Math.min(35, Math.max(0, appearances));
+  const regularity = 19 * Math.sqrt(minutesProxy / 28);
+  const starterShare = appearances > 0 ? Math.max(0, Math.min(1, starts / appearances)) : 0;
+  const titularity = appearances >= 8 ? (starterShare - 0.42) * 4 : 0;
+  const production = Math.min(4.5, ((Math.max(0, goals) * 1.4 + Math.max(0, assists)) / Math.max(12, appearances)) * (role === 'G' || role === 'D' ? 3.2 : 5));
+  const youthPenalty = age <= 18 && appearances < 8 ? 6 : age <= 20 && appearances < 5 ? 4 : age <= 22 && appearances < 4 ? 2 : 0;
+  const roleExperience = role === 'G' && age >= 32 && appearances >= 15 ? 1 : 0;
+  const stableVariation = (hash(name) % 5) - 2;
+  return clamp(Math.round(clubRating - 21 + regularity + titularity + production + roleExperience - youthPenalty + stableVariation), 43, 91);
+}
+
 export function makeRoster(club: Club): Player[] {
   const verified = REAL_ROSTERS_2026[club.id];
   if (!verified?.length) {
@@ -244,17 +303,25 @@ export function makeRoster(club: Club): Player[] {
     }));
   }
   const counters = { G:0, D:0, M:0, F:0 };
-  const real = verified.map(([name, role, age, shirt, nationalityCode], index) => {
+  const real = verified.map(([name, role, age, shirt, nationalityCode, appearances, starts, goals, assists, espnId], index) => {
     const list = REAL_POSITION_ROTATION[role];
-    const position = list[counters[role]++ % list.length]!;
-    const variation = (hash(club.id + ':' + name) % 7) - 3;
+    const position = REAL_ROLE_OVERRIDES[club.id]?.[name] ?? list[counters[role]++ % list.length]!;
     const player = makePlayer(
-      { name, age, position, skill: variation },
-      `${club.id}-real-${index + 1}`,
+      { name, age, position, skill: 0 },
+      `${club.id}-real-${espnId || index + 1}`,
       club.rating, index,
     );
+    // O antigo motor dava 88 a um goleiro reserva de 17 anos só porque
+    // ele estava inscrito no Flamengo. Separar desempenho de reputação.
+    const strength = typeof appearances === 'number'
+      ? verifiedPlayerStrength(club.rating, age, role, name, appearances, starts ?? 0, goals ?? 0, assists ?? 0)
+      : clamp(club.rating - 9 + ((hash(name) % 7) - 3), 43, 82);
+    const ageCurve = Math.max(0.45, 1 - Math.abs(age - 25) * 0.025);
     return {
       ...player,
+      strength,
+      value: Math.round(strength * strength * 220 * ageCurve / 10_000) * 10_000,
+      wage: Math.round((strength * 130 + Math.max(0, age - 29) * 300) / 100) * 100,
       nationality: COUNTRY_BY_ISO[nationalityCode] ?? club.country,
       nationalityCode,
       currentClubId: club.id,
