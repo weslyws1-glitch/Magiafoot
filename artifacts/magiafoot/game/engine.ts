@@ -677,8 +677,23 @@ export function startMatch(career: Career): Career {
   if (!club) return career;
 
   const recoveredPlayers = recoverBetweenRounds(career.players, career.roundIndex, career.trainingCenterUpgrades?.physio ?? 1, career.trainingCenterUpgrades?.gym ?? 1);
-  const lineup = career.lineup.map((slot) => ({ ...slot }));
-  const benchIds = career.benchIds.filter((id) => !lineup.some((slot) => slot.playerId === id)).slice(0, 7);
+  const eligiblePlayers = recoveredPlayers.filter((player) => player.status === 'available');
+  const eligibleIds = new Set(eligiblePlayers.map((player) => player.id));
+  // Não bloqueie o apito inicial por um atleta machucado/suspenso que ficou
+  // convocado na rodada anterior: atualize apenas as vagas indisponíveis.
+  const chosenLineup = career.lineup.map((slot) => ({ ...slot }));
+  const startingIds = chosenLineup.map((slot) => slot.playerId);
+  const validLineup = startingIds.length === 11
+    && new Set(startingIds).size === 11
+    && startingIds.every((id) => eligibleIds.has(id));
+  const lineup = validLineup ? chosenLineup : buildBestLineup(eligiblePlayers, career.formationId);
+  if (lineup.length !== 11 || new Set(lineup.map((slot) => slot.playerId)).size !== 11) return career;
+  const playingIds = new Set(lineup.map((slot) => slot.playerId));
+  // O banco não pode travar o começo da partida.
+  const benchIds = [
+    ...career.benchIds.filter((id) => eligibleIds.has(id) && !playingIds.has(id)),
+    ...buildBench(eligiblePlayers, lineup).filter((id) => !playingIds.has(id)),
+  ].filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 7);
   const game: MatchSession = {
     fixture,
     userClubId: career.clubId,
