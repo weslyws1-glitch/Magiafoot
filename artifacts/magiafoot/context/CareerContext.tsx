@@ -99,6 +99,7 @@ interface CareerContextValue {
   chooseCaptain: (playerId: string) => void;
   setTactics: (tactics: Tactics) => void;
   closeCurrentMatch: () => boolean;
+  finishAndSaveCurrentMatch: () => Promise<boolean>;
   signPlayer: (playerId: string) => boolean;
   negotiateMarketPlayer: (
     playerId: string,
@@ -207,6 +208,9 @@ export function CareerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isReady || !career || !identity) return;
+    // O relógio pode avançar 13 vezes por segundo em 3x. Não enfileirar uma
+    // gravação completa a cada minuto: isso bloqueia o salvamento do apito final.
+    if (career.liveMatch && career.liveMatch.phase !== 'finished' && career.liveMatch.minute % 5 !== 0) return;
     const snapshot = career;
     const nextRevision = revisionRef.current + 1;
     revisionRef.current = nextRevision;
@@ -528,6 +532,48 @@ export function CareerProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }, [career]);
+  const finishAndSaveCurrentMatch = useCallback(async (): Promise<boolean> => {
+    if (!career || !identity) return false;
+    let snapshot: Career;
+    try {
+      if (career.liveMatch?.phase === 'finished') {
+        snapshot = finalizeMatch(career);
+        if (snapshot === career || snapshot.liveMatch) return false;
+      } else if (!career.liveMatch && career.lastResult) {
+        // Já encerrou a partida, mas a persistência pode ter falhado: salvar
+        // novamente sem processar a rodada duas vezes.
+        snapshot = career;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error('[MagiaFoot] Não foi possível finalizar a partida:', error);
+      return false;
+    }
+
+    const revision = revisionRef.current + 1;
+    revisionRef.current = revision;
+    // Um único comando salva o resultado completo. A nuvem sincronizará pelo
+    // mecanismo existente, sem bloquear o usuário por problemas de rede.
+    setCareer(snapshot);
+    let persisted = false;
+    saveQueue.current = saveQueue.current
+      .then(async () => {
+        const saved = await persistProtectedCareer(snapshot, identity, revision, 'manual');
+        persisted = true;
+        setLastSavedAt(saved.savedAt);
+        setSaveHealth('healthy');
+        try { setBackupCount(await getBackupCount()); } catch { /* o save principal já foi escrito */ }
+      })
+      .catch((error) => {
+        console.error('[MagiaFoot] Falha ao gravar resultado:', error);
+        setStorageWarning(true);
+        setSaveHealth('corrupt');
+      });
+    await saveQueue.current;
+    return persisted;
+  }, [career, identity]);
+
   const signPlayer = useCallback((playerId: string) => {
     if (!career) return false;
     const next = addTransferPlayer(career, playerId);
@@ -716,6 +762,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     chooseCaptain,
     setTactics,
     closeCurrentMatch,
+    finishAndSaveCurrentMatch,
     signPlayer,
     negotiateMarketPlayer,
     transferPlayer,
@@ -742,7 +789,7 @@ export function CareerProvider({ children }: { children: ReactNode }) {
     acceptPlayerOffer,
     declinePlayerOffer,
   }), [
-    advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, createNewCareer,
+    advanceCurrentMatch, career, chooseCaptain, closeCurrentMatch, finishAndSaveCurrentMatch, createNewCareer,
     expandStadium, upgradeStadiumItem, updateTicketPrice, upgradeHeadquartersItem, updateHeadquartersRevenuePricing, updateHeadquartersImageAcquisition, updateHeadquartersInvestment, refreshSponsors, acceptSponsor, declineSponsor, negotiateSponsor, renewSponsor, hireAdminProfessional, fireAdminProfessional, upgradeTrainingCenterItem, renewPlayer, updatePlayerMarketStatus, updatePlayerSquadRole, updatePlayerTrainingFocus, promiseMinutes, acceptPlayerOffer, declinePlayerOffer, isReady, makeSubstitution, swapBenchPlayer, pauseMatchForTactics, resumeMatchFromTactics, resolveVAR, chooseSetPieceTaker, movePlayer, setFormation,
     setTactics, signPlayer, negotiateMarketPlayer, startCurrentMatch, storageWarning, transferPlayer,
     identity, saveHealth, lastSavedAt, backupCount, manualSave,
